@@ -1784,6 +1784,59 @@ function MaestroConsoleInner() {
 		handleOpenFileTab,
 	});
 
+	// --- REMOTE EVENT LISTENERS (from useRemoteIntegration CustomEvents) ---
+
+	// Handle remote open file tab events from CLI/web interface
+	useEffect(() => {
+		const handler = async (e: Event) => {
+			const { sessionId, filePath } = (e as CustomEvent).detail;
+			// Switch to the target session
+			setActiveSessionId(sessionId);
+			try {
+				const [content, stat] = await Promise.all([
+					window.maestro.fs.readFile(filePath),
+					window.maestro.fs.stat(filePath).catch(() => null),
+				]);
+				if (content !== null) {
+					const filename = filePath.split('/').pop() || filePath;
+					const lastModified = stat?.modifiedAt
+						? new Date(stat.modifiedAt).getTime()
+						: undefined;
+					handleOpenFileTab({
+						path: filePath,
+						name: filename,
+						content,
+						lastModified,
+					});
+				}
+			} catch (error) {
+				console.error('[Remote] Failed to open file tab:', error);
+			}
+		};
+		window.addEventListener('maestro:openFileTab', handler);
+		return () => window.removeEventListener('maestro:openFileTab', handler);
+	}, [handleOpenFileTab, setActiveSessionId]);
+
+	// Handle remote refresh file tree events from CLI/web interface
+	useEffect(() => {
+		const handler = (e: Event) => {
+			const { sessionId } = (e as CustomEvent).detail;
+			refreshFileTree(sessionId);
+		};
+		window.addEventListener('maestro:refreshFileTree', handler);
+		return () => window.removeEventListener('maestro:refreshFileTree', handler);
+	}, [refreshFileTree]);
+
+	// Handle remote refresh auto-run docs events from CLI/web interface
+	useEffect(() => {
+		const handler = (e: Event) => {
+			// handleAutoRunRefresh refreshes for the currently active session
+			handleAutoRunRefresh();
+		};
+		window.addEventListener('maestro:refreshAutoRunDocs', handler);
+		return () => window.removeEventListener('maestro:refreshAutoRunDocs', handler);
+	}, [handleAutoRunRefresh]);
+
 	// --- GROUP MANAGEMENT ---
 	// Extracted hook for group CRUD operations (toggle, rename, create, drag-drop)
 	const {
