@@ -17,6 +17,7 @@ import { openFile } from './commands/open-file';
 import { refreshFiles } from './commands/refresh-files';
 import { refreshAutoRun } from './commands/refresh-auto-run';
 import { status } from './commands/status';
+import { autoRun } from './commands/auto-run';
 
 // Read version from package.json at runtime
 function getVersion(): string {
@@ -135,6 +136,19 @@ program
 	.description('Refresh Auto Run documents in the Maestro desktop app')
 	.option('-s, --session <id>', 'Target session (defaults to active)')
 	.action(refreshAutoRun);
+
+// Auto-run command - configure and optionally launch an auto-run session
+program
+	.command('auto-run <docs...>')
+	.description('Configure and optionally launch an auto-run with documents')
+	.option('-s, --session <id>', 'Target session (defaults to active)')
+	.option('-p, --prompt <text>', 'Custom prompt for the auto-run')
+	.option('--loop', 'Enable looping')
+	.option('--max-loops <n>', 'Maximum loop count (implies --loop)')
+	.option('--save-as <name>', 'Save as a playbook with this name (don\'t launch)')
+	.option('--launch', 'Start the auto-run immediately (default: just configure)')
+	.option('--reset-on-completion', 'Enable reset-on-completion for all documents')
+	.action(autoRun);
 
 // Status command - check if Maestro desktop app is running and reachable
 program
