@@ -64,6 +64,7 @@ import type {
 	ToggleBookmarkCallback,
 	OpenFileTabCallback,
 	RefreshFileTreeCallback,
+	RefreshAutoRunDocsCallback,
 	GetThemeCallback,
 	GetCustomCommandsCallback,
 	GetHistoryCallback,
@@ -316,6 +317,10 @@ export class WebServer {
 		this.callbackRegistry.setRefreshFileTreeCallback(callback);
 	}
 
+	setRefreshAutoRunDocsCallback(callback: RefreshAutoRunDocsCallback): void {
+		this.callbackRegistry.setRefreshAutoRunDocsCallback(callback);
+	}
+
 	setGetHistoryCallback(callback: GetHistoryCallback): void {
 		this.callbackRegistry.setGetHistoryCallback(callback);
 	}
@@ -470,6 +475,8 @@ export class WebServer {
 				this.callbackRegistry.openFileTab(sessionId, filePath),
 			refreshFileTree: async (sessionId: string) =>
 				this.callbackRegistry.refreshFileTree(sessionId),
+			refreshAutoRunDocs: async (sessionId: string) =>
+				this.callbackRegistry.refreshAutoRunDocs(sessionId),
 			getSessions: () => this.callbackRegistry.getSessions(),
 			getLiveSessionInfo: (sessionId: string) =>
 				this.liveSessionManager.getLiveSessionInfo(sessionId),
