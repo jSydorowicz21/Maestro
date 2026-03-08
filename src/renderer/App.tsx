@@ -1769,13 +1769,16 @@ function MaestroConsoleInner() {
 				if (content !== null) {
 					const filename = filePath.split(/[\\/]/).pop() || filePath;
 					const lastModified = stat?.modifiedAt ? new Date(stat.modifiedAt).getTime() : undefined;
-					handleOpenFileTab({
-						path: filePath,
-						name: filename,
-						content,
-						lastModified,
-						sshRemoteId,
-					});
+					handleOpenFileTab(
+						{
+							path: filePath,
+							name: filename,
+							content,
+							lastModified,
+							sshRemoteId,
+						},
+						{ targetSessionId: sessionId }
+					);
 				}
 			} catch (error) {
 				console.error('[Remote] Failed to open file tab:', error);
@@ -1857,15 +1860,25 @@ function MaestroConsoleInner() {
 						return;
 					}
 
+					const documents = (config.documents || []).map(
+						(doc: { filename: string; resetOnCompletion?: boolean }) => ({
+							id: generateId(),
+							filename: doc.filename.replace(/\.md$/, ''),
+							resetOnCompletion: doc.resetOnCompletion || false,
+							isDuplicate: false,
+						})
+					);
+
+					if (documents.length === 0) {
+						window.maestro.process.sendRemoteConfigureAutoRunResponse(responseChannel, {
+							success: false,
+							error: 'No documents provided for auto-run',
+						});
+						return;
+					}
+
 					const batchConfig = {
-						documents: (config.documents || []).map(
-							(doc: { filename: string; resetOnCompletion?: boolean }) => ({
-								id: generateId(),
-								filename: doc.filename.replace(/\.md$/, ''),
-								resetOnCompletion: doc.resetOnCompletion || false,
-								isDuplicate: false,
-							})
-						),
+						documents,
 						prompt: config.prompt || '',
 						loopEnabled: config.loopEnabled || false,
 						maxLoops: config.maxLoops,
