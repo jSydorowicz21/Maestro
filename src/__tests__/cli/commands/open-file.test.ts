@@ -23,6 +23,17 @@ vi.mock('../../../cli/services/maestro-client', () => ({
 	resolveSessionId: vi.fn(),
 }));
 
+// Mock storage (used for resolving relative paths against agent's cwd)
+vi.mock('../../../cli/services/storage', () => ({
+	getSessionById: vi.fn().mockReturnValue({
+		id: 'session-123',
+		name: 'Test Agent',
+		toolType: 'claude-code',
+		cwd: '/home/user/project',
+		projectRoot: '/home/user/project',
+	}),
+}));
+
 import { openFile } from '../../../cli/commands/open-file';
 import { withMaestroClient, resolveSessionId } from '../../../cli/services/maestro-client';
 import { existsSync } from 'fs';

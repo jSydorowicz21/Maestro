@@ -1899,12 +1899,23 @@ function MaestroConsoleInner() {
 					}
 
 					const documents = (config.documents || []).map(
-						(doc: { filename: string; resetOnCompletion?: boolean }) => ({
-							id: generateId(),
-							filename: doc.filename.replace(/\.md$/, ''),
-							resetOnCompletion: doc.resetOnCompletion || false,
-							isDuplicate: false,
-						})
+						(doc: { filename: string; resetOnCompletion?: boolean }) => {
+							// Extract just the basename without .md extension.
+							// CLI sends full absolute paths (e.g., "/path/to/Auto Run Docs/temp.md")
+							// but the batch processor expects just the stem (e.g., "temp").
+							let name = doc.filename;
+							const lastSlash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
+							if (lastSlash >= 0) {
+								name = name.substring(lastSlash + 1);
+							}
+							name = name.replace(/\.md$/, '');
+							return {
+								id: generateId(),
+								filename: name,
+								resetOnCompletion: doc.resetOnCompletion || false,
+								isDuplicate: false,
+							};
+						}
 					);
 
 					if (documents.length === 0) {
@@ -1922,17 +1933,14 @@ function MaestroConsoleInner() {
 						maxLoops: config.maxLoops,
 					};
 
-					try {
-						await startBatchRun(sessionId, batchConfig, folderPath);
-						window.maestro.process.sendRemoteConfigureAutoRunResponse(responseChannel, {
-							success: true,
-						});
-					} catch (err) {
-						window.maestro.process.sendRemoteConfigureAutoRunResponse(responseChannel, {
-							success: false,
-							error: err instanceof Error ? err.message : String(err),
-						});
-					}
+					// Send success response immediately — startBatchRun is long-running
+					// and would exceed the IPC/CLI timeout if awaited.
+					window.maestro.process.sendRemoteConfigureAutoRunResponse(responseChannel, {
+						success: true,
+					});
+					startBatchRun(sessionId, batchConfig, folderPath).catch((err) => {
+						console.error('[Remote] Failed to start auto-run:', err);
+					});
 					return;
 				}
 

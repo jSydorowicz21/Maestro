@@ -576,8 +576,9 @@ describe('WebSocketMessageHandler', () => {
 			});
 
 			const response = JSON.parse((client.socket.send as any).mock.calls[0][0]);
-			expect(response.type).toBe('error');
-			expect(response.message).toContain('Missing sessionId or filePath');
+			expect(response.type).toBe('open_file_tab_result');
+			expect(response.success).toBe(false);
+			expect(response.error).toContain('Missing sessionId or filePath');
 			expect(callbacks.openFileTab).not.toHaveBeenCalled();
 		});
 
@@ -588,8 +589,9 @@ describe('WebSocketMessageHandler', () => {
 			});
 
 			const response = JSON.parse((client.socket.send as any).mock.calls[0][0]);
-			expect(response.type).toBe('error');
-			expect(response.message).toContain('Missing sessionId or filePath');
+			expect(response.type).toBe('open_file_tab_result');
+			expect(response.success).toBe(false);
+			expect(response.error).toContain('Missing sessionId or filePath');
 			expect(callbacks.openFileTab).not.toHaveBeenCalled();
 		});
 
@@ -605,8 +607,9 @@ describe('WebSocketMessageHandler', () => {
 			await vi.waitFor(() => {
 				const calls = (client.socket.send as any).mock.calls;
 				const lastResponse = JSON.parse(calls[calls.length - 1][0]);
-				expect(lastResponse.type).toBe('error');
-				expect(lastResponse.message).toContain('File not found');
+				expect(lastResponse.type).toBe('open_file_tab_result');
+				expect(lastResponse.success).toBe(false);
+				expect(lastResponse.error).toContain('File not found');
 			});
 		});
 
@@ -618,8 +621,9 @@ describe('WebSocketMessageHandler', () => {
 			});
 
 			const response = JSON.parse((client.socket.send as any).mock.calls[0][0]);
-			expect(response.type).toBe('error');
-			expect(response.message).toContain('Invalid file path');
+			expect(response.type).toBe('open_file_tab_result');
+			expect(response.success).toBe(false);
+			expect(response.error).toContain('Invalid file path');
 			expect(callbacks.openFileTab).not.toHaveBeenCalled();
 		});
 	});

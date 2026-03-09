@@ -890,8 +890,19 @@ export class WebSocketMessageHandler {
 			LOG_CONTEXT
 		);
 
+		// Helper to send typed error responses with requestId (prevents client timeouts)
+		const sendErrorResult = (error: string) => {
+			this.send(client, {
+				type: 'open_file_tab_result',
+				success: false,
+				error,
+				sessionId,
+				requestId: message.requestId,
+			});
+		};
+
 		if (!sessionId || !filePath) {
-			this.sendError(client, 'Missing sessionId or filePath');
+			sendErrorResult('Missing sessionId or filePath');
 			return;
 		}
 
@@ -899,18 +910,18 @@ export class WebSocketMessageHandler {
 		const sessions = this.callbacks.getSessions?.();
 		const session = sessions?.find((s) => s.id === sessionId);
 		if (!session?.cwd) {
-			this.sendError(client, 'Session not found or has no working directory');
+			sendErrorResult('Session not found or has no working directory');
 			return;
 		}
 		const sessionRoot = path.resolve(session.cwd);
 		const resolved = path.resolve(sessionRoot, filePath);
 		if (!resolved.startsWith(sessionRoot + path.sep) && resolved !== sessionRoot) {
-			this.sendError(client, 'Invalid file path');
+			sendErrorResult('Invalid file path: path is outside the agent working directory');
 			return;
 		}
 
 		if (!this.callbacks.openFileTab) {
-			this.sendError(client, 'File tab opening not configured');
+			sendErrorResult('File tab opening not configured');
 			return;
 		}
 
@@ -926,7 +937,7 @@ export class WebSocketMessageHandler {
 				});
 			})
 			.catch((error) => {
-				this.sendError(client, `Failed to open file tab: ${error.message}`);
+				sendErrorResult(`Failed to open file tab: ${error.message}`);
 			});
 	}
 

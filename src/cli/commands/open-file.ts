@@ -9,14 +9,25 @@ interface OpenFileOptions {
 }
 
 export async function openFile(filePath: string, options: OpenFileOptions): Promise<void> {
-	const absolutePath = path.resolve(filePath);
+	const sessionId = resolveSessionId(options);
+
+	// Resolve relative paths against the agent's working directory, not the CLI's cwd.
+	// This allows `open-file README.md -s <id>` to open files from the agent's project.
+	let absolutePath: string;
+	if (path.isAbsolute(filePath)) {
+		absolutePath = filePath;
+	} else {
+		// Try agent's cwd first by reading session info
+		const { getSessionById } = await import('../services/storage');
+		const session = getSessionById(sessionId);
+		const basePath = session?.cwd || process.cwd();
+		absolutePath = path.resolve(basePath, filePath);
+	}
 
 	if (!fs.existsSync(absolutePath)) {
 		console.error(`Error: File not found: ${absolutePath}`);
 		process.exit(1);
 	}
-
-	const sessionId = resolveSessionId(options);
 
 	try {
 		const result = await withMaestroClient(async (client) => {
