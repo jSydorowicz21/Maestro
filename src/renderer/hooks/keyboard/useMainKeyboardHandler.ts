@@ -557,8 +557,7 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				}
 			}
 
-			// Font size shortcuts: Cmd+= (zoom in), Cmd+- (zoom out), Cmd+0 (reset)
-			// These take priority over tab shortcuts (Cmd+0 was previously goToLastTab)
+			// Font size shortcuts: Cmd+= (zoom in), Cmd+- (zoom out), Cmd+Shift+0 (reset)
 			if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
 				if (e.key === '=' || e.key === '+') {
 					e.preventDefault();
@@ -576,13 +575,14 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 					trackShortcut('fontSizeDecrease');
 					return;
 				}
-				if (e.key === '0') {
-					e.preventDefault();
-					const { fontSize, setFontSize } = useSettingsStore.getState();
-					if (fontSize !== FONT_SIZE_DEFAULT) setFontSize(FONT_SIZE_DEFAULT);
-					trackShortcut('fontSizeReset');
-					return;
-				}
+			}
+			// Cmd+Shift+0: Reset font size (Cmd+0 is reserved for "Go to Last Tab")
+			if (ctx.isShortcut(e, 'fontSizeReset')) {
+				e.preventDefault();
+				const { fontSize, setFontSize } = useSettingsStore.getState();
+				if (fontSize !== FONT_SIZE_DEFAULT) setFontSize(FONT_SIZE_DEFAULT);
+				trackShortcut('fontSizeReset');
+				return;
 			}
 
 			// Tab shortcuts (AI mode only, requires an explicitly selected session, disabled in group chat view)
