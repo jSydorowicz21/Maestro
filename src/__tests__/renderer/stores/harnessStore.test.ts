@@ -280,19 +280,37 @@ describe('harnessStore', () => {
 			});
 		});
 
-		it('does not re-add interaction on IPC failure', async () => {
-			mockRespondToInteraction.mockRejectedValueOnce(new Error('IPC failed'));
+		it('removes interaction only after IPC success', async () => {
 			const request = createToolApproval({ interactionId: 'int-1' });
 			useHarnessStore.getState().addInteraction('session-1', request);
 
-			// Should not throw
+			// Verify interaction exists before response
+			expect(useHarnessStore.getState().pendingInteractions['session-1']).toHaveLength(1);
+
 			await useHarnessStore.getState().respondToInteraction('session-1', 'int-1', {
 				kind: 'approve',
 			});
 
-			// Interaction should still be removed (optimistic removal)
+			// Interaction removed after successful IPC
+			expect(useHarnessStore.getState().pendingInteractions['session-1'] || []).toHaveLength(0);
+		});
+
+		it('keeps interaction pending on IPC failure so user can retry', async () => {
+			mockRespondToInteraction.mockRejectedValueOnce(new Error('IPC failed'));
+			const request = createToolApproval({ interactionId: 'int-1' });
+			useHarnessStore.getState().addInteraction('session-1', request);
+
+			// Should throw on IPC failure
+			await expect(
+				useHarnessStore.getState().respondToInteraction('session-1', 'int-1', {
+					kind: 'approve',
+				})
+			).rejects.toThrow('IPC failed');
+
+			// Interaction should still be pending for retry
 			const state = useHarnessStore.getState();
-			expect(state.pendingInteractions['session-1'] || []).toHaveLength(0);
+			expect(state.pendingInteractions['session-1']).toHaveLength(1);
+			expect(state.pendingInteractions['session-1'][0].interactionId).toBe('int-1');
 		});
 	});
 

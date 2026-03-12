@@ -198,18 +198,18 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
 	},
 
 	respondToInteraction: async (sessionId, interactionId, response) => {
-		// Remove from pending state immediately (optimistic)
-		get().removeInteraction(sessionId, interactionId);
-
-		// Dispatch response to main process via IPC
+		// Dispatch response to main process via IPC first.
+		// Only remove from pending state on success so the user can retry on failure.
 		try {
 			await window.maestro.process.respondToInteraction(sessionId, interactionId, response);
+			get().removeInteraction(sessionId, interactionId);
 		} catch (err) {
 			console.error(
 				`[harnessStore] Failed to respond to interaction ${interactionId}:`,
 				err
 			);
-			// Don't re-add — the harness will timeout and handle cleanup
+			// Interaction stays pending — the user can retry
+			throw err;
 		}
 	},
 

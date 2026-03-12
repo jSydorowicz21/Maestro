@@ -104,7 +104,8 @@ export const InteractionRequestModal = memo(function InteractionRequestModal({
 	const handleRespond = useCallback(
 		(response: InteractionResponse) => {
 			if (!activeSessionId || !currentRequest) return;
-			respondToInteraction(activeSessionId, currentRequest.interactionId, response);
+			// Error is already logged by the store; interaction stays pending for retry
+			respondToInteraction(activeSessionId, currentRequest.interactionId, response).catch(() => {});
 		},
 		[activeSessionId, currentRequest, respondToInteraction]
 	);
