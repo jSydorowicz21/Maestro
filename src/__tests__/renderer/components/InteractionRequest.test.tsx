@@ -1267,3 +1267,281 @@ describe('InteractionRequest — import boundary enforcement', () => {
 		}
 	});
 });
+
+// ============================================================================
+// Validation: Interaction request display and response flow
+// ============================================================================
+
+describe('InteractionRequestModal — display and response flow validation', () => {
+	it('modal unmounts from DOM after the last interaction is resolved', async () => {
+		const request = createToolApproval({
+			interactionId: 'int-last',
+			sessionId: 'session-1',
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		// Modal should be visible
+		expect(screen.getByTestId('interaction-request-modal')).toBeInTheDocument();
+
+		// Approve the only interaction
+		fireEvent.click(screen.getByTestId('approve-button'));
+
+		// Modal should disappear from the DOM (not just store check)
+		await waitFor(() => {
+			expect(screen.queryByTestId('interaction-request-modal')).not.toBeInTheDocument();
+		});
+	});
+
+	it('multi-item queue drains completely: approve first → approve second → modal gone', async () => {
+		const req1 = createToolApproval({
+			interactionId: 'int-q1',
+			sessionId: 'session-1',
+			toolName: 'First',
+			timestamp: 1000,
+		});
+		const req2 = createToolApproval({
+			interactionId: 'int-q2',
+			sessionId: 'session-1',
+			toolName: 'Second',
+			timestamp: 2000,
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [req1, req2] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		// First interaction visible
+		expect(screen.getByText('First')).toBeInTheDocument();
+		expect(screen.getByTestId('remaining-count')).toHaveTextContent('+1 more pending');
+
+		// Approve first
+		fireEvent.click(screen.getByTestId('approve-button'));
+
+		// Second interaction should now be showing
+		await waitFor(() => {
+			expect(screen.getByText('Second')).toBeInTheDocument();
+		});
+		expect(screen.queryByTestId('remaining-count')).not.toBeInTheDocument();
+
+		// Approve second
+		fireEvent.click(screen.getByTestId('approve-button'));
+
+		// Modal should be fully gone
+		await waitFor(() => {
+			expect(screen.queryByTestId('interaction-request-modal')).not.toBeInTheDocument();
+		});
+	});
+
+	it('renders request timestamp in the modal', () => {
+		const timestamp = new Date('2026-03-12T10:30:00').getTime();
+		const request = createToolApproval({
+			interactionId: 'int-ts',
+			sessionId: 'session-1',
+			timestamp,
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		// The modal displays toLocaleTimeString() — verify the text is rendered
+		const expectedTime = new Date(timestamp).toLocaleTimeString();
+		expect(screen.getByText(expectedTime)).toBeInTheDocument();
+	});
+
+	it('submits combined option selection + free text in a single clarification response', async () => {
+		const request = createClarification({
+			interactionId: 'int-combo',
+			sessionId: 'session-1',
+			allowFreeText: true,
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		// Select an option AND type free text
+		fireEvent.click(screen.getByTestId('option-Option A'));
+		fireEvent.change(screen.getByTestId('free-text-input'), {
+			target: { value: 'Additional context' },
+		});
+		fireEvent.click(screen.getByTestId('submit-button'));
+
+		await waitFor(() => {
+			expect(mockRespondToInteraction).toHaveBeenCalledWith(
+				'session-1',
+				'int-combo',
+				{
+					kind: 'clarification-answer',
+					answers: [
+						{
+							questionIndex: 0,
+							selectedOptionLabels: ['Option A'],
+							text: 'Additional context',
+						},
+					],
+				}
+			);
+		});
+	});
+
+	it('submits answers across multiple questions', async () => {
+		const request = createClarification({
+			interactionId: 'int-multi-q',
+			sessionId: 'session-1',
+			allowFreeText: false,
+			questions: [
+				{
+					question: 'Framework?',
+					header: 'Q1',
+					options: [
+						{ label: 'React', description: '' },
+						{ label: 'Vue', description: '' },
+					],
+					multiSelect: false,
+				},
+				{
+					question: 'Features?',
+					header: 'Q2',
+					options: [
+						{ label: 'Auth', description: '' },
+						{ label: 'DB', description: '' },
+						{ label: 'Cache', description: '' },
+					],
+					multiSelect: true,
+				},
+			],
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		// Select in Q1 (single-select)
+		fireEvent.click(screen.getByTestId('option-React'));
+
+		// Select in Q2 (multi-select)
+		fireEvent.click(screen.getByTestId('option-Auth'));
+		fireEvent.click(screen.getByTestId('option-Cache'));
+
+		fireEvent.click(screen.getByTestId('submit-button'));
+
+		await waitFor(() => {
+			expect(mockRespondToInteraction).toHaveBeenCalled();
+		});
+
+		const response = mockRespondToInteraction.mock.calls[0][2];
+		expect(response.kind).toBe('clarification-answer');
+		expect(response.answers).toHaveLength(2);
+
+		// Q1 answer: single-select 'React'
+		expect(response.answers[0].questionIndex).toBe(0);
+		expect(response.answers[0].selectedOptionLabels).toEqual(['React']);
+
+		// Q2 answer: multi-select 'Auth' + 'Cache'
+		expect(response.answers[1].questionIndex).toBe(1);
+		expect(response.answers[1].selectedOptionLabels).toContain('Auth');
+		expect(response.answers[1].selectedOptionLabels).toContain('Cache');
+		expect(response.answers[1].selectedOptionLabels).not.toContain('DB');
+	});
+
+	it('deny then approve across queued interactions dispatches correct IDs', async () => {
+		const req1 = createToolApproval({
+			interactionId: 'int-deny-1',
+			sessionId: 'session-1',
+			toolName: 'Bash',
+			timestamp: 1000,
+		});
+		const req2 = createToolApproval({
+			interactionId: 'int-deny-2',
+			sessionId: 'session-1',
+			toolName: 'Write',
+			timestamp: 2000,
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [req1, req2] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		// Deny the first (Bash)
+		expect(screen.getByText('Bash')).toBeInTheDocument();
+		fireEvent.click(screen.getByTestId('deny-button'));
+
+		await waitFor(() => {
+			expect(mockRespondToInteraction).toHaveBeenCalledWith(
+				'session-1',
+				'int-deny-1',
+				{ kind: 'deny' }
+			);
+		});
+
+		// Second should now be visible
+		await waitFor(() => {
+			expect(screen.getByText('Write')).toBeInTheDocument();
+		});
+
+		// Approve the second (Write)
+		fireEvent.click(screen.getByTestId('approve-button'));
+
+		await waitFor(() => {
+			expect(mockRespondToInteraction).toHaveBeenCalledWith(
+				'session-1',
+				'int-deny-2',
+				{ kind: 'approve' }
+			);
+		});
+	});
+
+	it('switching active session shows the correct session interactions', async () => {
+		const { act } = await import('@testing-library/react');
+
+		const session1Req = createToolApproval({
+			interactionId: 'int-s1',
+			sessionId: 'session-1',
+			toolName: 'Session1Tool',
+		});
+		const session2Req = createClarification({
+			interactionId: 'int-s2',
+			sessionId: 'session-2',
+		});
+
+		useHarnessStore.setState({
+			pendingInteractions: {
+				'session-1': [session1Req],
+				'session-2': [session2Req],
+			},
+		});
+
+		// Start with session-1 active
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		expect(screen.getByTestId('tool-approval-view')).toBeInTheDocument();
+		expect(screen.getByText('Session1Tool')).toBeInTheDocument();
+
+		// Switch to session-2 — wrap in act to flush store subscription re-renders
+		act(() => {
+			useSessionStore.setState({ activeSessionId: 'session-2' });
+		});
+
+		await waitFor(() => {
+			expect(screen.getByTestId('clarification-view')).toBeInTheDocument();
+		});
+		expect(screen.queryByText('Session1Tool')).not.toBeInTheDocument();
+	});
+});
