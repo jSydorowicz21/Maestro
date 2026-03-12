@@ -946,6 +946,143 @@ describe('ClaudeCodeHarness', () => {
 			expect(meta.capabilities).toBeDefined();
 		});
 
+		it('should include current model from init message in runtime metadata', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'claude-session-model',
+				model: 'claude-opus-4-6',
+			} as any);
+
+			await flushMicrotasks();
+
+			// The initial snapshot should include the current model
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta).toBeDefined();
+			expect(initMeta!.availableModels).toEqual([{ id: 'claude-opus-4-6' }]);
+		});
+
+		it('should emit incremental runtime-metadata with models from supportedModels() API', async () => {
+			// Configure supportedModels to return a list
+			(mockFn.query.supportedModels as ReturnType<typeof vi.fn>).mockResolvedValue([
+				{ id: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
+				{ id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+				{ id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+			]);
+
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			// Push init message to trigger the supportedModels query
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'claude-session-models',
+				model: 'claude-opus-4-6',
+				skills: [],
+			} as any);
+
+			await flushMicrotasks();
+
+			// Should have 2 metadata events: initial snapshot + incremental models
+			expect(metadataEvents.length).toBeGreaterThanOrEqual(2);
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta).toBeDefined();
+
+			const incrementalMeta = metadataEvents.find((m) => m.replace === false);
+			expect(incrementalMeta).toBeDefined();
+			expect(incrementalMeta!.availableModels).toHaveLength(3);
+			expect(incrementalMeta!.availableModels).toEqual([
+				{ id: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
+				{ id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+				{ id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+			]);
+		});
+
+		it('should call supportedModels() on the SDK query after init', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'claude-session-api',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(mockFn.query.supportedModels).toHaveBeenCalled();
+		});
+
+		it('should handle supportedModels() failure gracefully (non-critical)', async () => {
+			(mockFn.query.supportedModels as ReturnType<typeof vi.fn>).mockRejectedValue(
+				new Error('SDK not ready')
+			);
+
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'claude-session-fail',
+				skills: [{ name: 'test-skill', description: 'Test' }],
+			} as any);
+
+			await flushMicrotasks();
+
+			// Initial snapshot should still be emitted despite supportedModels failure
+			expect(metadataEvents).toHaveLength(1);
+			expect(metadataEvents[0].replace).toBe(true);
+			expect(metadataEvents[0].skills).toHaveLength(1);
+
+			// Harness should still be running
+			expect(harness.isRunning()).toBe(true);
+		});
+
+		it('should not emit incremental metadata when supportedModels() returns empty', async () => {
+			(mockFn.query.supportedModels as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'claude-session-empty',
+			} as any);
+
+			await flushMicrotasks();
+
+			// Only the initial snapshot, no incremental update
+			expect(metadataEvents).toHaveLength(1);
+			expect(metadataEvents[0].replace).toBe(true);
+		});
+
 		it('should emit data from assistant messages', async () => {
 			const dataEvents: string[] = [];
 			harness.on('data', (_sid: string, data: string) => {

@@ -694,7 +694,8 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 
 	/**
 	 * Handle SDKSystemMessage (init) — emits session-id, slash-commands,
-	 * and runtime-metadata events.
+	 * and runtime-metadata events. After the initial snapshot, queries
+	 * supported-runtime discovery APIs for supplemental data (models).
 	 */
 	private handleSystemMessage(sessionId: string, message: SDKMessage): void {
 		const sys = message as any;
@@ -738,9 +739,70 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 			}));
 		}
 
+		// Include current model from init message if available
+		if (sys.model) {
+			metadata.availableModels = [{ id: sys.model }];
+		}
+
 		metadata.capabilities = this.getCapabilities();
 
 		this.emit('runtime-metadata', sessionId, metadata);
+
+		// Query supported-runtime discovery APIs for supplemental data.
+		// This runs async and emits incremental updates — it does not block
+		// message consumption.
+		this.querySupportedRuntimeData(sessionId).catch((error) => {
+			logger.debug(
+				`${LOG_CONTEXT} Supported-runtime query failed (non-critical): ${String(error)}`,
+				LOG_CONTEXT
+			);
+		});
+	}
+
+	/**
+	 * Query the SDK's supported-runtime discovery APIs and emit
+	 * incremental runtime-metadata updates.
+	 *
+	 * These APIs (supportedModels, supportedCommands, supportedAgents)
+	 * provide richer data than the init message alone — e.g., the full
+	 * list of available models for runtime switching, which the init
+	 * message does not include.
+	 *
+	 * Failures are non-critical: the initial snapshot from the init
+	 * message already covers the minimum required metadata.
+	 */
+	private async querySupportedRuntimeData(sessionId: string): Promise<void> {
+		if (!this._query || !this._running) return;
+
+		const metadata: RuntimeMetadataEvent = {
+			sessionId,
+			source: this.agentId,
+			replace: false,
+		};
+
+		let hasData = false;
+
+		// Query available models — not available in the init message
+		try {
+			const models = await this._query.supportedModels();
+			if (models && models.length > 0) {
+				metadata.availableModels = models.map((m) => ({
+					id: m.id,
+					label: m.label,
+				}));
+				hasData = true;
+			}
+		} catch (error) {
+			logger.debug(
+				`${LOG_CONTEXT} supportedModels() failed: ${String(error)}`,
+				LOG_CONTEXT
+			);
+		}
+
+		// Only emit if we got data and the harness is still running
+		if (hasData && this._running) {
+			this.emit('runtime-metadata', sessionId, metadata);
+		}
 	}
 
 	/**
