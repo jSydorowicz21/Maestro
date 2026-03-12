@@ -307,6 +307,8 @@ describe('envBuilder - Global Environment Variables', () => {
 		});
 
 		it('should include detected Node version manager bins in PATH', () => {
+			const originalPlatform = process.platform;
+			Object.defineProperty(process, 'platform', { value: 'darwin' });
 			const originalNvmDir = process.env.NVM_DIR;
 			const tempNvmDir = fs.mkdtempSync(path.join(os.tmpdir(), 'maestro-nvm-'));
 			process.env.NVM_DIR = tempNvmDir;
@@ -325,6 +327,7 @@ describe('envBuilder - Global Environment Variables', () => {
 				expect(pathParts).toContain(versionedBin);
 				expect(pathParts.indexOf(currentBin)).toBeLessThan(pathParts.indexOf(versionedBin));
 			} finally {
+				Object.defineProperty(process, 'platform', { value: originalPlatform });
 				if (originalNvmDir === undefined) {
 					delete process.env.NVM_DIR;
 				} else {
