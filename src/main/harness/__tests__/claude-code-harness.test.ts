@@ -3393,4 +3393,678 @@ describe('ClaudeCodeHarness', () => {
 			}
 		});
 	});
+
+	// ====================================================================
+	// Validation — Claude event mapping into shared events
+	// ====================================================================
+
+	describe('validation — Claude event mapping into shared events', () => {
+		// -- Assistant message mapping --
+
+		it('should emit separate data events for each text block in a single assistant message', async () => {
+			const dataEvents: string[] = [];
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'assistant',
+				message: {
+					content: [
+						{ type: 'text', text: 'First paragraph.' },
+						{ type: 'text', text: 'Second paragraph.' },
+						{ type: 'text', text: 'Third paragraph.' },
+					],
+				},
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(dataEvents).toEqual(['First paragraph.', 'Second paragraph.', 'Third paragraph.']);
+		});
+
+		it('should emit both data and thinking-chunk from mixed content blocks in one assistant message', async () => {
+			const dataEvents: string[] = [];
+			const thinkingEvents: string[] = [];
+
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+			harness.on('thinking-chunk', (_sid: string, text: string) => {
+				thinkingEvents.push(text);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'assistant',
+				message: {
+					content: [
+						{ type: 'thinking', thinking: 'Analyzing the problem...' },
+						{ type: 'text', text: 'Here is my answer.' },
+						{ type: 'thinking', thinking: 'Checking edge cases...' },
+					],
+				},
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(dataEvents).toEqual(['Here is my answer.']);
+			expect(thinkingEvents).toEqual(['Analyzing the problem...', 'Checking edge cases...']);
+		});
+
+		it('should emit no events from assistant message with empty content array', async () => {
+			const allEvents: Array<{ event: string; data: unknown }> = [];
+
+			for (const eventName of ['data', 'thinking-chunk', 'tool-execution']) {
+				harness.on(eventName, (_sid: string, data: unknown) => {
+					allEvents.push({ event: eventName, data });
+				});
+			}
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'assistant',
+				message: { content: [] },
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(allEvents).toHaveLength(0);
+		});
+
+		it('should ignore non-text/non-thinking content blocks in assistant messages (e.g., tool_use)', async () => {
+			const dataEvents: string[] = [];
+			const thinkingEvents: string[] = [];
+
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+			harness.on('thinking-chunk', (_sid: string, text: string) => {
+				thinkingEvents.push(text);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'assistant',
+				message: {
+					content: [
+						{ type: 'text', text: 'Before tool.' },
+						{ type: 'tool_use', id: 'tu-1', name: 'Bash', input: { command: 'ls' } },
+						{ type: 'text', text: 'After tool.' },
+					],
+				},
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(dataEvents).toEqual(['Before tool.', 'After tool.']);
+			expect(thinkingEvents).toHaveLength(0);
+		});
+
+		// -- System init message mapping --
+
+		it('should emit runtime-metadata with capabilities even when init has no optional fields', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'bare-init-session',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(metadataEvents.length).toBeGreaterThanOrEqual(1);
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta).toBeDefined();
+			expect(initMeta!.capabilities).toBeDefined();
+			expect(initMeta!.capabilities!.supportsMidTurnInput).toBe(true);
+			// Optional fields should be absent, not empty arrays
+			expect(initMeta!.skills).toBeUndefined();
+			expect(initMeta!.availableAgents).toBeUndefined();
+			expect(initMeta!.availableModels).toBeUndefined();
+		});
+
+		it('should ignore system messages with non-init subtype', async () => {
+			const sessionIdEvents: string[] = [];
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+
+			harness.on('session-id', (_sid: string, agentSessionId: string) => {
+				sessionIdEvents.push(agentSessionId);
+			});
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'heartbeat',
+				session_id: 'should-not-appear',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(sessionIdEvents).toHaveLength(0);
+			expect(metadataEvents).toHaveLength(0);
+		});
+
+		it('should map slash_commands to string names regardless of string or object format', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'slash-fmt-session',
+				slash_commands: [
+					'/compact',
+					{ name: '/review' },
+					{ name: '/commit', description: 'Commit changes' },
+				],
+			} as any);
+
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta).toBeDefined();
+			expect(initMeta!.slashCommands).toEqual(['/compact', '/review', '/commit']);
+		});
+
+		// -- Result message mapping --
+
+		it('should emit query-complete and exit without usage event when result has no usage data', async () => {
+			const usageEvents: unknown[] = [];
+			const exitEvents: number[] = [];
+			const queryCompleteEvents: unknown[] = [];
+
+			harness.on('usage', (_sid: string, stats: unknown) => {
+				usageEvents.push(stats);
+			});
+			harness.on('exit', (_sid: string, code: number) => {
+				exitEvents.push(code);
+			});
+			harness.on('query-complete', (_sid: string, data: unknown) => {
+				queryCompleteEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'result',
+				subtype: 'success',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(usageEvents).toHaveLength(0);
+			expect(queryCompleteEvents).toHaveLength(1);
+			expect(exitEvents).toContain(0);
+		});
+
+		it('should emit separate agent-error for each error in result message', async () => {
+			const errorEvents: any[] = [];
+			harness.on('agent-error', (_sid: string, err: any) => {
+				errorEvents.push(err);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'result',
+				subtype: 'error_unknown',
+				errors: [
+					{ message: 'First error' },
+					{ message: 'Second error' },
+					{ message: 'Third error' },
+				],
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(errorEvents).toHaveLength(3);
+			expect(errorEvents[0].message).toBe('First error');
+			expect(errorEvents[1].message).toBe('Second error');
+			expect(errorEvents[2].message).toBe('Third error');
+		});
+
+		it('should map all non-success result subtypes to exit code 1', async () => {
+			const subtypes = ['error_max_turns', 'error_budget', 'error_tool_use', 'error_unknown'];
+
+			for (const subtype of subtypes) {
+				const localMockFn = createMockQueryFn();
+				const localHarness = new ClaudeCodeHarness(localMockFn.queryFn);
+
+				const exitEvents: number[] = [];
+				localHarness.on('exit', (_sid: string, code: number) => {
+					exitEvents.push(code);
+				});
+
+				await localHarness.spawn(createTestConfig());
+				await flushMicrotasks();
+
+				localMockFn.pushMessage({
+					type: 'result',
+					subtype,
+				} as any);
+
+				await flushMicrotasks();
+
+				expect(exitEvents).toContain(1);
+				localHarness.kill();
+			}
+		});
+
+		it('should map success result subtype to exit code 0', async () => {
+			const exitEvents: number[] = [];
+			harness.on('exit', (_sid: string, code: number) => {
+				exitEvents.push(code);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'result',
+				subtype: 'success',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(exitEvents).toEqual([0]);
+		});
+
+		// -- Error event mapping --
+
+		it('should emit agent-error for auth_status "error" (not just "expired")', async () => {
+			const errorEvents: any[] = [];
+			harness.on('agent-error', (_sid: string, err: any) => {
+				errorEvents.push(err);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'auth_status',
+				status: 'error',
+				message: 'Authentication failed',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(errorEvents).toHaveLength(1);
+			expect(errorEvents[0].type).toBe('auth_expired');
+			expect(errorEvents[0].message).toBe('Authentication failed');
+			expect(errorEvents[0].recoverable).toBe(true);
+		});
+
+		it('should NOT emit agent-error for auth_status "ok"', async () => {
+			const errorEvents: any[] = [];
+			harness.on('agent-error', (_sid: string, err: any) => {
+				errorEvents.push(err);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'auth_status',
+				status: 'ok',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(errorEvents).toHaveLength(0);
+		});
+
+		it('should use fallback message for rate_limit with no message field', async () => {
+			const errorEvents: any[] = [];
+			harness.on('agent-error', (_sid: string, err: any) => {
+				errorEvents.push(err);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'rate_limit',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(errorEvents).toHaveLength(1);
+			expect(errorEvents[0].message).toBe('Rate limit hit');
+			expect(errorEvents[0].type).toBe('rate_limited');
+		});
+
+		it('should use fallback message for auth_status with no message field', async () => {
+			const errorEvents: any[] = [];
+			harness.on('agent-error', (_sid: string, err: any) => {
+				errorEvents.push(err);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'auth_status',
+				status: 'expired',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(errorEvents).toHaveLength(1);
+			expect(errorEvents[0].message).toBe('Authentication error');
+		});
+
+		// -- Tool event mapping --
+
+		it('should fall back to "unknown" for tool_use_summary with missing tool_name', async () => {
+			const toolEvents: any[] = [];
+			harness.on('tool-execution', (_sid: string, tool: any) => {
+				toolEvents.push(tool);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'tool_use_summary',
+				tool_use_id: 'tu-missing-name',
+				input: { command: 'ls' },
+				output: 'files',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(toolEvents).toHaveLength(1);
+			expect(toolEvents[0].toolName).toBe('unknown');
+			expect(toolEvents[0].state.input).toEqual({ command: 'ls' });
+			expect(toolEvents[0].state.output).toBe('files');
+		});
+
+		it('should fall back to "unknown" for tool_progress with missing tool_name', async () => {
+			const toolEvents: any[] = [];
+			harness.on('tool-execution', (_sid: string, tool: any) => {
+				toolEvents.push(tool);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'tool_progress',
+				tool_use_id: 'tp-missing-name',
+				content: 'Working...',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(toolEvents).toHaveLength(1);
+			expect(toolEvents[0].toolName).toBe('unknown');
+			expect(toolEvents[0].state.progress).toBe(true);
+			expect(toolEvents[0].state.content).toBe('Working...');
+		});
+
+		it('should pass error field through in tool_use_summary state', async () => {
+			const toolEvents: any[] = [];
+			harness.on('tool-execution', (_sid: string, tool: any) => {
+				toolEvents.push(tool);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'tool_use_summary',
+				tool_name: 'Bash',
+				tool_use_id: 'tu-error',
+				input: { command: 'bad-cmd' },
+				error: 'Command not found',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(toolEvents).toHaveLength(1);
+			expect(toolEvents[0].toolName).toBe('Bash');
+			expect(toolEvents[0].state.error).toBe('Command not found');
+		});
+
+		// -- Unknown message type --
+
+		it('should not emit any events for unknown message types', async () => {
+			const allEvents: Array<{ event: string; data: unknown }> = [];
+
+			for (const eventName of ['data', 'thinking-chunk', 'tool-execution', 'agent-error', 'usage', 'exit', 'query-complete', 'session-id', 'runtime-metadata', 'slash-commands']) {
+				harness.on(eventName, (...args: unknown[]) => {
+					allEvents.push({ event: eventName, data: args });
+				});
+			}
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({ type: 'custom_vendor_event', payload: 'something' } as any);
+
+			await flushMicrotasks();
+
+			expect(allEvents).toHaveLength(0);
+		});
+
+		// -- Session ID propagation --
+
+		it('should propagate correct session ID to all emitted events', async () => {
+			const sessionIds = new Map<string, string[]>();
+			const trackEvent = (eventName: string) => {
+				harness.on(eventName, (sid: string, ..._args: unknown[]) => {
+					if (!sessionIds.has(eventName)) sessionIds.set(eventName, []);
+					sessionIds.get(eventName)!.push(sid);
+				});
+			};
+
+			for (const name of ['data', 'thinking-chunk', 'tool-execution', 'agent-error', 'usage', 'exit', 'query-complete', 'session-id', 'runtime-metadata', 'slash-commands']) {
+				trackEvent(name);
+			}
+
+			const testSessionId = 'propagation-test-session';
+			await harness.spawn(createTestConfig({ sessionId: testSessionId }));
+			await flushMicrotasks();
+
+			// Push messages that trigger different event types
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'claude-internal',
+				slash_commands: [{ name: '/test' }],
+				skills: [{ name: 'test-skill' }],
+			} as any);
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'assistant',
+				message: { content: [{ type: 'text', text: 'Hello' }, { type: 'thinking', thinking: 'Hmm' }] },
+			} as any);
+			await flushMicrotasks();
+
+			mockFn.pushMessage({ type: 'rate_limit', message: 'Slow down' } as any);
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'tool_use_summary',
+				tool_name: 'Read',
+				tool_use_id: 'tu-prop',
+				input: {},
+			} as any);
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'result',
+				subtype: 'success',
+				total_cost_usd: 0.01,
+				usage: { input_tokens: 10, output_tokens: 5 },
+				duration_ms: 100,
+			} as any);
+			await flushMicrotasks();
+
+			// Every event emitted should carry the Maestro session ID, not the Claude session ID
+			for (const [eventName, sids] of sessionIds) {
+				for (const sid of sids) {
+					expect(sid).toBe(testSessionId);
+				}
+			}
+
+			// Verify that events were actually emitted for the key event types
+			expect(sessionIds.has('data')).toBe(true);
+			expect(sessionIds.has('thinking-chunk')).toBe(true);
+			expect(sessionIds.has('runtime-metadata')).toBe(true);
+			expect(sessionIds.has('session-id')).toBe(true);
+			expect(sessionIds.has('tool-execution')).toBe(true);
+			expect(sessionIds.has('agent-error')).toBe(true);
+			expect(sessionIds.has('usage')).toBe(true);
+			expect(sessionIds.has('exit')).toBe(true);
+			expect(sessionIds.has('query-complete')).toBe(true);
+		});
+
+		// -- Stream error mapping --
+
+		it('should emit agent-error when SDK message stream throws', async () => {
+			const errorEvents: any[] = [];
+			harness.on('agent-error', (_sid: string, err: any) => {
+				errorEvents.push(err);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.error(new Error('Connection reset by peer'));
+			await flushMicrotasks();
+
+			expect(errorEvents).toHaveLength(1);
+			expect(errorEvents[0].type).toBe('unknown');
+			expect(errorEvents[0].message).toContain('Connection reset by peer');
+			expect(errorEvents[0].recoverable).toBe(false);
+			expect(errorEvents[0].agentId).toBe('claude-code');
+			expect(errorEvents[0].sessionId).toBe('test-session-1');
+		});
+
+		// -- Result message usage field defaults --
+
+		it('should default missing usage fields to 0', async () => {
+			const usageEvents: any[] = [];
+			harness.on('usage', (_sid: string, stats: any) => {
+				usageEvents.push(stats);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'result',
+				subtype: 'success',
+				total_cost_usd: 0.02,
+				usage: {
+					input_tokens: 500,
+					// output_tokens, cache_read, cache_creation all omitted
+				},
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(usageEvents).toHaveLength(1);
+			expect(usageEvents[0].inputTokens).toBe(500);
+			expect(usageEvents[0].outputTokens).toBe(0);
+			expect(usageEvents[0].cacheReadInputTokens).toBe(0);
+			expect(usageEvents[0].cacheCreationInputTokens).toBe(0);
+			expect(usageEvents[0].totalCostUsd).toBe(0.02);
+		});
+
+		// -- Multi-message sequence end-to-end --
+
+		it('should correctly map a full conversation sequence of multiple SDK messages', async () => {
+			const dataEvents: string[] = [];
+			const thinkingEvents: string[] = [];
+			const toolEvents: any[] = [];
+			const usageEvents: any[] = [];
+			const exitEvents: number[] = [];
+
+			harness.on('data', (_sid: string, d: string) => dataEvents.push(d));
+			harness.on('thinking-chunk', (_sid: string, t: string) => thinkingEvents.push(t));
+			harness.on('tool-execution', (_sid: string, te: any) => toolEvents.push(te));
+			harness.on('usage', (_sid: string, u: any) => usageEvents.push(u));
+			harness.on('exit', (_sid: string, c: number) => exitEvents.push(c));
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			// Simulate: thinking → text → tool use summary → more text → result
+			mockFn.pushMessage({
+				type: 'assistant',
+				message: { content: [{ type: 'thinking', thinking: 'Planning approach...' }] },
+			} as any);
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'assistant',
+				message: { content: [{ type: 'text', text: 'Let me check that file.' }] },
+			} as any);
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'tool_use_summary',
+				tool_name: 'Read',
+				tool_use_id: 'tu-seq-1',
+				input: { path: '/src/main.ts' },
+				output: 'const x = 1;',
+			} as any);
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'assistant',
+				message: { content: [{ type: 'text', text: 'The file contains a constant.' }] },
+			} as any);
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'result',
+				subtype: 'success',
+				total_cost_usd: 0.03,
+				usage: { input_tokens: 200, output_tokens: 100 },
+				duration_ms: 5000,
+			} as any);
+			await flushMicrotasks();
+
+			expect(thinkingEvents).toEqual(['Planning approach...']);
+			expect(dataEvents).toEqual(['Let me check that file.', 'The file contains a constant.']);
+			expect(toolEvents).toHaveLength(1);
+			expect(toolEvents[0].toolName).toBe('Read');
+			expect(usageEvents).toHaveLength(1);
+			expect(usageEvents[0].inputTokens).toBe(200);
+			expect(exitEvents).toEqual([0]);
+		});
+	});
 });
