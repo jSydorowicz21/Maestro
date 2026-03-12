@@ -728,7 +728,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 					interactionId,
 					responseKind: response.kind,
 				});
-				return processManager.respondToInteraction(sessionId, interactionId, response);
+				await processManager.respondToInteraction(sessionId, interactionId, response);
 			}
 		)
 	);

@@ -351,11 +351,11 @@ export class ProcessManager extends EventEmitter {
 	 * protocol. When harness adapters are registered (Phase 2+) this will
 	 * delegate to harness.respondToInteraction().
 	 */
-	respondToInteraction(
+	async respondToInteraction(
 		sessionId: string,
 		interactionId: string,
 		response: InteractionResponse
-	): void {
+	): Promise<void> {
 		const execution = this.processes.get(sessionId);
 		if (!execution) {
 			logger.warn(
