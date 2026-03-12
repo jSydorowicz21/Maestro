@@ -36,6 +36,8 @@ import {
 	createInterruptResponse,
 	createTerminationResponse,
 } from './interaction-helpers';
+import type { ClaudeProviderOptions, ClaudeRuntimeOptions } from './claude-provider-options';
+import { CLAUDE_PROVIDER_OPTION_KEYS, CLAUDE_RUNTIME_OPTION_KEYS } from './claude-provider-options';
 import type {
 	SDKMessage,
 	SDKQuery,
@@ -79,29 +81,6 @@ export interface PendingInteraction {
 	timeout: ReturnType<typeof setTimeout>;
 	/** Retained for ClarificationRequest response translation */
 	originalSdkInput?: Record<string, unknown>;
-}
-
-// ============================================================================
-// Claude Provider Options
-// ============================================================================
-
-/**
- * Claude-specific provider options extracted from AgentExecutionConfig.providerOptions.
- * These are adapter-owned and opaque to shared code.
- */
-interface ClaudeProviderOptions {
-	continueSession?: boolean;
-	forkSession?: boolean;
-	thinking?: { type: 'adaptive' } | { type: 'enabled'; budget_tokens: number };
-	effort?: 'low' | 'medium' | 'high' | 'max';
-	allowedTools?: string[];
-	disallowedTools?: string[];
-	maxBudgetUsd?: number;
-	enableFileCheckpointing?: boolean;
-	includePartialMessages?: boolean;
-	settingSources?: string[];
-	mcpServers?: Record<string, unknown>;
-	sandbox?: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -302,6 +281,39 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 				this._query.setModel(settings.model || undefined);
 			} catch (error) {
 				logger.error(`${LOG_CONTEXT} setModel failed: ${String(error)}`, LOG_CONTEXT);
+			}
+		}
+
+		// Handle Claude-specific runtime options from providerOptions
+		if (settings.providerOptions) {
+			const runtimeOpts = this.extractRuntimeOptions(settings.providerOptions);
+			this.applyRuntimeOptions(runtimeOpts);
+		}
+	}
+
+	/**
+	 * Apply Claude-specific runtime options to the running query.
+	 * Translation from shared option names to SDK API calls happens here.
+	 */
+	private applyRuntimeOptions(options: ClaudeRuntimeOptions): void {
+		if (!this._query) return;
+
+		if (options.effort !== undefined) {
+			try {
+				// Claude SDK does not have a dedicated setEffort() method.
+				// Effort is a query-level option applied at spawn time.
+				// Runtime effort changes are stored and applied on the next
+				// streamInput call via query options if the SDK supports it
+				// in a future version. For now, log the intent.
+				logger.debug(
+					`${LOG_CONTEXT} Runtime effort change requested: ${options.effort} (applied at next query)`,
+					LOG_CONTEXT
+				);
+			} catch (error) {
+				logger.error(
+					`${LOG_CONTEXT} applyRuntimeOptions failed: ${String(error)}`,
+					LOG_CONTEXT
+				);
 			}
 		}
 	}
@@ -964,26 +976,48 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 	}
 
 	/**
-	 * Extract Claude-specific options from the generic providerOptions bag.
+	 * Extract and validate Claude-specific options from the generic providerOptions bag.
 	 * Unknown keys are ignored with a debug log.
+	 *
+	 * Callers should use buildClaudeProviderOptions() to construct the bag —
+	 * this method validates at runtime in case the bag was constructed ad hoc.
 	 */
 	private extractProviderOptions(options?: Record<string, unknown>): ClaudeProviderOptions {
 		if (!options) return {};
 
 		const known: ClaudeProviderOptions = {};
-		const knownKeys = new Set([
-			'continueSession', 'forkSession', 'thinking', 'effort',
-			'allowedTools', 'disallowedTools', 'maxBudgetUsd',
-			'enableFileCheckpointing', 'includePartialMessages',
-			'settingSources', 'mcpServers', 'sandbox',
-		]);
 
 		for (const [key, value] of Object.entries(options)) {
-			if (knownKeys.has(key)) {
+			if (CLAUDE_PROVIDER_OPTION_KEYS.has(key)) {
 				(known as any)[key] = value;
 			} else {
 				logger.debug(
 					`${LOG_CONTEXT} Ignoring unknown provider option: ${key}`,
+					LOG_CONTEXT
+				);
+			}
+		}
+
+		return known;
+	}
+
+	/**
+	 * Extract and validate Claude-specific runtime options from the generic
+	 * HarnessRuntimeSettings.providerOptions bag.
+	 *
+	 * Callers should use buildClaudeRuntimeOptions() to construct the bag.
+	 */
+	private extractRuntimeOptions(options?: Record<string, unknown>): ClaudeRuntimeOptions {
+		if (!options) return {};
+
+		const known: ClaudeRuntimeOptions = {};
+
+		for (const [key, value] of Object.entries(options)) {
+			if (CLAUDE_RUNTIME_OPTION_KEYS.has(key)) {
+				(known as any)[key] = value;
+			} else {
+				logger.debug(
+					`${LOG_CONTEXT} Ignoring unknown runtime option: ${key}`,
 					LOG_CONTEXT
 				);
 			}

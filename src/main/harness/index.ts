@@ -54,6 +54,15 @@ export {
 export { ClaudeCodeHarness } from './claude-code-harness';
 export type { PendingInteraction } from './claude-code-harness';
 
+// Re-export Claude provider option helpers (typed builders for providerOptions)
+export type { ClaudeProviderOptions, ClaudeRuntimeOptions } from './claude-provider-options';
+export {
+	buildClaudeProviderOptions,
+	buildClaudeRuntimeOptions,
+	CLAUDE_PROVIDER_OPTION_KEYS,
+	CLAUDE_RUNTIME_OPTION_KEYS,
+} from './claude-provider-options';
+
 // Import registry functions for initialization
 import {
 	registerHarness,

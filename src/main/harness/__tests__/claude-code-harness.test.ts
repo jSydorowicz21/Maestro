@@ -1621,4 +1621,102 @@ describe('ClaudeCodeHarness', () => {
 			await resultPromise;
 		});
 	});
+
+	// ====================================================================
+	// Provider Options Containment
+	// ====================================================================
+
+	describe('provider options containment', () => {
+		it('should ignore unknown provider option keys with no crash', async () => {
+			const config = createTestConfig({
+				providerOptions: {
+					effort: 'high',
+					unknownOption: 'should be ignored',
+					anotherUnknown: 42,
+				},
+			});
+
+			const capturedOptions: Record<string, unknown>[] = [];
+			const queryFn: SDKQueryFunction = (cfg) => {
+				capturedOptions.push(cfg.options || {});
+				return mockFn.query;
+			};
+
+			const h = new ClaudeCodeHarness(queryFn);
+			const result = await h.spawn(config);
+
+			expect(result.success).toBe(true);
+
+			// Known options should be passed through
+			const opts = capturedOptions[0];
+			expect(opts.effort).toBe('high');
+
+			// Unknown options should NOT be passed to SDK
+			expect(opts.unknownOption).toBeUndefined();
+			expect(opts.anotherUnknown).toBeUndefined();
+
+			h.kill();
+		});
+
+		it('should handle empty providerOptions bag', async () => {
+			const config = createTestConfig({
+				providerOptions: {},
+			});
+
+			const capturedOptions: Record<string, unknown>[] = [];
+			const queryFn: SDKQueryFunction = (cfg) => {
+				capturedOptions.push(cfg.options || {});
+				return mockFn.query;
+			};
+
+			const h = new ClaudeCodeHarness(queryFn);
+			const result = await h.spawn(config);
+
+			expect(result.success).toBe(true);
+			h.kill();
+		});
+
+		it('should handle undefined providerOptions', async () => {
+			const config = createTestConfig();
+			delete config.providerOptions;
+
+			const result = await harness.spawn(config);
+			expect(result.success).toBe(true);
+		});
+
+		it('should handle runtime providerOptions in updateRuntimeSettings', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			// Should not throw
+			await harness.updateRuntimeSettings({
+				providerOptions: { effort: 'max' },
+			});
+		});
+
+		it('should ignore unknown runtime provider option keys', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			// Should not throw — unknown keys silently ignored
+			await harness.updateRuntimeSettings({
+				providerOptions: {
+					effort: 'low',
+					unknownRuntimeOption: true,
+				},
+			});
+		});
+
+		it('should handle runtime providerOptions with no recognized keys', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			// All unknown keys — should not crash
+			await harness.updateRuntimeSettings({
+				providerOptions: {
+					totallyFake: 'value',
+				},
+			});
+		});
+	});
 });
