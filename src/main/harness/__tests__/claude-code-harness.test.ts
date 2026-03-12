@@ -4067,4 +4067,716 @@ describe('ClaudeCodeHarness', () => {
 			expect(exitEvents).toEqual([0]);
 		});
 	});
+
+	// ====================================================================
+	// Validation — Runtime metadata emission for supported models,
+	// slash commands, skills, and related data
+	// ====================================================================
+
+	describe('validation — runtime metadata emission for supported models, slash commands, skills, and related data', () => {
+
+		// -- Skills mapping --
+
+		it('should map multiple skills with correct id, name, and description fields', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-skills-multi',
+				skills: [
+					{ name: 'tdd', description: 'Test-driven development' },
+					{ name: 'debugging', description: 'Systematic debugging' },
+					{ name: 'brainstorming', description: 'Creative ideation' },
+				],
+			} as any);
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta).toBeDefined();
+			expect(initMeta!.skills).toHaveLength(3);
+			expect(initMeta!.skills).toEqual([
+				{ id: 'tdd', name: 'tdd', description: 'Test-driven development' },
+				{ id: 'debugging', name: 'debugging', description: 'Systematic debugging' },
+				{ id: 'brainstorming', name: 'brainstorming', description: 'Creative ideation' },
+			]);
+		});
+
+		it('should map skills with missing description as undefined', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-skills-nodesc',
+				skills: [
+					{ name: 'minimal-skill' },
+				],
+			} as any);
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta!.skills).toHaveLength(1);
+			expect(initMeta!.skills![0].id).toBe('minimal-skill');
+			expect(initMeta!.skills![0].name).toBe('minimal-skill');
+			expect(initMeta!.skills![0].description).toBeUndefined();
+		});
+
+		it('should use skill name as both id and name (identity mapping)', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-skills-id',
+				skills: [{ name: 'my-custom-skill', description: 'Custom' }],
+			} as any);
+			await flushMicrotasks();
+
+			const skill = metadataEvents.find((m) => m.replace === true)!.skills![0];
+			expect(skill.id).toBe(skill.name);
+			expect(skill.id).toBe('my-custom-skill');
+		});
+
+		it('should omit skills field from metadata when init has no skills', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-no-skills',
+			} as any);
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta).toBeDefined();
+			expect(initMeta!.skills).toBeUndefined();
+		});
+
+		// -- Slash commands mapping --
+
+		it('should map object-format slash commands to string names in metadata', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-cmds-obj',
+				slash_commands: [
+					{ name: '/commit', description: 'Commit changes' },
+					{ name: '/review', description: 'Review PR' },
+					{ name: '/help', description: 'Get help' },
+				],
+			} as any);
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta!.slashCommands).toEqual(['/commit', '/review', '/help']);
+		});
+
+		it('should map string-format slash commands directly', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-cmds-str',
+				slash_commands: ['/commit', '/review', '/help'],
+			} as any);
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta!.slashCommands).toEqual(['/commit', '/review', '/help']);
+		});
+
+		it('should handle mixed string and object slash command formats', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-cmds-mixed',
+				slash_commands: [
+					'/commit',
+					{ name: '/review', description: 'Review PR' },
+					'/help',
+				],
+			} as any);
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta!.slashCommands).toEqual(['/commit', '/review', '/help']);
+		});
+
+		it('should emit slash commands both as standalone event and within metadata', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			const slashCommandEvents: unknown[][] = [];
+
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+			harness.on('slash-commands', (_sid: string, cmds: unknown[]) => {
+				slashCommandEvents.push(cmds);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const commands = [{ name: '/commit' }, { name: '/test' }];
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-cmds-dual',
+				slash_commands: commands,
+			} as any);
+			await flushMicrotasks();
+
+			// Standalone event emits the raw SDK format
+			expect(slashCommandEvents).toHaveLength(1);
+			expect(slashCommandEvents[0]).toEqual(commands);
+
+			// Metadata event maps to string names
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta!.slashCommands).toEqual(['/commit', '/test']);
+		});
+
+		it('should omit slashCommands field from metadata when init has no slash_commands', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-no-cmds',
+			} as any);
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta!.slashCommands).toBeUndefined();
+		});
+
+		// -- Available models mapping --
+
+		it('should include init model as single-element availableModels without label', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-model-init',
+				model: 'claude-sonnet-4-6',
+			} as any);
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta!.availableModels).toHaveLength(1);
+			expect(initMeta!.availableModels![0]).toEqual({ id: 'claude-sonnet-4-6' });
+			// Init model has no label — only supportedModels() provides labels
+			expect(initMeta!.availableModels![0].label).toBeUndefined();
+		});
+
+		it('should omit availableModels from initial snapshot when init has no model field', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-no-model',
+				// No model field
+			} as any);
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta!.availableModels).toBeUndefined();
+		});
+
+		it('should propagate label from supportedModels() API in incremental update', async () => {
+			(mockFn.query.supportedModels as ReturnType<typeof vi.fn>).mockResolvedValue([
+				{ id: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
+				{ id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+			]);
+
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-models-labels',
+				model: 'claude-opus-4-6',
+			} as any);
+			await flushMicrotasks();
+
+			const incrementalMeta = metadataEvents.find((m) => m.replace === false);
+			expect(incrementalMeta).toBeDefined();
+
+			// Incremental update from supportedModels() carries labels
+			for (const model of incrementalMeta!.availableModels!) {
+				expect(model.label).toBeDefined();
+				expect(typeof model.label).toBe('string');
+			}
+			expect(incrementalMeta!.availableModels![0].label).toBe('Claude Opus 4.6');
+			expect(incrementalMeta!.availableModels![1].label).toBe('Claude Sonnet 4.6');
+		});
+
+		it('should not call supportedModels() when harness is killed before init', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.kill();
+			await flushMicrotasks();
+
+			// No init message was sent, so supportedModels should not be called
+			expect(mockFn.query.supportedModels).not.toHaveBeenCalled();
+		});
+
+		// -- Available agents mapping --
+
+		it('should map multiple agents with correct id and label fields', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-agents-multi',
+				agents: [
+					{ name: 'code-reviewer', description: 'Reviews code quality' },
+					{ name: 'test-runner', description: 'Runs test suites' },
+					{ name: 'explorer', description: 'Explores codebases' },
+				],
+			} as any);
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta!.availableAgents).toHaveLength(3);
+			expect(initMeta!.availableAgents).toEqual([
+				{ id: 'code-reviewer', label: 'Reviews code quality' },
+				{ id: 'test-runner', label: 'Runs test suites' },
+				{ id: 'explorer', label: 'Explores codebases' },
+			]);
+		});
+
+		it('should map agents with no description to undefined label', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-agents-nodesc',
+				agents: [{ name: 'minimal-agent' }],
+			} as any);
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta!.availableAgents).toHaveLength(1);
+			expect(initMeta!.availableAgents![0].id).toBe('minimal-agent');
+			expect(initMeta!.availableAgents![0].label).toBeUndefined();
+		});
+
+		it('should omit availableAgents from metadata when init has no agents', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-no-agents',
+			} as any);
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta!.availableAgents).toBeUndefined();
+		});
+
+		// -- Capabilities in metadata --
+
+		it('should include all capability flags in initial metadata snapshot', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-caps',
+			} as any);
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta!.capabilities).toBeDefined();
+
+			const caps = initMeta!.capabilities!;
+			expect(caps.supportsMidTurnInput).toBe(true);
+			expect(caps.supportsInteractionRequests).toBe(true);
+			expect(caps.supportsPersistentStdin).toBe(false);
+			expect(caps.supportsRuntimePermissionUpdates).toBe(true);
+			expect(caps.supportsRuntimeModelChange).toBe(true);
+			expect(caps.supportsRuntimeEffortChange).toBe(true);
+			expect(caps.supportsSkillsEnumeration).toBe(true);
+			expect(caps.supportsRuntimeSlashCommands).toBe(true);
+			expect(caps.supportsFileCheckpointing).toBe(true);
+			expect(caps.supportsStructuredOutput).toBe(true);
+			expect(caps.supportsBudgetLimits).toBe(true);
+			expect(caps.supportsContextCompaction).toBe(true);
+			expect(caps.supportsSessionFork).toBe(true);
+		});
+
+		it('should match capabilities in metadata to getCapabilities() output', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-caps-match',
+			} as any);
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			const directCaps = harness.getCapabilities();
+
+			// Every field in getCapabilities() should appear in metadata capabilities
+			expect(initMeta!.capabilities).toEqual(directCaps);
+		});
+
+		// -- Metadata shape integrity --
+
+		it('should set replace: true on initial snapshot and replace: false on incremental update', async () => {
+			(mockFn.query.supportedModels as ReturnType<typeof vi.fn>).mockResolvedValue([
+				{ id: 'claude-opus-4-6', label: 'Opus' },
+			]);
+
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-replace-flags',
+				model: 'claude-opus-4-6',
+				skills: [{ name: 'skill-1' }],
+			} as any);
+			await flushMicrotasks();
+
+			expect(metadataEvents.length).toBeGreaterThanOrEqual(2);
+
+			const snapshots = metadataEvents.filter((m) => m.replace === true);
+			const incrementals = metadataEvents.filter((m) => m.replace === false);
+
+			expect(snapshots).toHaveLength(1);
+			expect(incrementals).toHaveLength(1);
+		});
+
+		it('should set correct sessionId and source on all metadata events', async () => {
+			(mockFn.query.supportedModels as ReturnType<typeof vi.fn>).mockResolvedValue([
+				{ id: 'model-1' },
+			]);
+
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			const sessionId = 'custom-session-xyz';
+			await harness.spawn(createTestConfig({ sessionId }));
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sdk-session',
+			} as any);
+			await flushMicrotasks();
+
+			for (const meta of metadataEvents) {
+				expect(meta.sessionId).toBe(sessionId);
+				expect(meta.source).toBe('claude-code');
+			}
+		});
+
+		it('should only include capabilities and defined fields in metadata — no extra SDK data leaks', async () => {
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-containment',
+				mcp_servers: [{ name: 'server-1', status: 'connected' }],
+				plugins: [{ name: 'plugin-1' }],
+				tools: [{ name: 'Read' }, { name: 'Write' }],
+			} as any);
+			await flushMicrotasks();
+
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta).toBeDefined();
+
+			// These SDK-specific fields should NOT appear in the shared metadata
+			const metaKeys = Object.keys(initMeta!);
+			expect(metaKeys).not.toContain('mcp_servers');
+			expect(metaKeys).not.toContain('plugins');
+			expect(metaKeys).not.toContain('tools');
+
+			// Only shared RuntimeMetadataEvent fields should be present
+			const allowedKeys = new Set([
+				'sessionId', 'source', 'replace',
+				'skills', 'slashCommands', 'availableModels', 'availableAgents', 'capabilities',
+			]);
+			for (const key of metaKeys) {
+				expect(allowedKeys.has(key)).toBe(true);
+			}
+		});
+
+		// -- Full init with all fields --
+
+		it('should correctly map a full init message with all metadata fields populated', async () => {
+			(mockFn.query.supportedModels as ReturnType<typeof vi.fn>).mockResolvedValue([
+				{ id: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
+				{ id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+			]);
+
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			const sessionIdEvents: string[] = [];
+			const slashCommandEvents: unknown[][] = [];
+
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+			harness.on('session-id', (_sid: string, id: string) => {
+				sessionIdEvents.push(id);
+			});
+			harness.on('slash-commands', (_sid: string, cmds: unknown[]) => {
+				slashCommandEvents.push(cmds);
+			});
+
+			await harness.spawn(createTestConfig({ sessionId: 'full-init-session' }));
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'claude-full-init',
+				model: 'claude-opus-4-6',
+				slash_commands: [
+					{ name: '/commit', description: 'Commit' },
+					'/help',
+				],
+				skills: [
+					{ name: 'tdd', description: 'Test driven' },
+					{ name: 'debugging' },
+				],
+				agents: [
+					{ name: 'reviewer', description: 'Code review' },
+				],
+			} as any);
+			await flushMicrotasks();
+
+			// Session ID emitted
+			expect(sessionIdEvents).toContain('claude-full-init');
+
+			// Slash commands standalone event emitted
+			expect(slashCommandEvents).toHaveLength(1);
+
+			// Initial snapshot
+			const initMeta = metadataEvents.find((m) => m.replace === true);
+			expect(initMeta).toBeDefined();
+			expect(initMeta!.sessionId).toBe('full-init-session');
+			expect(initMeta!.source).toBe('claude-code');
+			expect(initMeta!.skills).toHaveLength(2);
+			expect(initMeta!.slashCommands).toEqual(['/commit', '/help']);
+			expect(initMeta!.availableModels).toEqual([{ id: 'claude-opus-4-6' }]);
+			expect(initMeta!.availableAgents).toEqual([{ id: 'reviewer', label: 'Code review' }]);
+			expect(initMeta!.capabilities).toBeDefined();
+			expect(initMeta!.capabilities!.supportsMidTurnInput).toBe(true);
+
+			// Incremental update with full model list from API
+			const incrementalMeta = metadataEvents.find((m) => m.replace === false);
+			expect(incrementalMeta).toBeDefined();
+			expect(incrementalMeta!.availableModels).toHaveLength(2);
+			expect(incrementalMeta!.availableModels![0].label).toBe('Claude Opus 4.6');
+
+			// Incremental update should NOT re-emit skills/agents/slashCommands/capabilities
+			expect(incrementalMeta!.skills).toBeUndefined();
+			expect(incrementalMeta!.slashCommands).toBeUndefined();
+			expect(incrementalMeta!.availableAgents).toBeUndefined();
+			expect(incrementalMeta!.capabilities).toBeUndefined();
+		});
+
+		// -- Incremental update scoping --
+
+		it('should not include skills, slashCommands, agents, or capabilities in incremental model update', async () => {
+			(mockFn.query.supportedModels as ReturnType<typeof vi.fn>).mockResolvedValue([
+				{ id: 'model-a' },
+			]);
+
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-scope',
+				skills: [{ name: 'skill-a' }],
+				slash_commands: ['/cmd-a'],
+				agents: [{ name: 'agent-a' }],
+			} as any);
+			await flushMicrotasks();
+
+			const incrementalMeta = metadataEvents.find((m) => m.replace === false);
+			expect(incrementalMeta).toBeDefined();
+			expect(incrementalMeta!.availableModels).toBeDefined();
+
+			// These should only be in the initial snapshot, not the incremental update
+			expect(incrementalMeta!.skills).toBeUndefined();
+			expect(incrementalMeta!.slashCommands).toBeUndefined();
+			expect(incrementalMeta!.availableAgents).toBeUndefined();
+			expect(incrementalMeta!.capabilities).toBeUndefined();
+		});
+
+		// -- supportedModels() not queried after harness stops --
+
+		it('should not emit incremental metadata if harness stops before supportedModels() resolves', async () => {
+			// Use a deferred promise for supportedModels
+			let resolveSupportedModels: ((value: any) => void) | null = null;
+			(mockFn.query.supportedModels as ReturnType<typeof vi.fn>).mockImplementation(() => {
+				return new Promise((resolve) => {
+					resolveSupportedModels = resolve;
+				});
+			});
+
+			const metadataEvents: RuntimeMetadataEvent[] = [];
+			harness.on('runtime-metadata', (_sid: string, meta: RuntimeMetadataEvent) => {
+				metadataEvents.push(meta);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-race',
+			} as any);
+			await flushMicrotasks();
+
+			// Kill harness before supportedModels resolves
+			harness.kill();
+			await flushMicrotasks();
+
+			// Now resolve supportedModels after kill
+			if (resolveSupportedModels) {
+				resolveSupportedModels([{ id: 'late-model', label: 'Late' }]);
+			}
+			await flushMicrotasks();
+
+			// Only the initial snapshot should exist, no incremental from late-resolving models
+			const incrementals = metadataEvents.filter((m) => m.replace === false);
+			expect(incrementals).toHaveLength(0);
+		});
+	});
 });
