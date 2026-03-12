@@ -760,8 +760,9 @@ describe('Nullable PID Handling', () => {
 
 			pm.kill('harness-1');
 
+			// No harness instance on this execution, so it warns about missing harness
 			expect(mockLogger.warn).toHaveBeenCalledWith(
-				expect.stringContaining('harness kill not yet implemented'),
+				expect.stringContaining('harness-backed execution has no harness instance'),
 				'ProcessManager',
 				expect.objectContaining({ sessionId: 'harness-1' })
 			);
