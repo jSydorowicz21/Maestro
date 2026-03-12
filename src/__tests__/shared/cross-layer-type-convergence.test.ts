@@ -199,6 +199,94 @@ describe('cross-layer type convergence', () => {
 		});
 	});
 
+	describe('clarification response structural separation', () => {
+		it('clarification-answer kind should carry structured ClarificationAnswer[], not text', () => {
+			const response: InteractionResponse = {
+				kind: 'clarification-answer',
+				answers: [
+					{ questionIndex: 0, selectedOptionLabels: ['main'] },
+					{ questionIndex: 1, text: 'Custom free-text answer' },
+				],
+			};
+			expect(response.kind).toBe('clarification-answer');
+			// Narrow via discriminator — `answers` is only available on clarification-answer
+			if (response.kind === 'clarification-answer') {
+				expect(response.answers).toHaveLength(2);
+				expect(response.answers[0].questionIndex).toBe(0);
+				expect(response.answers[0].selectedOptionLabels).toEqual(['main']);
+				expect(response.answers[1].text).toBe('Custom free-text answer');
+			}
+		});
+
+		it('text kind should NOT be used for clarification answers', () => {
+			// The 'text' kind is a generic fallback — structurally it cannot
+			// carry ClarificationAnswer data without JSON-encoding it,
+			// which would break provider-neutral harness translation.
+			const textResponse: InteractionResponse = {
+				kind: 'text',
+				text: 'Some free-text input',
+			};
+			if (textResponse.kind === 'text') {
+				// 'text' variant only has a flat string, no structured answers
+				expect(typeof textResponse.text).toBe('string');
+				expect(textResponse).not.toHaveProperty('answers');
+			}
+		});
+
+		it('ClarificationAnswer should be structurally richer than a plain string', () => {
+			const answer: ClarificationAnswer = {
+				questionIndex: 0,
+				selectedOptionLabels: ['option-a', 'option-b'],
+				text: 'additional context',
+			};
+			// ClarificationAnswer carries semantic fields that a flat text string cannot
+			expect(answer.questionIndex).toBe(0);
+			expect(answer.selectedOptionLabels).toEqual(['option-a', 'option-b']);
+			expect(answer.text).toBe('additional context');
+		});
+
+		it('clarification-answer response should round-trip through JSON without losing structure', () => {
+			const original: InteractionResponse = {
+				kind: 'clarification-answer',
+				answers: [
+					{ questionIndex: 0, selectedOptionLabels: ['main'] },
+					{ questionIndex: 1, text: 'free text' },
+				],
+			};
+			const serialized = JSON.stringify(original);
+			const deserialized = JSON.parse(serialized) as InteractionResponse;
+
+			expect(deserialized.kind).toBe('clarification-answer');
+			if (deserialized.kind === 'clarification-answer') {
+				expect(deserialized.answers).toHaveLength(2);
+				expect(deserialized.answers[0].selectedOptionLabels).toEqual(['main']);
+				expect(deserialized.answers[1].text).toBe('free text');
+			}
+		});
+
+		it('clarification-answer and text responses should be distinguishable by kind discriminator', () => {
+			const clarificationResponse: InteractionResponse = {
+				kind: 'clarification-answer',
+				answers: [{ questionIndex: 0, selectedOptionLabels: ['yes'] }],
+			};
+			const textResponse: InteractionResponse = {
+				kind: 'text',
+				text: 'yes',
+			};
+
+			// The kind discriminator is the only way to distinguish them
+			expect(clarificationResponse.kind).not.toBe(textResponse.kind);
+
+			// Each can be serialized and deserialized independently
+			const parsedClarification = JSON.parse(JSON.stringify(clarificationResponse));
+			const parsedText = JSON.parse(JSON.stringify(textResponse));
+			expect(parsedClarification.kind).toBe('clarification-answer');
+			expect(parsedText.kind).toBe('text');
+			expect(parsedClarification).toHaveProperty('answers');
+			expect(parsedText).not.toHaveProperty('answers');
+		});
+	});
+
 	describe('provider-neutral boundary', () => {
 		it('InteractionRequest should not require Claude-specific decoding', () => {
 			// ToolApprovalRequest.toolInput is Record<string, unknown>, not a Claude SDK type

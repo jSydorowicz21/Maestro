@@ -437,6 +437,30 @@ describe('Process Preload API', () => {
 			);
 		});
 
+		it('should send clarification-answer with structured answers (not JSON-in-text)', async () => {
+			mockInvoke.mockResolvedValue(undefined);
+
+			// Clarification answers MUST use the structured clarification-answer kind,
+			// NOT the text kind with JSON-encoded answer data.
+			const response = {
+				kind: 'clarification-answer' as const,
+				answers: [
+					{ questionIndex: 0, selectedOptionLabels: ['main', 'develop'] },
+					{ questionIndex: 1, text: 'Custom branch name: feature/xyz' },
+				],
+			};
+
+			await api.respondToInteraction('session-789', 'int-006', response);
+
+			const sentResponse = mockInvoke.mock.calls[0][3];
+			expect(sentResponse.kind).toBe('clarification-answer');
+			expect(sentResponse.answers).toHaveLength(2);
+			expect(sentResponse.answers[0].selectedOptionLabels).toEqual(['main', 'develop']);
+			expect(sentResponse.answers[1].text).toBe('Custom branch name: feature/xyz');
+			// Verify it's NOT a text response with JSON stuffed in
+			expect(sentResponse).not.toHaveProperty('text');
+		});
+
 		it('should send text response', async () => {
 			mockInvoke.mockResolvedValue(undefined);
 

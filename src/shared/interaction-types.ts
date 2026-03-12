@@ -140,8 +140,13 @@ export interface ClarificationAnswer {
  *
  * - approve: user approves the tool use (optionally with modified input)
  * - deny: user denies the tool use (optionally requesting full interrupt)
- * - text: free-text response (generic fallback)
- * - clarification-answer: structured answer to clarification questions
+ * - text: free-text response (generic fallback for non-structured input).
+ *         MUST NOT be used for clarification answers — use 'clarification-answer'
+ *         with structured ClarificationAnswer[] instead. Stuffing JSON into the
+ *         text field defeats provider-neutral typing and breaks harness translation.
+ * - clarification-answer: structured answer to clarification questions.
+ *         Always use this kind (not 'text') when responding to a ClarificationRequest.
+ *         Harness adapters translate this into provider-specific formats internally.
  * - cancel: user cancels the interaction without providing an answer
  */
 export type InteractionResponse =
