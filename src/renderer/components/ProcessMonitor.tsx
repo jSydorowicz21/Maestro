@@ -32,11 +32,11 @@ interface ProcessMonitorProps {
 interface ActiveProcess {
 	sessionId: string;
 	toolType: string;
-	pid: number;
+	pid: number | null;
 	cwd: string;
 	isTerminal: boolean;
 	isBatchMode: boolean;
-	startTime?: number;
+	startTime: number;
 	command?: string;
 	args?: string[];
 }
@@ -48,7 +48,7 @@ interface ProcessNode {
 	emoji?: string;
 	sessionId?: string;
 	processSessionId?: string; // The full process session ID for killing processes (e.g., "abc123-ai-tab1")
-	pid?: number;
+	pid?: number | null;
 	processType?:
 		| 'ai'
 		| 'terminal'

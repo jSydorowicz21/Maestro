@@ -1104,7 +1104,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 							})
 						);
 					});
-			} else if (targetPid > 0) {
+			} else if (targetPid != null && targetPid > 0) {
 				// AI mode: Write to stdin
 				window.maestro.process.write(targetSessionId, capturedInputValue).catch((error) => {
 					console.error('Failed to write to process:', error);

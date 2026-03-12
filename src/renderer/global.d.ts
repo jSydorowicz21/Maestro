@@ -45,6 +45,13 @@ interface ProcessConfig {
 	// Windows command line length workaround
 	sendPromptViaStdin?: boolean; // If true, send the prompt via stdin as JSON instead of command line
 	sendPromptViaStdinRaw?: boolean; // If true, send the prompt via stdin as raw text instead of command line
+	// Stats tracking options
+	querySource?: 'user' | 'auto';
+	tabId?: string;
+	// Execution mode hint (ProcessManager has final say)
+	preferredExecutionMode?: 'auto' | 'classic' | 'harness';
+	// Provider-specific options (adapter-owned, opaque to shared layers)
+	providerOptions?: Record<string, unknown>;
 }
 
 interface AgentConfigOption {
@@ -149,86 +156,24 @@ interface UsageStats {
 
 /**
  * Interaction request from harness-backed agents (provider-neutral).
- * Mirrors the shared InteractionRequest union in interaction-types.ts.
+ * Aliased from the shared InteractionRequest in interaction-types.ts.
  * Used by window.maestro.process.onInteractionRequest.
  */
-interface InteractionRequestPayload {
-	interactionId: string;
-	sessionId: string;
-	agentId: string;
-	kind: 'tool-approval' | 'clarification';
-	timestamp: number;
-	timeoutMs?: number;
-	// Tool approval fields
-	toolUseId?: string;
-	toolName?: string;
-	toolInput?: Record<string, unknown>;
-	decisionReason?: string;
-	suggestedPermissions?: Record<string, unknown>[];
-	blockedPath?: string;
-	subagentId?: string;
-	// Clarification fields
-	questions?: Array<{
-		question: string;
-		header: string;
-		options: Array<{ label: string; description: string; preview?: string }>;
-		multiSelect: boolean;
-	}>;
-	allowFreeText?: boolean;
-}
+type InteractionRequestPayload = import('../shared/interaction-types').InteractionRequest;
 
 /**
  * Interaction response sent from renderer to harness (provider-neutral).
- * Mirrors the shared InteractionResponse union in interaction-types.ts.
+ * Aliased from the shared InteractionResponse in interaction-types.ts.
  * Used by window.maestro.process.respondToInteraction.
  */
-interface InteractionResponsePayload {
-	kind: 'approve' | 'deny' | 'text' | 'clarification-answer' | 'cancel';
-	// Approve fields
-	updatedInput?: Record<string, unknown>;
-	updatedPermissions?: Record<string, unknown>[];
-	// Deny / cancel fields
-	message?: string;
-	interrupt?: boolean;
-	// Text response field
-	text?: string;
-	// Clarification answer fields
-	answers?: Array<{
-		questionIndex: number;
-		selectedOptionLabels?: string[];
-		text?: string;
-	}>;
-}
+type InteractionResponsePayload = import('../shared/interaction-types').InteractionResponse;
 
 /**
  * Runtime metadata event from harness-backed agents (provider-neutral).
- * Mirrors the shared RuntimeMetadataEvent in runtime-metadata-types.ts.
+ * Aliased from the shared RuntimeMetadataEvent in runtime-metadata-types.ts.
  * Used by window.maestro.process.onRuntimeMetadata.
  */
-interface RuntimeMetadataPayload {
-	sessionId: string;
-	source: string;
-	replace?: boolean;
-	skills?: Array<{
-		id: string;
-		name: string;
-		description?: string;
-	}>;
-	slashCommands?: string[];
-	availableModels?: Array<{
-		id: string;
-		label?: string;
-	}>;
-	availableAgents?: Array<{
-		id: string;
-		label?: string;
-	}>;
-	capabilities?: {
-		supportsRuntimeModelChange?: boolean;
-		supportsSkillsEnumeration?: boolean;
-		supportsInteractionRequests?: boolean;
-	};
-}
+type RuntimeMetadataPayload = import('../shared/runtime-metadata-types').RuntimeMetadataEvent;
 
 type HistoryEntryType = 'AUTO' | 'USER';
 
@@ -338,7 +283,7 @@ interface MaestroAPI {
 		setAll: (groups: any[]) => Promise<boolean>;
 	};
 	process: {
-		spawn: (config: ProcessConfig) => Promise<{ pid: number; success: boolean }>;
+		spawn: (config: ProcessConfig) => Promise<{ pid: number | null; success: boolean; sshRemote?: { id: string; name: string; host: string } }>;
 		write: (sessionId: string, data: string) => Promise<boolean>;
 		interrupt: (sessionId: string) => Promise<boolean>;
 		kill: (sessionId: string) => Promise<boolean>;
@@ -358,10 +303,13 @@ interface MaestroAPI {
 			Array<{
 				sessionId: string;
 				toolType: string;
-				pid: number;
+				pid: number | null;
 				cwd: string;
 				isTerminal: boolean;
 				isBatchMode: boolean;
+				startTime: number;
+				command?: string;
+				args?: string[];
 			}>
 		>;
 		onData: (callback: (sessionId: string, data: string) => void) => () => void;
