@@ -6,6 +6,13 @@
  * skills, slash commands, available models, available agents, and
  * runtime capabilities discovered after the harness is created.
  *
+ * BOUNDARY INVARIANT: This module must NEVER import from provider-specific
+ * code (main/harness/*, @anthropic-ai/sdk, openai, etc.). All types here
+ * use generic summary shapes (id + optional label/name/description) so that
+ * any provider's harness adapter can emit them without the renderer needing
+ * provider-specific decoding. Provider-specific raw payloads should stay
+ * inside logs or adapter-local code, not the renderer contract.
+ *
  * Runtime metadata is session-scoped, not global agent-scoped.
  * Harnesses emit an initial snapshot early after spawn and may emit
  * incremental updates during execution.

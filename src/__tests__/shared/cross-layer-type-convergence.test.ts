@@ -372,6 +372,188 @@ describe('cross-layer type convergence', () => {
 			expect(sources).toContain('codex');
 			expect(sources).toContain('opencode');
 		});
+
+		it('shared interaction types should only import from shared modules', () => {
+			// This is a structural test: interaction-types.ts imports only from shared/types.ts.
+			// If someone adds an import from a provider-specific module, this file-read test catches it.
+			const fs = require('fs');
+			const path = require('path');
+			const interactionSource = fs.readFileSync(
+				path.resolve(__dirname, '../../shared/interaction-types.ts'),
+				'utf-8'
+			);
+			const importLines = interactionSource
+				.split('\n')
+				.filter((line: string) => /^\s*import\s/.test(line));
+
+			for (const line of importLines) {
+				// Must only import from ./types or other shared modules
+				expect(line).not.toMatch(/from\s+['"].*\/(main|renderer|preload)\//);
+				expect(line).not.toMatch(/from\s+['"]@anthropic-ai/);
+				expect(line).not.toMatch(/from\s+['"]openai/);
+			}
+		});
+
+		it('shared runtime metadata types should only import from shared modules', () => {
+			const fs = require('fs');
+			const path = require('path');
+			const runtimeSource = fs.readFileSync(
+				path.resolve(__dirname, '../../shared/runtime-metadata-types.ts'),
+				'utf-8'
+			);
+			const importLines = runtimeSource
+				.split('\n')
+				.filter((line: string) => /^\s*import\s/.test(line));
+
+			for (const line of importLines) {
+				expect(line).not.toMatch(/from\s+['"].*\/(main|renderer|preload)\//);
+				expect(line).not.toMatch(/from\s+['"]@anthropic-ai/);
+				expect(line).not.toMatch(/from\s+['"]openai/);
+			}
+		});
+
+		it('ToolApprovalRequest fields should all be provider-neutral primitives', () => {
+			// Every field on ToolApprovalRequest should be a JSON-safe primitive
+			// or Record<string, unknown> — no SDK class instances
+			const request: ToolApprovalRequest = {
+				interactionId: 'int-1',
+				sessionId: 's1',
+				agentId: 'claude-code',
+				kind: 'tool-approval',
+				timestamp: Date.now(),
+				toolUseId: 'tu-1',
+				toolName: 'Edit',
+				toolInput: { file_path: '/a.ts', new_string: 'hello' },
+				decisionReason: 'Needs approval',
+				suggestedPermissions: [{ tool: 'Edit', scope: '/src' }],
+				blockedPath: '/a.ts',
+				subagentId: 'sub-1',
+			};
+			// All values should survive JSON round-trip without loss
+			const roundTripped = JSON.parse(JSON.stringify(request));
+			expect(roundTripped).toEqual(request);
+		});
+
+		it('ClarificationRequest fields should all be provider-neutral primitives', () => {
+			const request: ClarificationRequest = {
+				interactionId: 'int-2',
+				sessionId: 's2',
+				agentId: 'codex',
+				kind: 'clarification',
+				timestamp: Date.now(),
+				questions: [{
+					question: 'Which database?',
+					header: 'DB',
+					options: [
+						{ label: 'Postgres', description: 'PostgreSQL' },
+						{ label: 'SQLite', description: 'SQLite embedded', preview: '```sql\nSELECT 1;\n```' },
+					],
+					multiSelect: false,
+				}],
+				allowFreeText: true,
+			};
+			const roundTripped = JSON.parse(JSON.stringify(request));
+			expect(roundTripped).toEqual(request);
+		});
+
+		it('all InteractionResponse variants should be provider-neutral', () => {
+			// Each response variant uses only primitives and Record<string, unknown>
+			const responses: InteractionResponse[] = [
+				{
+					kind: 'approve',
+					updatedInput: { file_path: '/b.ts' },
+					updatedPermissions: [{ tool: 'Bash' }],
+					message: 'Approved',
+				},
+				{ kind: 'deny', message: 'Denied', interrupt: true },
+				{ kind: 'text', text: 'Free text' },
+				{
+					kind: 'clarification-answer',
+					answers: [
+						{ questionIndex: 0, selectedOptionLabels: ['Postgres'] },
+						{ questionIndex: 1, text: 'Custom answer' },
+					],
+				},
+				{ kind: 'cancel', message: 'User cancelled' },
+			];
+
+			for (const response of responses) {
+				const roundTripped = JSON.parse(JSON.stringify(response));
+				expect(roundTripped).toEqual(response);
+			}
+		});
+
+		it('providerOptions must be opaque — compile-time assignability to Record<string, unknown>', () => {
+			// providerOptions should accept arbitrary provider data without type narrowing
+			const claudeOpts: Record<string, unknown> = {
+				thinking: { type: 'enabled', budget: 10000 },
+				effort: 'high',
+				mcpServers: [{ name: 'test' }],
+			};
+			const codexOpts: Record<string, unknown> = {
+				httpTimeout: 30000,
+				maxRetries: 3,
+			};
+			const openCodeOpts: Record<string, unknown> = {
+				sessionMode: 'persistent',
+			};
+
+			// All should be assignable to the config's providerOptions field
+			const configs: Pick<AgentExecutionConfig, 'providerOptions'>[] = [
+				{ providerOptions: claudeOpts },
+				{ providerOptions: codexOpts },
+				{ providerOptions: openCodeOpts },
+				{ providerOptions: undefined },
+			];
+			expect(configs).toHaveLength(4);
+		});
+
+		it('HarnessRuntimeCapabilities should not contain provider-specific field names', () => {
+			// Capability names should be generic (supports*), not provider-prefixed (claude*, codex*)
+			const fullCaps: HarnessRuntimeCapabilities = {
+				supportsMidTurnInput: true,
+				supportsInteractionRequests: true,
+				supportsPersistentStdin: true,
+				supportsRuntimePermissionUpdates: true,
+				supportsRuntimeModelChange: true,
+				supportsRuntimeEffortChange: true,
+				supportsSkillsEnumeration: true,
+				supportsRuntimeSlashCommands: true,
+				supportsFileCheckpointing: true,
+				supportsStructuredOutput: true,
+				supportsBudgetLimits: true,
+				supportsContextCompaction: true,
+				supportsSessionFork: true,
+			};
+			const fieldNames = Object.keys(fullCaps);
+			for (const name of fieldNames) {
+				// No provider-prefixed fields
+				expect(name).not.toMatch(/^claude/i);
+				expect(name).not.toMatch(/^codex/i);
+				expect(name).not.toMatch(/^opencode/i);
+				expect(name).not.toMatch(/^openai/i);
+				// All should start with 'supports'
+				expect(name).toMatch(/^supports/);
+			}
+		});
+
+		it('RuntimeMetadataEvent data fields should use provider-neutral summary types', () => {
+			// Summary types use generic id/name/label/description — not SDK-specific shapes
+			const skill: SkillSummary = { id: 'commit', name: 'Commit' };
+			const model: RuntimeModelSummary = { id: 'model-x' };
+			const agent: RuntimeAgentSummary = { id: 'agent-y' };
+
+			// All summary types should have only 'id' as required, plus optional label/name/description
+			expect(Object.keys(skill)).toEqual(expect.arrayContaining(['id', 'name']));
+			expect(Object.keys(model)).toEqual(expect.arrayContaining(['id']));
+			expect(Object.keys(agent)).toEqual(expect.arrayContaining(['id']));
+
+			// None should reference provider-specific SDK fields
+			const allKeys = [...Object.keys(skill), ...Object.keys(model), ...Object.keys(agent)];
+			for (const key of allKeys) {
+				expect(key).not.toMatch(/^claude|^anthropic|^openai|^codex/i);
+			}
+		});
 	});
 
 	describe('serialization safety', () => {

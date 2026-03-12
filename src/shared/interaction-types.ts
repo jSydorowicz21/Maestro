@@ -5,6 +5,12 @@
  * (tool approvals, clarification questions) between harness-backed agents
  * and the renderer. They cross the main → preload → renderer boundary.
  *
+ * BOUNDARY INVARIANT: This module must NEVER import from provider-specific
+ * code (main/harness/*, @anthropic-ai/sdk, openai, etc.). All types here
+ * must be expressible as JSON-safe primitives and Record<string, unknown>
+ * so that any provider's harness adapter can produce or consume them without
+ * the renderer needing provider-specific decoding logic.
+ *
  * Day 1 interaction kinds: tool-approval, clarification.
  * Future kinds (auth prompts, file pickers, etc.) can be added later
  * without breaking existing contracts.
