@@ -27,6 +27,7 @@ vi.mock('lucide-react', () => ({
 	ShieldCheck: ({ className }: any) => <svg data-testid="shield-check-icon" className={className} />,
 	ShieldX: ({ className }: any) => <svg data-testid="shield-x-icon" className={className} />,
 	HelpCircle: ({ className, style }: any) => <svg data-testid="help-circle-icon" className={className} style={style} />,
+	AlertTriangle: ({ className }: any) => <svg data-testid="alert-triangle-icon" className={className} />,
 	MessageSquare: ({ className, style }: any) => <svg data-testid="message-square-icon" className={className} style={style} />,
 	Check: ({ className, style }: any) => <svg data-testid="check-icon" className={className} style={style} />,
 	Send: ({ className }: any) => <svg data-testid="send-icon" className={className} />,
@@ -534,6 +535,166 @@ describe('ClarificationView', () => {
 		);
 
 		expect(screen.getByText('Select one or more options')).toBeInTheDocument();
+	});
+
+	// ================================================================
+	// Options length validation (Issue #9)
+	// ================================================================
+
+	it('warns when a question has fewer than 2 options (1 option)', () => {
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const request = createClarification({
+			questions: [
+				{
+					question: 'Only one choice?',
+					header: 'Single',
+					options: [{ label: 'Only', description: '' }],
+					multiSelect: false,
+				},
+			],
+		});
+		renderWithLayerStack(
+			<ClarificationView theme={testTheme} request={request} onRespond={vi.fn()} />
+		);
+
+		expect(warnSpy).toHaveBeenCalledWith(
+			expect.stringContaining('has 1 option(s)')
+		);
+		// Still renders the single option (graceful degradation)
+		expect(screen.getByTestId('option-Only')).toBeInTheDocument();
+		warnSpy.mockRestore();
+	});
+
+	it('warns when a question has more than 4 options (5 options)', () => {
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const request = createClarification({
+			questions: [
+				{
+					question: 'Too many choices',
+					header: 'Many',
+					options: [
+						{ label: 'A', description: '' },
+						{ label: 'B', description: '' },
+						{ label: 'C', description: '' },
+						{ label: 'D', description: '' },
+						{ label: 'E', description: '' },
+					],
+					multiSelect: false,
+				},
+			],
+		});
+		renderWithLayerStack(
+			<ClarificationView theme={testTheme} request={request} onRespond={vi.fn()} />
+		);
+
+		expect(warnSpy).toHaveBeenCalledWith(
+			expect.stringContaining('has 5 option(s)')
+		);
+		// Still renders all 5 options
+		expect(screen.getByTestId('option-A')).toBeInTheDocument();
+		expect(screen.getByTestId('option-E')).toBeInTheDocument();
+		warnSpy.mockRestore();
+	});
+
+	it('does not warn for 2 options (lower bound)', () => {
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		renderWithLayerStack(
+			<ClarificationView
+				theme={testTheme}
+				request={createClarification()} // default has 2 options
+				onRespond={vi.fn()}
+			/>
+		);
+
+		expect(warnSpy).not.toHaveBeenCalled();
+		warnSpy.mockRestore();
+	});
+
+	it('does not warn for 4 options (upper bound)', () => {
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const request = createClarification({
+			questions: [
+				{
+					question: 'Four options',
+					header: 'Four',
+					options: [
+						{ label: 'W', description: '' },
+						{ label: 'X', description: '' },
+						{ label: 'Y', description: '' },
+						{ label: 'Z', description: '' },
+					],
+					multiSelect: false,
+				},
+			],
+		});
+		renderWithLayerStack(
+			<ClarificationView theme={testTheme} request={request} onRespond={vi.fn()} />
+		);
+
+		expect(warnSpy).not.toHaveBeenCalled();
+		warnSpy.mockRestore();
+	});
+
+	// ================================================================
+	// Zero options edge case (Issue #9)
+	// ================================================================
+
+	it('renders zero-options question with free-text hint when allowFreeText is true', () => {
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const request = createClarification({
+			allowFreeText: true,
+			questions: [
+				{
+					question: 'What do you think?',
+					header: 'Open',
+					options: [],
+					multiSelect: false,
+				},
+			],
+		});
+		renderWithLayerStack(
+			<ClarificationView theme={testTheme} request={request} onRespond={vi.fn()} />
+		);
+
+		// Question text still renders
+		expect(screen.getByText('What do you think?')).toBeInTheDocument();
+		// Shows the free-text hint
+		expect(screen.getByTestId('question-0-no-options')).toBeInTheDocument();
+		expect(screen.getByText(/use the text input below/i)).toBeInTheDocument();
+		// Free-text input is available
+		expect(screen.getByTestId('free-text-input')).toBeInTheDocument();
+		// No option buttons rendered
+		expect(screen.queryByRole('button', { name: /option/i })).not.toBeInTheDocument();
+		warnSpy.mockRestore();
+	});
+
+	it('renders zero-options question with disabled state when allowFreeText is false', () => {
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const request = createClarification({
+			allowFreeText: false,
+			questions: [
+				{
+					question: 'No choices for you',
+					header: 'Empty',
+					options: [],
+					multiSelect: false,
+				},
+			],
+		});
+		renderWithLayerStack(
+			<ClarificationView theme={testTheme} request={request} onRespond={vi.fn()} />
+		);
+
+		// Question text still renders
+		expect(screen.getByText('No choices for you')).toBeInTheDocument();
+		// Shows disabled-state message
+		expect(screen.getByTestId('no-options-disabled')).toBeInTheDocument();
+		expect(screen.getByText(/Please cancel and try again/)).toBeInTheDocument();
+		// Submit is disabled (no options, no free-text)
+		expect(screen.getByTestId('submit-button')).toBeDisabled();
+		// No free-text input
+		expect(screen.queryByTestId('free-text-input')).not.toBeInTheDocument();
+		warnSpy.mockRestore();
 	});
 });
 

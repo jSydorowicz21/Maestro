@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback, memo } from 'react';
-import { HelpCircle, Check, Send, X } from 'lucide-react';
+import { HelpCircle, AlertTriangle, Check, Send, X } from 'lucide-react';
 import type {
 	Theme,
 	ClarificationRequest,
@@ -17,6 +17,24 @@ import type {
 	ClarificationAnswer,
 	InteractionResponse,
 } from '../../types';
+
+/** Expected options count range per the ClarificationQuestion contract (2–4). */
+const MIN_OPTIONS = 2;
+const MAX_OPTIONS = 4;
+
+/**
+ * Validates a question's options array length at runtime.
+ * Logs a warning for out-of-range counts but never throws — the UI
+ * still renders whatever options are present (graceful degradation).
+ */
+function validateOptionsLength(question: ClarificationQuestion, questionIndex: number): void {
+	const count = question.options.length;
+	if (count < MIN_OPTIONS || count > MAX_OPTIONS) {
+		console.warn(
+			`[ClarificationView] Question ${questionIndex} ("${question.header}") has ${count} option(s); expected ${MIN_OPTIONS}–${MAX_OPTIONS}.`
+		);
+	}
+}
 
 export interface ClarificationViewProps {
 	theme: Theme;
@@ -97,6 +115,12 @@ export const ClarificationView = memo(function ClarificationView({
 		onRespond({ kind: 'cancel' });
 	}, [onRespond]);
 
+	// Validate all questions' options lengths on each render (warns once per render cycle)
+	request.questions.forEach((q, i) => validateOptionsLength(q, i));
+
+	// Whether every question has zero options — drives free-text-only fallback
+	const allQuestionsEmpty = request.questions.every((q) => q.options.length === 0);
+
 	return (
 		<div className="space-y-4" data-testid="clarification-view">
 			{/* Questions */}
@@ -108,8 +132,20 @@ export const ClarificationView = memo(function ClarificationView({
 					questionIndex={qIdx}
 					selectedLabels={selections[qIdx] || new Set()}
 					onToggle={toggleOption}
+					allowFreeText={request.allowFreeText}
 				/>
 			))}
+
+			{/* Disabled state: zero options and no free-text */}
+			{allQuestionsEmpty && !request.allowFreeText && (
+				<div
+					className="text-xs italic px-3 py-2 rounded"
+					style={{ color: theme.colors.textDim, backgroundColor: `${theme.colors.warning}15` }}
+					data-testid="no-options-disabled"
+				>
+					No options available. Please cancel and try again.
+				</div>
+			)}
 
 			{/* Free text input */}
 			{request.allowFreeText && (
@@ -183,6 +219,8 @@ interface QuestionBlockProps {
 	questionIndex: number;
 	selectedLabels: Set<string>;
 	onToggle: (questionIndex: number, label: string, multiSelect: boolean) => void;
+	/** Whether the parent request allows free-text fallback (used for zero-options state) */
+	allowFreeText: boolean;
 }
 
 const QuestionBlock = memo(function QuestionBlock({
@@ -191,7 +229,10 @@ const QuestionBlock = memo(function QuestionBlock({
 	questionIndex,
 	selectedLabels,
 	onToggle,
+	allowFreeText,
 }: QuestionBlockProps) {
+	const hasOptions = question.options.length > 0;
+
 	return (
 		<div data-testid={`question-${questionIndex}`}>
 			{/* Header and question text */}
@@ -217,56 +258,72 @@ const QuestionBlock = memo(function QuestionBlock({
 				</div>
 			</div>
 
+			{/* Zero options: show contextual hint */}
+			{!hasOptions && (
+				<div
+					className="flex items-center gap-2 ml-11 px-3 py-2 rounded text-xs"
+					style={{ color: theme.colors.warning, backgroundColor: `${theme.colors.warning}10` }}
+					data-testid={`question-${questionIndex}-no-options`}
+				>
+					<AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+					{allowFreeText
+						? 'No predefined options — use the text input below.'
+						: 'No options available.'}
+				</div>
+			)}
+
 			{/* Options */}
-			<div className="space-y-1.5 ml-11">
-				{question.options.map((option) => {
-					const isSelected = selectedLabels.has(option.label);
-					return (
-						<button
-							key={option.label}
-							type="button"
-							onClick={() => onToggle(questionIndex, option.label, question.multiSelect)}
-							className="w-full flex items-start gap-3 px-3 py-2 rounded border text-left transition-colors hover:bg-white/5"
-							style={{
-								borderColor: isSelected ? theme.colors.accent : theme.colors.border,
-								backgroundColor: isSelected ? `${theme.colors.accent}10` : 'transparent',
-							}}
-							data-testid={`option-${option.label}`}
-						>
-							{/* Selection indicator */}
-							<div
-								className="w-4 h-4 rounded shrink-0 mt-0.5 border flex items-center justify-center"
+			{hasOptions && (
+				<div className="space-y-1.5 ml-11">
+					{question.options.map((option) => {
+						const isSelected = selectedLabels.has(option.label);
+						return (
+							<button
+								key={option.label}
+								type="button"
+								onClick={() => onToggle(questionIndex, option.label, question.multiSelect)}
+								className="w-full flex items-start gap-3 px-3 py-2 rounded border text-left transition-colors hover:bg-white/5"
 								style={{
 									borderColor: isSelected ? theme.colors.accent : theme.colors.border,
-									backgroundColor: isSelected ? theme.colors.accent : 'transparent',
-									borderRadius: question.multiSelect ? '4px' : '50%',
+									backgroundColor: isSelected ? `${theme.colors.accent}10` : 'transparent',
 								}}
+								data-testid={`option-${option.label}`}
 							>
-								{isSelected && (
-									<Check
-										className="w-3 h-3"
-										style={{ color: theme.colors.accentForeground }}
-									/>
-								)}
-							</div>
-							{/* Label and description */}
-							<div className="min-w-0 flex-1">
-								<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-									{option.label}
+								{/* Selection indicator */}
+								<div
+									className="w-4 h-4 rounded shrink-0 mt-0.5 border flex items-center justify-center"
+									style={{
+										borderColor: isSelected ? theme.colors.accent : theme.colors.border,
+										backgroundColor: isSelected ? theme.colors.accent : 'transparent',
+										borderRadius: question.multiSelect ? '4px' : '50%',
+									}}
+								>
+									{isSelected && (
+										<Check
+											className="w-3 h-3"
+											style={{ color: theme.colors.accentForeground }}
+										/>
+									)}
 								</div>
-								{option.description && (
-									<div className="text-xs mt-0.5" style={{ color: theme.colors.textDim }}>
-										{option.description}
+								{/* Label and description */}
+								<div className="min-w-0 flex-1">
+									<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
+										{option.label}
 									</div>
-								)}
-							</div>
-						</button>
-					);
-				})}
-			</div>
+									{option.description && (
+										<div className="text-xs mt-0.5" style={{ color: theme.colors.textDim }}>
+											{option.description}
+										</div>
+									)}
+								</div>
+							</button>
+						);
+					})}
+				</div>
+			)}
 
 			{/* Multi-select hint */}
-			{question.multiSelect && (
+			{question.multiSelect && hasOptions && (
 				<div
 					className="text-xs mt-1.5 ml-11"
 					style={{ color: theme.colors.textDim }}
