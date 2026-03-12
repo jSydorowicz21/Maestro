@@ -147,6 +147,36 @@ interface UsageStats {
 	reasoningTokens?: number; // Separate reasoning tokens (Codex o3/o4-mini)
 }
 
+/**
+ * Interaction request from harness-backed agents (provider-neutral).
+ * Mirrors the shared InteractionRequest union in interaction-types.ts.
+ * Used by window.maestro.process.onInteractionRequest.
+ */
+interface InteractionRequestPayload {
+	interactionId: string;
+	sessionId: string;
+	agentId: string;
+	kind: 'tool-approval' | 'clarification';
+	timestamp: number;
+	timeoutMs?: number;
+	// Tool approval fields
+	toolUseId?: string;
+	toolName?: string;
+	toolInput?: Record<string, unknown>;
+	decisionReason?: string;
+	suggestedPermissions?: Record<string, unknown>[];
+	blockedPath?: string;
+	subagentId?: string;
+	// Clarification fields
+	questions?: Array<{
+		question: string;
+		header: string;
+		options: Array<{ label: string; description: string; preview?: string }>;
+		multiSelect: boolean;
+	}>;
+	allowFreeText?: boolean;
+}
+
 type HistoryEntryType = 'AUTO' | 'USER';
 
 /**
@@ -342,6 +372,9 @@ interface MaestroAPI {
 					parsedJson?: unknown;
 				}
 			) => void
+		) => () => void;
+		onInteractionRequest: (
+			callback: (sessionId: string, request: InteractionRequestPayload) => void
 		) => () => void;
 	};
 	agentError: {

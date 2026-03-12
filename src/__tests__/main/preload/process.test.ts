@@ -273,6 +273,94 @@ describe('Process Preload API', () => {
 		});
 	});
 
+	describe('onInteractionRequest', () => {
+		it('should register event listener for process:interaction-request', () => {
+			const callback = vi.fn();
+
+			const cleanup = api.onInteractionRequest(callback);
+
+			expect(mockOn).toHaveBeenCalledWith('process:interaction-request', expect.any(Function));
+			expect(typeof cleanup).toBe('function');
+		});
+
+		it('should call callback with sessionId and tool approval request', () => {
+			const callback = vi.fn();
+			let registeredHandler: (event: unknown, sessionId: string, request: unknown) => void;
+
+			mockOn.mockImplementation((channel: string, handler: typeof registeredHandler) => {
+				if (channel === 'process:interaction-request') {
+					registeredHandler = handler;
+				}
+			});
+
+			api.onInteractionRequest(callback);
+
+			const toolApprovalRequest = {
+				interactionId: 'int-001',
+				sessionId: 'session-123',
+				agentId: 'claude-code',
+				kind: 'tool-approval' as const,
+				timestamp: Date.now(),
+				timeoutMs: 300000,
+				toolUseId: 'tool-use-abc',
+				toolName: 'Edit',
+				toolInput: { file_path: '/src/main.ts', old_string: 'foo', new_string: 'bar' },
+				decisionReason: 'File write requires approval',
+			};
+			registeredHandler!({}, 'session-123', toolApprovalRequest);
+
+			expect(callback).toHaveBeenCalledWith('session-123', toolApprovalRequest);
+		});
+
+		it('should call callback with sessionId and clarification request', () => {
+			const callback = vi.fn();
+			let registeredHandler: (event: unknown, sessionId: string, request: unknown) => void;
+
+			mockOn.mockImplementation((channel: string, handler: typeof registeredHandler) => {
+				if (channel === 'process:interaction-request') {
+					registeredHandler = handler;
+				}
+			});
+
+			api.onInteractionRequest(callback);
+
+			const clarificationRequest = {
+				interactionId: 'int-002',
+				sessionId: 'session-456',
+				agentId: 'claude-code',
+				kind: 'clarification' as const,
+				timestamp: Date.now(),
+				questions: [
+					{
+						question: 'Which branch should I target?',
+						header: 'Branch',
+						options: [
+							{ label: 'main', description: 'The main branch' },
+							{ label: 'develop', description: 'The develop branch' },
+						],
+						multiSelect: false,
+					},
+				],
+				allowFreeText: true,
+			};
+			registeredHandler!({}, 'session-456', clarificationRequest);
+
+			expect(callback).toHaveBeenCalledWith('session-456', clarificationRequest);
+		});
+
+		it('should return cleanup function that removes listener', () => {
+			const callback = vi.fn();
+
+			const cleanup = api.onInteractionRequest(callback);
+			cleanup();
+
+			expect(mockRemoveListener).toHaveBeenCalledWith(
+				'process:interaction-request',
+				expect.any(Function)
+			);
+		});
+	});
+
 	describe('onRemoteCommand', () => {
 		it('should register listener and invoke callback with all parameters', () => {
 			const callback = vi.fn();

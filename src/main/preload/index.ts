@@ -407,6 +407,7 @@ export type {
 	AgentError,
 	ToolExecutionEvent,
 	SshRemoteInfo,
+	InteractionRequest,
 } from './process';
 export type {
 	// From git

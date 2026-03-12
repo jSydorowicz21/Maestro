@@ -5,6 +5,20 @@
 export { AGENT_IDS, isValidAgentId } from './agentIds';
 export type { AgentId } from './agentIds';
 
+// Re-export interaction types for cross-layer consumption
+export type {
+	InteractionKind,
+	InteractionRequest,
+	InteractionResponse,
+	BaseInteractionRequest,
+	ToolApprovalRequest,
+	ClarificationRequest,
+	ClarificationQuestion,
+	ClarificationOption,
+	ClarificationAnswer,
+	PermissionUpdate,
+} from './interaction-types';
+
 /**
  * Union type of all valid agent IDs.
  * Derived from AGENT_IDS — the single source of truth in agentIds.ts.

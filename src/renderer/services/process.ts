@@ -5,6 +5,7 @@
 
 import { createIpcMethod } from './ipcWrapper';
 import type { ProcessConfig } from '../types';
+import type { InteractionRequest } from '../../shared/interaction-types';
 
 export type { ProcessConfig } from '../types';
 
@@ -117,5 +118,17 @@ export const processService = {
 		) => void
 	): () => void {
 		return window.maestro.process.onToolExecution(handler);
+	},
+
+	/**
+	 * Register handler for interaction request events from harness-backed agents.
+	 * Called when an agent needs user input mid-turn (tool approval, clarification).
+	 */
+	onInteractionRequest(
+		handler: (sessionId: string, request: InteractionRequest) => void
+	): () => void {
+		return window.maestro.process.onInteractionRequest(
+			handler as unknown as (sessionId: string, request: unknown) => void
+		);
 	},
 };

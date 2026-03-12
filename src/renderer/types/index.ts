@@ -23,6 +23,16 @@ export type {
 	PermissionMode,
 	AgentExecutionConfig,
 	StructuredOutputConfig,
+	// Interaction types (harness mid-turn interactions)
+	InteractionKind,
+	InteractionRequest,
+	InteractionResponse,
+	ToolApprovalRequest,
+	ClarificationRequest,
+	ClarificationQuestion,
+	ClarificationOption,
+	ClarificationAnswer,
+	PermissionUpdate,
 } from '../../shared/types';
 
 // Re-export Symphony types for session metadata

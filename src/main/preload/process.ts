@@ -10,6 +10,7 @@
  */
 
 import { ipcRenderer } from 'electron';
+import type { InteractionRequest } from '../../shared/interaction-types';
 
 /**
  * Helper to log via the main process logger.
@@ -459,8 +460,25 @@ export function createProcessApi() {
 			ipcRenderer.on('agent:error', handler);
 			return () => ipcRenderer.removeListener('agent:error', handler);
 		},
+
+		/**
+		 * Subscribe to interaction request events from harness-backed agents.
+		 * Emitted when an agent needs user input mid-turn (tool approval, clarification).
+		 * Renderer should display the appropriate UI and respond via respondToInteraction.
+		 */
+		onInteractionRequest: (
+			callback: (sessionId: string, request: InteractionRequest) => void
+		): (() => void) => {
+			const handler = (_: unknown, sessionId: string, request: InteractionRequest) =>
+				callback(sessionId, request);
+			ipcRenderer.on('process:interaction-request', handler);
+			return () => ipcRenderer.removeListener('process:interaction-request', handler);
+		},
 	};
 }
+
+// Re-export interaction types for consumers of the preload API
+export type { InteractionRequest } from '../../shared/interaction-types';
 
 /**
  * TypeScript type for the process API
