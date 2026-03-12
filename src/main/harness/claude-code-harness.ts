@@ -291,13 +291,31 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 			throw new Error(message);
 		}
 
-		// Clear timeout and remove from map
+		// Clear timeout and remove from map BEFORE translation.
+		// If translation fails, the SDK promise must still resolve (with a
+		// safe deny) so that the SDK callback never dangles forever.
 		clearTimeout(pending.timeout);
 		this.pendingInteractions.delete(interactionId);
 
-		// Translate shared InteractionResponse → Claude SDK PermissionResult
-		const sdkResult = this.translateResponseToSdk(response, pending);
-		pending.resolve(sdkResult);
+		try {
+			const sdkResult = this.translateResponseToSdk(response, pending);
+			pending.resolve(sdkResult);
+		} catch (translationError) {
+			// Translation failed — resolve with a safe deny so the SDK
+			// callback is never left dangling, then re-throw so the caller
+			// knows the response was malformed.
+			logger.error(
+				`${LOG_CONTEXT} Response translation failed for ${interactionId}: ${String(translationError)}`,
+				LOG_CONTEXT
+			);
+			pending.resolve({
+				behavior: 'deny',
+				message: `Response translation error: ${String(translationError)}`,
+			});
+			throw new Error(
+				`Response translation failed for interaction ${interactionId}: ${String(translationError)}`
+			);
+		}
 	}
 
 	async updateRuntimeSettings(settings: HarnessRuntimeSettings): Promise<void> {
@@ -607,7 +625,24 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 
 		// Build the SDK's answers record: { [questionText]: selectedLabel }
 		const sdkAnswers: Record<string, string> = {};
+
+		// Defensive: handle null/undefined/non-array answers gracefully
+		if (!Array.isArray(answers)) {
+			logger.warn(
+				`${LOG_CONTEXT} clarification-answer received non-array answers, returning empty`,
+				LOG_CONTEXT
+			);
+			return {
+				behavior: 'allow',
+				updatedInput: {
+					questions: originalInput?.questions || [],
+					answers: sdkAnswers,
+				},
+			};
+		}
+
 		for (const answer of answers) {
+			if (!answer || typeof answer.questionIndex !== 'number') continue;
 			const question = questions[answer.questionIndex];
 			if (question) {
 				if (answer.text) {
