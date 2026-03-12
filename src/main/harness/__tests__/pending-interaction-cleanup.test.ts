@@ -909,6 +909,7 @@ describe('Claude harness pending interaction cleanup and failure behavior', () =
 
 			expect(mockLogger.error).toHaveBeenCalledWith(
 				expect.stringContaining('SDK message stream error'),
+				expect.anything(),
 				expect.anything()
 			);
 		});
@@ -988,7 +989,7 @@ describe('Claude harness pending interaction cleanup and failure behavior', () =
 			harness.write({ type: 'text', text: 'test' });
 
 			expect(mockLogger.error).toHaveBeenCalledWith(
-				expect.stringContaining('write() failed'),
+				expect.stringContaining('write() streamInput failed'),
 				expect.anything()
 			);
 		});

@@ -175,6 +175,18 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 
 			this._running = true;
 
+			logger.info(
+				`${LOG_CONTEXT} spawn() succeeded`,
+				LOG_CONTEXT,
+				{
+					sessionId: config.sessionId,
+					model: config.modelId || 'default',
+					cwd: config.cwd,
+					hasResume: !!config.resumeSessionId,
+					permissionMode: config.permissionMode,
+				}
+			);
+
 			// Start consuming the async generator in the background
 			this.consumeMessages(config.sessionId).catch((error) => {
 				logger.error(
@@ -185,7 +197,9 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 
 			return { success: true, pid: null };
 		} catch (error) {
-			logger.error(`${LOG_CONTEXT} spawn() failed: ${String(error)}`, LOG_CONTEXT);
+			logger.error(`${LOG_CONTEXT} spawn() failed: ${String(error)}`, LOG_CONTEXT, {
+				sessionId: config.sessionId,
+			});
 			this._running = false;
 			return { success: false, pid: null };
 		}
@@ -207,7 +221,7 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 		try {
 			this._query.streamInput(this.createStreamingPrompt(message));
 		} catch (error) {
-			logger.error(`${LOG_CONTEXT} write() failed: ${String(error)}`, LOG_CONTEXT);
+			logger.error(`${LOG_CONTEXT} write() streamInput failed: ${String(error)}`, LOG_CONTEXT);
 		}
 	}
 
@@ -232,6 +246,8 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 	kill(): void {
 		if (this._disposed) return; // Already fully cleaned up
 
+		const pendingCount = this.pendingInteractions.size;
+
 		// Resolve all pending interactions with termination responses
 		this.resolveAllPending(createTerminationResponse);
 
@@ -250,6 +266,11 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 		this._running = false;
 		this._query = null;
 		this._abortController = null;
+
+		logger.debug(
+			`${LOG_CONTEXT} kill() completed, resolved ${pendingCount} pending interaction(s)`,
+			LOG_CONTEXT
+		);
 	}
 
 	dispose(): void {
@@ -297,9 +318,22 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 		clearTimeout(pending.timeout);
 		this.pendingInteractions.delete(interactionId);
 
+		const latencyMs = Date.now() - pending.createdAt;
+
 		try {
 			const sdkResult = this.translateResponseToSdk(response, pending);
 			pending.resolve(sdkResult);
+
+			logger.debug(
+				`${LOG_CONTEXT} respondToInteraction() resolved`,
+				LOG_CONTEXT,
+				{
+					interactionId,
+					kind: pending.kind,
+					responseKind: response.kind,
+					latencyMs,
+				}
+			);
 		} catch (translationError) {
 			// Translation failed — resolve with a safe deny so the SDK
 			// callback is never left dangling, then re-throw so the caller
@@ -451,6 +485,13 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 					this.pendingInteractions.delete(request.interactionId);
 					const timeoutResponse = createInteractionTimeoutResponse(request.kind);
 					const sdkResult = this.translateResponseToSdk(timeoutResponse, pending);
+
+					logger.debug(
+						`${LOG_CONTEXT} Interaction timed out after ${timeoutMs}ms`,
+						LOG_CONTEXT,
+						{ interactionId: request.interactionId, kind: request.kind, sessionId }
+					);
+
 					resolve(sdkResult);
 				}
 			}, timeoutMs);
@@ -467,6 +508,19 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 			};
 
 			this.pendingInteractions.set(request.interactionId, pending);
+
+			logger.debug(
+				`${LOG_CONTEXT} Pending interaction created`,
+				LOG_CONTEXT,
+				{
+					interactionId: request.interactionId,
+					kind: request.kind,
+					sessionId,
+					timeoutMs,
+					pendingCount: this.pendingInteractions.size,
+				}
+			);
+
 			this.emit('interaction-request', sessionId, request);
 		});
 	}
@@ -478,6 +532,14 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 	private resolveAllPending(
 		responseFactory: (kind: InteractionKind) => InteractionResponse
 	): void {
+		const count = this.pendingInteractions.size;
+		if (count > 0) {
+			logger.debug(
+				`${LOG_CONTEXT} Resolving ${count} pending interaction(s) via ${responseFactory.name || 'factory'}`,
+				LOG_CONTEXT
+			);
+		}
+
 		for (const [, pending] of this.pendingInteractions) {
 			clearTimeout(pending.timeout);
 			const response = responseFactory(pending.kind);
@@ -521,6 +583,12 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 					multiSelect: q.multiSelect,
 				}));
 
+				logger.debug(
+					`${LOG_CONTEXT} canUseTool: clarification request`,
+					LOG_CONTEXT,
+					{ sessionId, interactionId, questionCount: questions.length }
+				);
+
 				const request: ClarificationRequest = {
 					interactionId,
 					sessionId,
@@ -535,6 +603,12 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 				return this.awaitInteraction(sessionId, request, input);
 			} else {
 				// Tool approval request
+				logger.debug(
+					`${LOG_CONTEXT} canUseTool: tool approval request`,
+					LOG_CONTEXT,
+					{ sessionId, interactionId, toolName, reason: options.decisionReason }
+				);
+
 				const request: ToolApprovalRequest = {
 					interactionId,
 					sessionId,
@@ -676,6 +750,8 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 	private async consumeMessages(sessionId: string): Promise<void> {
 		if (!this._query) return;
 
+		logger.debug(`${LOG_CONTEXT} Message stream started`, LOG_CONTEXT, { sessionId });
+
 		try {
 			for await (const message of this._query) {
 				if (!this._running) break;
@@ -686,7 +762,8 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 
 			logger.error(
 				`${LOG_CONTEXT} SDK message stream error: ${String(error)}`,
-				LOG_CONTEXT
+				LOG_CONTEXT,
+				{ sessionId, pendingInteractions: this.pendingInteractions.size }
 			);
 			this.emit('agent-error', sessionId, {
 				type: 'unknown',
@@ -700,6 +777,8 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 			this._running = false;
 			// Resolve any remaining pending interactions on stream end
 			this.resolveAllPending(createTerminationResponse);
+
+			logger.debug(`${LOG_CONTEXT} Message stream ended`, LOG_CONTEXT, { sessionId });
 		}
 	}
 

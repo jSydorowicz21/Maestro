@@ -68,10 +68,18 @@ export class ProcessManager extends EventEmitter {
 		}
 
 		// Classic execution path (also serves as fallback for unregistered harnesses)
-		if (this.shouldUsePty(config)) {
-			return this.ptySpawner.spawn(config);
-		}
-		return this.childProcessSpawner.spawn(config);
+		const usePty = this.shouldUsePty(config);
+		const result = usePty
+			? this.ptySpawner.spawn(config)
+			: this.childProcessSpawner.spawn(config);
+
+		logger.debug(
+			`[ProcessManager] spawn() completed — backend=${usePty ? 'pty' : 'child-process'}, pid=${result.pid}, success=${result.success}`,
+			'ProcessManager',
+			{ sessionId: config.sessionId, toolType: config.toolType, selectedMode: mode }
+		);
+
+		return result;
 	}
 
 	private shouldUsePty(config: ProcessConfig): boolean {
@@ -107,6 +115,9 @@ export class ProcessManager extends EventEmitter {
 						execution.ptyProcess.write(data);
 						return true;
 					}
+					logger.warn('[ProcessManager] write() - pty backend has no ptyProcess handle', 'ProcessManager', {
+						sessionId,
+					});
 					return false;
 
 				case 'child-process':
@@ -114,6 +125,10 @@ export class ProcessManager extends EventEmitter {
 						execution.childProcess.stdin.write(data);
 						return true;
 					}
+					logger.warn('[ProcessManager] write() - child-process backend has no stdin handle', 'ProcessManager', {
+						sessionId,
+						hasChildProcess: !!execution.childProcess,
+					});
 					return false;
 
 				case 'harness':
@@ -126,6 +141,10 @@ export class ProcessManager extends EventEmitter {
 					return false;
 
 				default:
+					logger.warn('[ProcessManager] write() - unknown backend type', 'ProcessManager', {
+						sessionId,
+						backend: execution.backend,
+					});
 					return false;
 			}
 		} catch (error) {
@@ -167,7 +186,12 @@ export class ProcessManager extends EventEmitter {
 	 */
 	interrupt(sessionId: string): boolean {
 		const execution = this.processes.get(sessionId);
-		if (!execution) return false;
+		if (!execution) {
+			logger.warn('[ProcessManager] interrupt() - No execution found for session', 'ProcessManager', {
+				sessionId,
+			});
+			return false;
+		}
 
 		try {
 			switch (execution.backend) {
@@ -176,6 +200,9 @@ export class ProcessManager extends EventEmitter {
 						execution.ptyProcess.write('\x03');
 						return true;
 					}
+					logger.warn('[ProcessManager] interrupt() - pty backend has no ptyProcess handle', 'ProcessManager', {
+						sessionId,
+					});
 					return false;
 
 				case 'child-process':
@@ -204,6 +231,9 @@ export class ProcessManager extends EventEmitter {
 
 						return true;
 					}
+					logger.warn('[ProcessManager] interrupt() - child-process backend has no childProcess handle', 'ProcessManager', {
+						sessionId,
+					});
 					return false;
 
 				case 'harness':
@@ -216,6 +246,10 @@ export class ProcessManager extends EventEmitter {
 					return false;
 
 				default:
+					logger.warn('[ProcessManager] interrupt() - unknown backend type', 'ProcessManager', {
+						sessionId,
+						backend: execution.backend,
+					});
 					return false;
 			}
 		} catch (error) {
@@ -236,7 +270,12 @@ export class ProcessManager extends EventEmitter {
 	 */
 	kill(sessionId: string): boolean {
 		const execution = this.processes.get(sessionId);
-		if (!execution) return false;
+		if (!execution) {
+			logger.warn('[ProcessManager] kill() - No execution found for session', 'ProcessManager', {
+				sessionId,
+			});
+			return false;
+		}
 
 		try {
 			// Common cleanup: flush buffers (applies to all backends)
@@ -271,6 +310,13 @@ export class ProcessManager extends EventEmitter {
 
 			// Always remove the execution record
 			this.processes.delete(sessionId);
+
+			logger.debug('[ProcessManager] kill() completed', 'ProcessManager', {
+				sessionId,
+				backend: execution.backend,
+				pid: execution.pid,
+			});
+
 			return true;
 		} catch (error) {
 			logger.error('[ProcessManager] Failed to kill execution', 'ProcessManager', {
@@ -328,6 +374,10 @@ export class ProcessManager extends EventEmitter {
 	 * Kill all managed processes
 	 */
 	killAll(): void {
+		const count = this.processes.size;
+		if (count > 0) {
+			logger.info(`[ProcessManager] killAll() — terminating ${count} execution(s)`, 'ProcessManager');
+		}
 		for (const [sessionId] of this.processes) {
 			this.kill(sessionId);
 		}
