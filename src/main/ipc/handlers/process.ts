@@ -25,6 +25,7 @@ import { getWindowsShellForAgentExecution } from '../../process-manager/utils/sh
 import { buildExpandedEnv } from '../../../shared/pathUtils';
 import type { SshRemoteConfig } from '../../../shared/types';
 import type { InteractionResponse } from '../../../shared/interaction-types';
+import type { HarnessRuntimeSettings } from '../../../shared/harness-types';
 import { powerManager } from '../../power-manager';
 import { MaestroSettings } from './persistence';
 
@@ -728,6 +729,24 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 					responseKind: response.kind,
 				});
 				return processManager.respondToInteraction(sessionId, interactionId, response);
+			}
+		)
+	);
+
+	// Update runtime settings on a harness-backed execution.
+	// Routes the settings to the ProcessManager which forwards them to the
+	// appropriate harness instance for application.
+	ipcMain.handle(
+		'process:update-runtime-settings',
+		withIpcErrorLogging(
+			handlerOpts('update runtime settings'),
+			async (sessionId: string, settings: HarnessRuntimeSettings) => {
+				const processManager = requireProcessManager(getProcessManager);
+				logger.debug(`Updating runtime settings`, LOG_CONTEXT, {
+					sessionId,
+					settingsKeys: Object.keys(settings),
+				});
+				return processManager.updateRuntimeSettings(sessionId, settings);
 			}
 		)
 	);
