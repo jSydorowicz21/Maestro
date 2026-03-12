@@ -270,19 +270,57 @@ describe('ProcessManager: Unified Execution Ownership', () => {
 	// kill() routing by backend
 	// ===================================================================
 	describe('kill() backend routing', () => {
-		it('logs warning for harness backend and removes execution record', () => {
-			const execution = makeHarnessExecution();
+		it('calls harness.dispose() for harness backend and removes execution record', () => {
+			const mockDispose = vi.fn();
+			const execution = makeHarnessExecution({
+				harness: { dispose: mockDispose, isDisposed: () => false } as any,
+			});
+			injectExecution(pm, execution);
+
+			const result = pm.kill('harness-session-1');
+
+			expect(result).toBe(true);
+			expect(mockDispose).toHaveBeenCalledOnce();
+			expect(pm.get('harness-session-1')).toBeUndefined();
+		});
+
+		it('logs warning when harness-backed execution has no harness instance', () => {
+			const execution = makeHarnessExecution(); // no harness field
 			injectExecution(pm, execution);
 
 			const result = pm.kill('harness-session-1');
 
 			expect(result).toBe(true);
 			expect(mockLogger.warn).toHaveBeenCalledWith(
-				expect.stringContaining('harness kill not yet implemented'),
+				expect.stringContaining('no harness instance'),
 				'ProcessManager',
 				expect.objectContaining({ sessionId: 'harness-session-1' })
 			);
-			// Record should be removed from the map
+			expect(pm.get('harness-session-1')).toBeUndefined();
+		});
+
+		it('still deletes execution record if harness.dispose() throws', () => {
+			const mockDispose = vi.fn(() => {
+				throw new Error('dispose exploded');
+			});
+			const execution = makeHarnessExecution({
+				harness: { dispose: mockDispose, isDisposed: () => false } as any,
+			});
+			injectExecution(pm, execution);
+
+			const result = pm.kill('harness-session-1');
+
+			expect(result).toBe(true);
+			expect(mockDispose).toHaveBeenCalledOnce();
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				expect.stringContaining('harness.dispose() threw'),
+				'ProcessManager',
+				expect.objectContaining({
+					sessionId: 'harness-session-1',
+					error: 'Error: dispose exploded',
+				})
+			);
+			// Execution record must still be removed
 			expect(pm.get('harness-session-1')).toBeUndefined();
 		});
 

@@ -300,12 +300,26 @@ export class ProcessManager extends EventEmitter {
 					break;
 
 				case 'harness':
-					// Harness kill delegation — Phase 2+
-					logger.warn(
-						'[ProcessManager] kill() called on harness-backed execution but harness kill not yet implemented',
-						'ProcessManager',
-						{ sessionId }
-					);
+					// Deterministic cleanup: dispose the harness to release all resources.
+					// dispose() is synchronous and idempotent. Errors must not prevent
+					// the execution record from being deleted.
+					if (execution.harness) {
+						try {
+							execution.harness.dispose();
+						} catch (disposeError) {
+							logger.error(
+								'[ProcessManager] kill() - harness.dispose() threw, continuing with cleanup',
+								'ProcessManager',
+								{ sessionId, error: String(disposeError) }
+							);
+						}
+					} else {
+						logger.warn(
+							'[ProcessManager] kill() - harness-backed execution has no harness instance',
+							'ProcessManager',
+							{ sessionId }
+						);
+					}
 					break;
 			}
 
