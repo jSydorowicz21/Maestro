@@ -154,6 +154,67 @@ describe('cross-layer type convergence', () => {
 			};
 			expect(event.capabilities?.supportsRuntimeModelChange).toBeUndefined();
 		});
+
+		it('HarnessRuntimeCapabilities should include all design-doc fields', () => {
+			// Full capabilities object — validates all 13 fields from the design doc compile
+			const fullCaps: HarnessRuntimeCapabilities = {
+				// Interaction
+				supportsMidTurnInput: true,
+				supportsInteractionRequests: true,
+				supportsPersistentStdin: false,
+				// Runtime changes
+				supportsRuntimePermissionUpdates: true,
+				supportsRuntimeModelChange: true,
+				supportsRuntimeEffortChange: true,
+				// Feature discovery
+				supportsSkillsEnumeration: true,
+				supportsRuntimeSlashCommands: true,
+				// Data features
+				supportsFileCheckpointing: true,
+				supportsStructuredOutput: true,
+				supportsBudgetLimits: true,
+				supportsContextCompaction: true,
+				supportsSessionFork: true,
+			};
+			expect(Object.keys(fullCaps)).toHaveLength(13);
+		});
+
+		it('RuntimeMetadataEvent should carry all design-doc data fields', () => {
+			// Validates that the event shape includes all top-level fields from the design doc
+			const snapshot: RuntimeMetadataEvent = {
+				sessionId: 'session-full',
+				source: 'claude-code',
+				replace: true,
+				skills: [{ id: 'sk1', name: 'Skill' }],
+				slashCommands: ['/help'],
+				availableModels: [{ id: 'model-1' }],
+				availableAgents: [{ id: 'agent-1' }],
+				capabilities: { supportsInteractionRequests: true },
+			};
+			// Every optional data field is present
+			expect(snapshot.skills).toBeDefined();
+			expect(snapshot.slashCommands).toBeDefined();
+			expect(snapshot.availableModels).toBeDefined();
+			expect(snapshot.availableAgents).toBeDefined();
+			expect(snapshot.capabilities).toBeDefined();
+			expect(snapshot.replace).toBe(true);
+		});
+
+		it('SkillSummary, RuntimeModelSummary, RuntimeAgentSummary should match design doc', () => {
+			const skill: SkillSummary = { id: 'sk1', name: 'Test', description: 'desc' };
+			const model: RuntimeModelSummary = { id: 'model-1', label: 'Model One' };
+			const agent: RuntimeAgentSummary = { id: 'agent-1', label: 'Agent One' };
+			// description and label are optional
+			const minSkill: SkillSummary = { id: 'sk2', name: 'Minimal' };
+			const minModel: RuntimeModelSummary = { id: 'model-2' };
+			const minAgent: RuntimeAgentSummary = { id: 'agent-2' };
+			expect(skill.description).toBe('desc');
+			expect(minSkill.description).toBeUndefined();
+			expect(model.label).toBe('Model One');
+			expect(minModel.label).toBeUndefined();
+			expect(agent.label).toBe('Agent One');
+			expect(minAgent.label).toBeUndefined();
+		});
 	});
 
 	describe('AgentExecutionConfig convergence with PreloadProcessConfig', () => {

@@ -20,14 +20,50 @@ import type { ToolType } from './types';
 /**
  * Runtime capabilities discovered after harness creation.
  * These inform the renderer which runtime controls to enable.
+ *
+ * Capability layers (keep distinct):
+ * 1. Static agent capabilities (AgentCapabilities) — known before spawn
+ * 2. Harness runtime capabilities (this interface) — known after harness creation
+ * 3. Session runtime metadata (RuntimeMetadataEvent data fields) — concrete session-scoped data
  */
 export interface HarnessRuntimeCapabilities {
-	/** Whether the harness supports changing the model mid-session */
-	supportsRuntimeModelChange: boolean;
-	/** Whether the harness can enumerate agent skills */
-	supportsSkillsEnumeration: boolean;
+	// -- Interaction --
+
+	/** Whether the harness supports writing input mid-turn */
+	supportsMidTurnInput: boolean;
 	/** Whether the harness supports mid-turn interaction requests */
 	supportsInteractionRequests: boolean;
+	/** Whether the harness supports a persistent stdin channel */
+	supportsPersistentStdin: boolean;
+
+	// -- Runtime changes --
+
+	/** Whether the harness supports permission updates at runtime */
+	supportsRuntimePermissionUpdates: boolean;
+	/** Whether the harness supports changing the model mid-session */
+	supportsRuntimeModelChange: boolean;
+	/** Whether the harness supports changing reasoning effort at runtime */
+	supportsRuntimeEffortChange: boolean;
+
+	// -- Feature discovery --
+
+	/** Whether the harness can enumerate agent skills */
+	supportsSkillsEnumeration: boolean;
+	/** Whether the harness supports runtime slash commands */
+	supportsRuntimeSlashCommands: boolean;
+
+	// -- Data features --
+
+	/** Whether the harness supports file checkpointing (rewind/revert) */
+	supportsFileCheckpointing: boolean;
+	/** Whether the harness supports structured output */
+	supportsStructuredOutput: boolean;
+	/** Whether the harness supports budget/token limits */
+	supportsBudgetLimits: boolean;
+	/** Whether the harness supports context compaction */
+	supportsContextCompaction: boolean;
+	/** Whether the harness supports session forking */
+	supportsSessionFork: boolean;
 }
 
 // ============================================================================
