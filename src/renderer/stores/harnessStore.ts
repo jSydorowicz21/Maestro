@@ -19,6 +19,7 @@
 
 import { create } from 'zustand';
 import type { InteractionRequest, InteractionResponse } from '../../shared/interaction-types';
+import type { HarnessRuntimeSettings } from '../../shared/harness-types';
 import type {
 	RuntimeMetadataEvent,
 	HarnessRuntimeCapabilities,
@@ -78,6 +79,17 @@ export interface HarnessStoreActions {
 		sessionId: string,
 		interactionId: string,
 		response: InteractionResponse
+	) => Promise<void>;
+
+	// === Runtime Settings ===
+
+	/**
+	 * Update runtime settings on a running harness-backed agent.
+	 * Dispatches through processService to the main process.
+	 */
+	updateRuntimeSettings: (
+		sessionId: string,
+		settings: HarnessRuntimeSettings
 	) => Promise<void>;
 
 	// === Runtime Metadata ===
@@ -198,6 +210,20 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
 				err
 			);
 			// Don't re-add — the harness will timeout and handle cleanup
+		}
+	},
+
+	// --- Runtime Settings Actions ---
+
+	updateRuntimeSettings: async (sessionId, settings) => {
+		try {
+			await window.maestro.process.updateRuntimeSettings(sessionId, settings);
+		} catch (err) {
+			console.error(
+				`[harnessStore] Failed to update runtime settings for ${sessionId}:`,
+				err
+			);
+			throw err; // Let callers handle the error
 		}
 	},
 
@@ -339,6 +365,7 @@ export function getHarnessActions() {
 		removeInteraction: state.removeInteraction,
 		clearSessionInteractions: state.clearSessionInteractions,
 		respondToInteraction: state.respondToInteraction,
+		updateRuntimeSettings: state.updateRuntimeSettings,
 		applyRuntimeMetadata: state.applyRuntimeMetadata,
 		clearSessionMetadata: state.clearSessionMetadata,
 		clearSession: state.clearSession,

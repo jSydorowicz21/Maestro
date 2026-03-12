@@ -7,6 +7,7 @@ import { createIpcMethod } from './ipcWrapper';
 import type { ProcessConfig } from '../types';
 import type { InteractionRequest, InteractionResponse } from '../../shared/interaction-types';
 import type { RuntimeMetadataEvent } from '../../shared/runtime-metadata-types';
+import type { HarnessRuntimeSettings } from '../../shared/harness-types';
 
 export type { ProcessConfig } from '../types';
 
@@ -145,6 +146,20 @@ export const processService = {
 		createIpcMethod({
 			call: () => window.maestro.process.respondToInteraction(sessionId, interactionId, response),
 			errorContext: 'Respond to interaction',
+			rethrow: true,
+		}),
+
+	/**
+	 * Update runtime settings on a running harness-backed agent.
+	 * Routes through the main process to the harness that owns the session.
+	 */
+	updateRuntimeSettings: (
+		sessionId: string,
+		settings: HarnessRuntimeSettings
+	): Promise<void> =>
+		createIpcMethod({
+			call: () => window.maestro.process.updateRuntimeSettings(sessionId, settings),
+			errorContext: 'Update runtime settings',
 			rethrow: true,
 		}),
 
