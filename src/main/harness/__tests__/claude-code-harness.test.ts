@@ -1273,6 +1273,186 @@ describe('ClaudeCodeHarness', () => {
 	});
 
 	// ====================================================================
+	// Response Translation — SDK Return Values
+	// ====================================================================
+
+	describe('response translation', () => {
+		it('should translate approve (no optional fields) to SDK allow', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			const resultPromise = mockFn.canUseTool!(
+				'Read',
+				{ path: '/test.ts' },
+				{ signal: new AbortController().signal, toolUseID: 'trans-approve-1' }
+			);
+			await flushMicrotasks();
+
+			await harness.respondToInteraction(capturedRequest!.interactionId, {
+				kind: 'approve',
+			});
+
+			const result = await resultPromise;
+			expect(result.behavior).toBe('allow');
+			expect((result as any).updatedInput).toBeUndefined();
+			expect((result as any).updatedPermissions).toBeUndefined();
+		});
+
+		it('should translate text response to SDK allow with text in updatedInput', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			const resultPromise = mockFn.canUseTool!(
+				'Bash',
+				{ command: 'ls' },
+				{ signal: new AbortController().signal, toolUseID: 'trans-text-1' }
+			);
+			await flushMicrotasks();
+
+			await harness.respondToInteraction(capturedRequest!.interactionId, {
+				kind: 'text',
+				text: 'Use /tmp instead',
+			});
+
+			const result = await resultPromise;
+			expect(result.behavior).toBe('allow');
+			expect((result as any).updatedInput).toEqual({ text: 'Use /tmp instead' });
+		});
+
+		it('should translate deny (no optional fields) to SDK deny with default message', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			const resultPromise = mockFn.canUseTool!(
+				'Bash',
+				{ command: 'rm -rf /' },
+				{ signal: new AbortController().signal, toolUseID: 'trans-deny-1' }
+			);
+			await flushMicrotasks();
+
+			await harness.respondToInteraction(capturedRequest!.interactionId, {
+				kind: 'deny',
+			});
+
+			const result = await resultPromise;
+			expect(result.behavior).toBe('deny');
+			expect((result as any).message).toBe('User denied');
+			expect((result as any).interrupt).toBeUndefined();
+		});
+
+		it('should translate cancel (no optional fields) to SDK deny with default message', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			const resultPromise = mockFn.canUseTool!(
+				'Write',
+				{ path: '/test.ts' },
+				{ signal: new AbortController().signal, toolUseID: 'trans-cancel-1' }
+			);
+			await flushMicrotasks();
+
+			await harness.respondToInteraction(capturedRequest!.interactionId, {
+				kind: 'cancel',
+			});
+
+			const result = await resultPromise;
+			expect(result.behavior).toBe('deny');
+			expect((result as any).message).toBe('User cancelled');
+		});
+
+		it('should translate clarification-answer with multiple questions', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			const resultPromise = mockFn.canUseTool!(
+				'AskUserQuestion',
+				{
+					questions: [
+						{ question: 'Language?', header: 'Lang', options: [{ label: 'TS', description: 'TypeScript' }], multiSelect: false },
+						{ question: 'Framework?', header: 'FW', options: [{ label: 'React', description: 'React.js' }], multiSelect: false },
+					],
+				},
+				{ signal: new AbortController().signal, toolUseID: 'trans-multi-q-1' }
+			);
+			await flushMicrotasks();
+
+			await harness.respondToInteraction(capturedRequest!.interactionId, {
+				kind: 'clarification-answer',
+				answers: [
+					{ questionIndex: 0, selectedOptionLabels: ['TS'] },
+					{ questionIndex: 1, text: 'Vue' },
+				],
+			});
+
+			const result = await resultPromise;
+			expect(result.behavior).toBe('allow');
+			const input = (result as any).updatedInput;
+			expect(input.answers).toEqual({ 'Language?': 'TS', 'Framework?': 'Vue' });
+			expect(input.questions).toHaveLength(2);
+		});
+
+		it('should translate clarification-answer with out-of-bounds question index gracefully', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			const resultPromise = mockFn.canUseTool!(
+				'AskUserQuestion',
+				{
+					questions: [
+						{ question: 'Color?', header: 'Color', options: [{ label: 'Red', description: 'Red' }], multiSelect: false },
+					],
+				},
+				{ signal: new AbortController().signal, toolUseID: 'trans-oob-1' }
+			);
+			await flushMicrotasks();
+
+			await harness.respondToInteraction(capturedRequest!.interactionId, {
+				kind: 'clarification-answer',
+				answers: [
+					{ questionIndex: 0, selectedOptionLabels: ['Red'] },
+					{ questionIndex: 5, text: 'This index does not exist' },
+				],
+			});
+
+			const result = await resultPromise;
+			expect(result.behavior).toBe('allow');
+			const input = (result as any).updatedInput;
+			// Only the valid index should appear in answers
+			expect(input.answers).toEqual({ 'Color?': 'Red' });
+		});
+	});
+
+	// ====================================================================
 	// Subagent ID Forwarding
 	// ====================================================================
 
