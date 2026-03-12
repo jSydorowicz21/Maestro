@@ -1,6 +1,12 @@
 /**
  * Claude Agent SDK type definitions for the harness adapter.
  *
+ * SDK version: @anthropic-ai/claude-agent-sdk v0.2.74
+ * Last synced: 2026-03-12
+ * Provenance: Hand-transcribed from SDK source types. Run the drift
+ *   detection test (`claude-sdk-types.test.ts`) to verify compatibility
+ *   when the SDK is installed as a dependency.
+ *
  * These types represent the subset of the @anthropic-ai/claude-agent-sdk API
  * surface that ClaudeCodeHarness depends on. They live inside the harness
  * directory because Claude SDK types must NEVER leak across the process
