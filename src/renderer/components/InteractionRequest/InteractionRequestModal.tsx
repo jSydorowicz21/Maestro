@@ -33,6 +33,8 @@ const EMPTY_INTERACTIONS: InteractionRequest[] = [];
 
 /**
  * Get a human-readable title for an interaction kind.
+ * Uses exhaustive check so new kinds get a compile-time error
+ * instead of silently falling through to a generic title.
  */
 function getInteractionTitle(request: InteractionRequest): string {
 	switch (request.kind) {
@@ -40,13 +42,17 @@ function getInteractionTitle(request: InteractionRequest): string {
 			return 'Tool Approval Required';
 		case 'clarification':
 			return 'Agent Needs Input';
-		default:
+		default: {
+			const _exhaustive: never = request;
 			return 'Agent Interaction';
+		}
 	}
 }
 
 /**
  * Get the header icon for an interaction kind.
+ * Uses exhaustive check so new kinds get a compile-time error
+ * instead of silently falling through to a generic icon.
  */
 function getInteractionIcon(request: InteractionRequest, theme: Theme): React.ReactNode {
 	switch (request.kind) {
@@ -64,13 +70,15 @@ function getInteractionIcon(request: InteractionRequest, theme: Theme): React.Re
 					style={{ color: theme.colors.accent }}
 				/>
 			);
-		default:
+		default: {
+			const _exhaustive: never = request;
 			return (
 				<MessageSquare
 					className="w-4 h-4"
 					style={{ color: theme.colors.textDim }}
 				/>
 			);
+		}
 	}
 }
 

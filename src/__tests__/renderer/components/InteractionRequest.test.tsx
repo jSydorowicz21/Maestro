@@ -765,3 +765,183 @@ describe('InteractionRequestModal', () => {
 		});
 	});
 });
+
+// ============================================================================
+// Kind-neutral behavior tests
+// ============================================================================
+
+describe('InteractionRequestModal — kind-neutral behavior', () => {
+	it('clarification interaction shows "Agent Needs Input" title, not tool-approval title', () => {
+		const request = createClarification({
+			interactionId: 'int-c1',
+			sessionId: 'session-1',
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		expect(screen.getByText('Agent Needs Input')).toBeInTheDocument();
+		expect(screen.queryByText('Tool Approval Required')).not.toBeInTheDocument();
+	});
+
+	it('clarification submit through modal dispatches structured answer via IPC', async () => {
+		const request = createClarification({
+			interactionId: 'int-c2',
+			sessionId: 'session-1',
+			allowFreeText: false,
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		// Select an option and submit
+		fireEvent.click(screen.getByTestId('option-Option A'));
+		fireEvent.click(screen.getByTestId('submit-button'));
+
+		await waitFor(() => {
+			expect(mockRespondToInteraction).toHaveBeenCalledWith(
+				'session-1',
+				'int-c2',
+				{
+					kind: 'clarification-answer',
+					answers: [
+						{
+							questionIndex: 0,
+							selectedOptionLabels: ['Option A'],
+							text: undefined,
+						},
+					],
+				}
+			);
+		});
+	});
+
+	it('clarification modal close sends cancel response, not deny', async () => {
+		const request = createClarification({
+			interactionId: 'int-c3',
+			sessionId: 'session-1',
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		const closeButton = screen.getByLabelText('Close modal');
+		fireEvent.click(closeButton);
+
+		await waitFor(() => {
+			expect(mockRespondToInteraction).toHaveBeenCalledWith(
+				'session-1',
+				'int-c3',
+				{ kind: 'cancel' }
+			);
+		});
+		// Must NOT send deny — that's tool-approval-specific
+		expect(mockRespondToInteraction).not.toHaveBeenCalledWith(
+			'session-1',
+			'int-c3',
+			expect.objectContaining({ kind: 'deny' })
+		);
+	});
+
+	it('mixed-kind queue renders correct view as items are resolved', async () => {
+		const toolReq = createToolApproval({
+			interactionId: 'int-tool',
+			sessionId: 'session-1',
+			toolName: 'Bash',
+			timestamp: 1000,
+		});
+		const clarReq = createClarification({
+			interactionId: 'int-clar',
+			sessionId: 'session-1',
+			timestamp: 2000,
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [toolReq, clarReq] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		// First in queue: tool-approval
+		expect(screen.getByTestId('tool-approval-view')).toBeInTheDocument();
+		expect(screen.queryByTestId('clarification-view')).not.toBeInTheDocument();
+		expect(screen.getByText('Tool Approval Required')).toBeInTheDocument();
+
+		// Approve the tool request — should advance to clarification
+		fireEvent.click(screen.getByTestId('approve-button'));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('clarification-view')).toBeInTheDocument();
+		});
+
+		// Now the clarification view should be showing with correct title
+		expect(screen.queryByTestId('tool-approval-view')).not.toBeInTheDocument();
+		expect(screen.getByText('Agent Needs Input')).toBeInTheDocument();
+	});
+
+	it('clarification-first queue does not show tool-approval UI', () => {
+		const clarReq = createClarification({
+			interactionId: 'int-clar',
+			sessionId: 'session-1',
+			timestamp: 1000,
+		});
+		const toolReq = createToolApproval({
+			interactionId: 'int-tool',
+			sessionId: 'session-1',
+			toolName: 'Edit',
+			timestamp: 2000,
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [clarReq, toolReq] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		// Clarification should be shown first (FIFO)
+		expect(screen.getByTestId('clarification-view')).toBeInTheDocument();
+		expect(screen.queryByTestId('tool-approval-view')).not.toBeInTheDocument();
+		expect(screen.getByText('Agent Needs Input')).toBeInTheDocument();
+
+		// Approve/Deny buttons should NOT be present
+		expect(screen.queryByTestId('approve-button')).not.toBeInTheDocument();
+		expect(screen.queryByTestId('deny-button')).not.toBeInTheDocument();
+
+		// Submit/Cancel buttons SHOULD be present
+		expect(screen.getByTestId('submit-button')).toBeInTheDocument();
+		expect(screen.getByTestId('cancel-button')).toBeInTheDocument();
+	});
+
+	it('removes clarification from store after responding', async () => {
+		const request = createClarification({
+			interactionId: 'int-c4',
+			sessionId: 'session-1',
+			allowFreeText: true,
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		// Type free text and submit
+		const input = screen.getByTestId('free-text-input');
+		fireEvent.change(input, { target: { value: 'My answer' } });
+		fireEvent.click(screen.getByTestId('submit-button'));
+
+		await waitFor(() => {
+			const state = useHarnessStore.getState();
+			expect(state.pendingInteractions['session-1'] ?? []).toHaveLength(0);
+		});
+	});
+});
