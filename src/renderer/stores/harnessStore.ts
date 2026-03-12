@@ -302,6 +302,21 @@ export const selectSessionRuntimeMetadata = (
 	sessionId: string
 ): SessionRuntimeMetadata | undefined => state.runtimeMetadata[sessionId];
 
+/**
+ * Select Layer 2 runtime capabilities for a specific session.
+ * Returns only the harness runtime capability flags, separated from
+ * the broader session runtime metadata (Layer 3 data fields like skills,
+ * slash commands, and available models).
+ *
+ * Use this when you need to check "can this running harness instance do X?"
+ * For static agent capabilities (Layer 1), use useAgentCapabilities instead.
+ */
+export const selectSessionRuntimeCapabilities = (
+	state: HarnessStore,
+	sessionId: string
+): Partial<HarnessRuntimeCapabilities> | undefined =>
+	state.runtimeMetadata[sessionId]?.capabilities;
+
 // ============================================================================
 // Non-React Access
 // ============================================================================

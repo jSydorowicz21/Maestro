@@ -738,31 +738,10 @@ export interface AgentConfigOption {
 	argBuilder?: (value: any) => string[];
 }
 
-export interface AgentCapabilities {
-	supportsResume: boolean;
-	supportsReadOnlyMode: boolean;
-	supportsJsonOutput: boolean;
-	supportsSessionId: boolean;
-	supportsImageInput: boolean;
-	supportsImageInputOnResume: boolean;
-	supportsSlashCommands: boolean;
-	supportsSessionStorage: boolean;
-	supportsCostTracking: boolean;
-	supportsUsageStats: boolean;
-	supportsBatchMode: boolean;
-	requiresPromptToStart: boolean;
-	supportsStreaming: boolean;
-	supportsResultMessages: boolean;
-	supportsModelSelection?: boolean;
-	supportsStreamJsonInput?: boolean;
-	supportsThinkingDisplay?: boolean;
-	supportsContextMerge?: boolean;
-	supportsContextExport?: boolean;
-	supportsWizard?: boolean;
-	supportsGroupChatModeration?: boolean;
-	usesJsonLineOutput?: boolean;
-	usesCombinedContextWindow?: boolean;
-}
+// Re-export from shared — single source of truth (Layer 1: static agent capabilities)
+// For Layer 2 (harness runtime capabilities), see HarnessRuntimeCapabilities.
+// For Layer 3 (session runtime metadata), see SessionRuntimeMetadata in harnessStore.ts.
+export type { AgentCapabilities } from '../../shared/agent-capabilities-types';
 
 export interface AgentConfig {
 	id: string;

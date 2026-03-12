@@ -13,7 +13,7 @@ export type {
 	AgentSpawnResult,
 } from './useAgentExecution';
 
-// Agent capability queries
+// Agent capability queries (Layer 1: static agent capabilities)
 export {
 	useAgentCapabilities,
 	clearCapabilitiesCache,
@@ -21,6 +21,10 @@ export {
 	DEFAULT_CAPABILITIES,
 } from './useAgentCapabilities';
 export type { AgentCapabilities, UseAgentCapabilitiesReturn } from './useAgentCapabilities';
+
+// Session runtime capabilities (Layer 2: harness runtime capabilities)
+export { useSessionRuntimeCapabilities } from './useSessionRuntimeCapabilities';
+export type { UseSessionRuntimeCapabilitiesReturn } from './useSessionRuntimeCapabilities';
 
 // Agent session history and resume
 export { useAgentSessionManagement } from './useAgentSessionManagement';
