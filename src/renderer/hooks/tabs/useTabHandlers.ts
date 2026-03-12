@@ -32,7 +32,7 @@ import { useTabStore } from '../../stores/tabStore';
 // ============================================================================
 
 export interface CloseCurrentTabResult {
-	type: 'file' | 'ai' | 'prevented' | 'none';
+	type: 'file' | 'ai' | 'terminal' | 'prevented' | 'none';
 	tabId?: string;
 	isWizardTab?: boolean;
 	hasDraft?: boolean;
@@ -951,7 +951,22 @@ export function useTabHandlers(): TabHandlersReturn {
 		const session = sessions.find((s) => s.id === activeSessionId);
 		if (!session) return { type: 'none' };
 
-		// Check if a file tab is active first
+		// Terminal tab is active — close it (unless it's the only tab of any type)
+		if (session.inputMode === 'terminal' && session.activeTerminalTabId) {
+			const tabId = session.activeTerminalTabId;
+			// Allow closing terminal tabs as long as there are other tabs to fall back to.
+			// closeTerminalTabHelper handles selecting the adjacent tab (which may be AI or file).
+			const totalTabs =
+				(session.aiTabs?.length || 0) +
+				(session.filePreviewTabs?.length || 0) +
+				(session.terminalTabs?.length || 0);
+			if (totalTabs <= 1) {
+				return { type: 'prevented' };
+			}
+			return { type: 'terminal', tabId };
+		}
+
+		// Check if a file tab is active
 		if (session.activeFileTabId) {
 			const tabId = session.activeFileTabId;
 			setSessions((prev: Session[]) =>
@@ -1085,10 +1100,18 @@ export function useTabHandlers(): TabHandlersReturn {
 	// ========================================================================
 
 	const handleRequestTabRename = useCallback((tabId: string) => {
+		console.log('[DEBUG renameTab] handleRequestTabRename called', { tabId });
 		const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
 		const session = sessions.find((s) => s.id === activeSessionId);
-		if (!session) return;
+		if (!session) {
+			console.log('[DEBUG renameTab] no session found');
+			return;
+		}
 		const tab = session.aiTabs?.find((t) => t.id === tabId);
+		console.log('[DEBUG renameTab] tab found:', !!tab, {
+			aiTabCount: session.aiTabs?.length,
+			tabId,
+		});
 		if (tab) {
 			if (tab.isGeneratingName) {
 				setSessions((prev: Session[]) =>

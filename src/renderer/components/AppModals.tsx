@@ -493,6 +493,15 @@ export const AppSessionModals = memo(function AppSessionModals({
 		? terminalTabs.findIndex((t) => t.id === renameTabId)
 		: -1;
 
+	// DEBUG: Trace rename modal render gate
+	if (renameTabModalOpen || renameTabId) {
+		console.log('[DEBUG renameTab] AppSessionModals render', {
+			renameTabModalOpen,
+			renameTabId,
+			renamingTerminalTab: !!renamingTerminalTab,
+		});
+	}
+
 	return (
 		<>
 			{/* --- NEW INSTANCE MODAL --- */}
