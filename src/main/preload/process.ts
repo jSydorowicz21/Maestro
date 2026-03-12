@@ -11,6 +11,7 @@
 
 import { ipcRenderer } from 'electron';
 import type { InteractionRequest, InteractionResponse } from '../../shared/interaction-types';
+import type { HarnessRuntimeSettings } from '../../shared/harness-types';
 import type { RuntimeMetadataEvent } from '../../shared/runtime-metadata-types';
 
 /**
@@ -488,6 +489,16 @@ export function createProcessApi() {
 			ipcRenderer.invoke('process:respond-interaction', sessionId, interactionId, response),
 
 		/**
+		 * Update runtime settings on a harness-backed execution.
+		 * Routes through the main process to the harness that owns the execution.
+		 */
+		updateRuntimeSettings: (
+			sessionId: string,
+			settings: HarnessRuntimeSettings
+		): Promise<void> =>
+			ipcRenderer.invoke('process:update-runtime-settings', sessionId, settings),
+
+		/**
 		 * Subscribe to runtime metadata events from harness-backed agents.
 		 * Emitted when an agent reports skills, slash commands, available models,
 		 * available agents, or runtime capability changes.
@@ -506,6 +517,9 @@ export function createProcessApi() {
 
 // Re-export interaction types for consumers of the preload API
 export type { InteractionRequest, InteractionResponse } from '../../shared/interaction-types';
+
+// Re-export harness types for consumers of the preload API
+export type { HarnessRuntimeSettings } from '../../shared/harness-types';
 
 // Re-export runtime metadata types for consumers of the preload API
 export type { RuntimeMetadataEvent } from '../../shared/runtime-metadata-types';
