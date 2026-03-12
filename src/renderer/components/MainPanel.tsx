@@ -30,6 +30,7 @@ import { InputArea } from './InputArea';
 import { FilePreview, FilePreviewHandle } from './FilePreview';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GitStatusWidget } from './GitStatusWidget';
+import { RuntimeMetadataBar } from './RuntimeMetadataBar';
 import { AgentSessionsBrowser } from './AgentSessionsBrowser';
 import { TabBar } from './TabBar';
 import { WizardConversationView, DocumentGenerationView } from './InlineWizard';
@@ -1116,6 +1117,12 @@ export const MainPanel = React.memo(
 										theme={theme}
 										onViewDiff={handleViewGitDiff}
 										onViewLog={() => setGitLogOpen?.(true)}
+									/>
+
+									{/* Runtime Metadata Bar - shows harness skills, models, agents */}
+									<RuntimeMetadataBar
+										sessionId={activeSession.id}
+										theme={theme}
 									/>
 								</div>
 

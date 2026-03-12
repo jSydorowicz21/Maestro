@@ -26,6 +26,10 @@ export type { AgentCapabilities, UseAgentCapabilitiesReturn } from './useAgentCa
 export { useSessionRuntimeCapabilities } from './useSessionRuntimeCapabilities';
 export type { UseSessionRuntimeCapabilitiesReturn } from './useSessionRuntimeCapabilities';
 
+// Session runtime metadata (Layer 3: concrete session-scoped data)
+export { useSessionRuntimeMetadata } from './useSessionRuntimeMetadata';
+export type { UseSessionRuntimeMetadataReturn } from './useSessionRuntimeMetadata';
+
 // Agent session history and resume
 export { useAgentSessionManagement } from './useAgentSessionManagement';
 export type {

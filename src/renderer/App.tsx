@@ -73,6 +73,7 @@ import {
 	useAgentSessionManagement,
 	useAgentExecution,
 	useAgentCapabilities,
+	useSessionRuntimeMetadata,
 	useMergeTransferHandlers,
 	useSummarizeAndContinue,
 	// Git
@@ -1007,6 +1008,11 @@ function MaestroConsoleInner() {
 		activeSession?.toolType
 	);
 
+	// Layer 3: Get harness runtime metadata for slash command integration
+	const { slashCommands: harnessSlashCommands } = useSessionRuntimeMetadata(
+		activeSession?.id
+	);
+
 	// Merge & Transfer handlers (Phase 2.5)
 	const {
 		mergeState,
@@ -1099,6 +1105,17 @@ function MaestroConsoleInner() {
 					aiOnly: true, // Agent commands are only available in AI mode
 				}))
 			: [];
+		// Harness runtime slash commands (Layer 3, typed event model).
+		// These arrive via RuntimeMetadataEvent and may overlap with classic
+		// agentCommands — deduplicate by normalized command name.
+		const classicCommandSet = new Set(agentCommands.map((c) => c.command.replace(/^\//, '')));
+		const harnessCommands = harnessSlashCommands
+			.filter((cmd) => !classicCommandSet.has(cmd.replace(/^\//, '')))
+			.map((cmd) => ({
+				command: cmd.startsWith('/') ? cmd : `/${cmd}`,
+				description: '',
+				aiOnly: true,
+			}));
 		// Filter built-in slash commands by agent type (if specified)
 		const currentAgentType = activeSession?.toolType;
 		const filteredSlashCommands = slashCommands.filter(
@@ -1110,6 +1127,7 @@ function MaestroConsoleInner() {
 			...speckitCommandsAsSlash,
 			...openspecCommandsAsSlash,
 			...agentCommands,
+			...harnessCommands,
 		];
 	}, [
 		customAICommands,
@@ -1118,6 +1136,7 @@ function MaestroConsoleInner() {
 		activeSession?.agentCommands,
 		activeSession?.toolType,
 		hasActiveSessionCapability,
+		harnessSlashCommands,
 	]);
 
 	const canAttachImages = useMemo(() => {
