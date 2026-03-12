@@ -1,4 +1,6 @@
 export { appendToBuffer } from './bufferUtils';
+export { selectExecutionMode } from './executionMode';
+export type { ExecutionMode, ExecutionModeResult } from './executionMode';
 export { parseDataUrl, saveImageToTempFile, cleanupTempFiles } from './imageUtils';
 export { buildStreamJsonMessage } from './streamJsonBuilder';
 export { buildUnixBasePath, buildPtyTerminalEnv, buildChildProcessEnv } from './envBuilder';

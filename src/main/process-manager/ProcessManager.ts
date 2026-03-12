@@ -14,6 +14,7 @@ import { ChildProcessSpawner } from './spawners/ChildProcessSpawner';
 import { DataBufferManager } from './handlers/DataBufferManager';
 import { LocalCommandRunner } from './runners/LocalCommandRunner';
 import { SshCommandRunner } from './runners/SshCommandRunner';
+import { selectExecutionMode } from './utils/executionMode';
 import { logger } from '../utils/logger';
 import type { SshRemoteConfig } from '../../shared/types';
 
@@ -44,16 +45,32 @@ export class ProcessManager extends EventEmitter {
 	}
 
 	/**
-	 * Spawn a new process for a session
+	 * Spawn a new execution for a session.
+	 *
+	 * Selects execution mode (classic vs harness) based on agent capabilities,
+	 * query context, and caller preferences. Classic mode uses PTY or child-process
+	 * spawners. Harness mode will delegate to an AgentHarness adapter once
+	 * implementations are registered (Phase 2+).
 	 */
 	spawn(config: ProcessConfig): SpawnResult {
-		const usePty = this.shouldUsePty(config);
+		const { mode } = selectExecutionMode(config);
 
-		if (usePty) {
-			return this.ptySpawner.spawn(config);
-		} else {
-			return this.childProcessSpawner.spawn(config);
+		if (mode === 'harness') {
+			// Harness execution path — harness implementations are not yet registered.
+			// Log and fall back to classic for now. When harness adapters are added
+			// (Phase 2+), this branch will call createHarness() and spawnHarnessExecution().
+			logger.warn(
+				'[ProcessManager] Harness mode selected but no harness implementations registered; falling back to classic',
+				'ProcessManager',
+				{ sessionId: config.sessionId, toolType: config.toolType }
+			);
 		}
+
+		// Classic execution path (also serves as fallback for unregistered harnesses)
+		if (this.shouldUsePty(config)) {
+			return this.ptySpawner.spawn(config);
+		}
+		return this.childProcessSpawner.spawn(config);
 	}
 
 	private shouldUsePty(config: ProcessConfig): boolean {
@@ -62,33 +79,58 @@ export class ProcessManager extends EventEmitter {
 	}
 
 	/**
-	 * Write data to a process's stdin
+	 * Write data to an execution's backend.
+	 *
+	 * Routes to the correct backend based on the execution record:
+	 * - 'pty': writes to the PTY process
+	 * - 'child-process': writes to the child process stdin
+	 * - 'harness': delegates to the harness write() (Phase 2+)
 	 */
 	write(sessionId: string, data: string): boolean {
-		const process = this.processes.get(sessionId);
-		if (!process) {
-			logger.error('[ProcessManager] write() - No process found for session', 'ProcessManager', {
+		const execution = this.processes.get(sessionId);
+		if (!execution) {
+			logger.error('[ProcessManager] write() - No execution found for session', 'ProcessManager', {
 				sessionId,
 			});
 			return false;
 		}
 
 		try {
-			if (process.isTerminal && process.ptyProcess) {
-				const command = data.replace(/\r?\n$/, '');
-				if (command.trim()) {
-					process.lastCommand = command.trim();
-				}
-				process.ptyProcess.write(data);
-				return true;
-			} else if (process.childProcess?.stdin) {
-				process.childProcess.stdin.write(data);
-				return true;
+			switch (execution.backend) {
+				case 'pty':
+					if (execution.ptyProcess) {
+						const command = data.replace(/\r?\n$/, '');
+						if (command.trim()) {
+							execution.lastCommand = command.trim();
+						}
+						execution.ptyProcess.write(data);
+						return true;
+					}
+					return false;
+
+				case 'child-process':
+					if (execution.childProcess?.stdin) {
+						execution.childProcess.stdin.write(data);
+						return true;
+					}
+					return false;
+
+				case 'harness':
+					// Harness write delegation — Phase 2+
+					logger.warn(
+						'[ProcessManager] write() called on harness-backed execution but harness write not yet implemented',
+						'ProcessManager',
+						{ sessionId }
+					);
+					return false;
+
+				default:
+					return false;
 			}
-			return false;
 		} catch (error) {
-			logger.error('[ProcessManager] Failed to write to process', 'ProcessManager', {
+			logger.error('[ProcessManager] Failed to write to execution', 'ProcessManager', {
 				sessionId,
+				backend: execution.backend,
 				error: String(error),
 			});
 			return false;
@@ -115,47 +157,70 @@ export class ProcessManager extends EventEmitter {
 	}
 
 	/**
-	 * Send interrupt signal (SIGINT/Ctrl+C) to a process.
-	 * For child processes, escalates to SIGTERM if the process doesn't exit
-	 * within a short timeout (Claude Code may not immediately exit on SIGINT).
+	 * Send interrupt signal to an execution.
+	 *
+	 * Routes based on backend:
+	 * - 'pty': sends Ctrl+C character
+	 * - 'child-process': sends SIGINT, escalates to SIGTERM after timeout
+	 * - 'harness': delegates to harness interrupt() (Phase 2+)
 	 */
 	interrupt(sessionId: string): boolean {
-		const process = this.processes.get(sessionId);
-		if (!process) return false;
+		const execution = this.processes.get(sessionId);
+		if (!execution) return false;
 
 		try {
-			if (process.isTerminal && process.ptyProcess) {
-				process.ptyProcess.write('\x03');
-				return true;
-			} else if (process.childProcess) {
-				const child = process.childProcess;
-				child.kill('SIGINT');
-
-				// Escalate to SIGTERM if the process doesn't exit promptly.
-				// Some agents (e.g., Claude Code --print) may not exit on SIGINT alone.
-				const escalationTimer = setTimeout(() => {
-					const stillRunning = this.processes.get(sessionId);
-					if (stillRunning?.childProcess && !stillRunning.childProcess.killed) {
-						logger.warn(
-							'[ProcessManager] Process did not exit after SIGINT, escalating to SIGTERM',
-							'ProcessManager',
-							{ sessionId, pid: stillRunning.pid }
-						);
-						this.kill(sessionId);
+			switch (execution.backend) {
+				case 'pty':
+					if (execution.ptyProcess) {
+						execution.ptyProcess.write('\x03');
+						return true;
 					}
-				}, 2000);
+					return false;
 
-				// Clear the timer if the process exits on its own
-				child.once('exit', () => {
-					clearTimeout(escalationTimer);
-				});
+				case 'child-process':
+					if (execution.childProcess) {
+						const child = execution.childProcess;
+						child.kill('SIGINT');
 
-				return true;
+						// Escalate to SIGTERM if the process doesn't exit promptly.
+						// Some agents (e.g., Claude Code --print) may not exit on SIGINT alone.
+						const escalationTimer = setTimeout(() => {
+							const stillRunning = this.processes.get(sessionId);
+							if (stillRunning?.childProcess && !stillRunning.childProcess.killed) {
+								logger.warn(
+									'[ProcessManager] Process did not exit after SIGINT, escalating to SIGTERM',
+									'ProcessManager',
+									{ sessionId, pid: stillRunning.pid }
+								);
+								this.kill(sessionId);
+							}
+						}, 2000);
+
+						// Clear the timer if the process exits on its own
+						child.once('exit', () => {
+							clearTimeout(escalationTimer);
+						});
+
+						return true;
+					}
+					return false;
+
+				case 'harness':
+					// Harness interrupt delegation — Phase 2+
+					logger.warn(
+						'[ProcessManager] interrupt() called on harness-backed execution but harness interrupt not yet implemented',
+						'ProcessManager',
+						{ sessionId }
+					);
+					return false;
+
+				default:
+					return false;
 			}
-			return false;
 		} catch (error) {
-			logger.error('[ProcessManager] Failed to interrupt process', 'ProcessManager', {
+			logger.error('[ProcessManager] Failed to interrupt execution', 'ProcessManager', {
 				sessionId,
+				backend: execution.backend,
 				error: String(error),
 			});
 			return false;
@@ -163,28 +228,53 @@ export class ProcessManager extends EventEmitter {
 	}
 
 	/**
-	 * Kill a specific process
+	 * Kill a specific execution.
+	 *
+	 * Cleans up buffers and removes the execution record regardless of backend.
+	 * Routes the actual kill signal based on backend type.
 	 */
 	kill(sessionId: string): boolean {
-		const process = this.processes.get(sessionId);
-		if (!process) return false;
+		const execution = this.processes.get(sessionId);
+		if (!execution) return false;
 
 		try {
-			if (process.dataBufferTimeout) {
-				clearTimeout(process.dataBufferTimeout);
+			// Common cleanup: flush buffers (applies to all backends)
+			if (execution.dataBufferTimeout) {
+				clearTimeout(execution.dataBufferTimeout);
 			}
 			this.bufferManager.flushDataBuffer(sessionId);
 
-			if (process.isTerminal && process.ptyProcess) {
-				process.ptyProcess.kill();
-			} else if (process.childProcess) {
-				process.childProcess.kill('SIGTERM');
+			// Backend-specific termination
+			switch (execution.backend) {
+				case 'pty':
+					if (execution.ptyProcess) {
+						execution.ptyProcess.kill();
+					}
+					break;
+
+				case 'child-process':
+					if (execution.childProcess) {
+						execution.childProcess.kill('SIGTERM');
+					}
+					break;
+
+				case 'harness':
+					// Harness kill delegation — Phase 2+
+					logger.warn(
+						'[ProcessManager] kill() called on harness-backed execution but harness kill not yet implemented',
+						'ProcessManager',
+						{ sessionId }
+					);
+					break;
 			}
+
+			// Always remove the execution record
 			this.processes.delete(sessionId);
 			return true;
 		} catch (error) {
-			logger.error('[ProcessManager] Failed to kill process', 'ProcessManager', {
+			logger.error('[ProcessManager] Failed to kill execution', 'ProcessManager', {
 				sessionId,
+				backend: execution.backend,
 				error: String(error),
 			});
 			return false;
