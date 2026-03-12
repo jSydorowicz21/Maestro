@@ -24,6 +24,7 @@ import { buildStreamJsonMessage } from '../../process-manager/utils/streamJsonBu
 import { getWindowsShellForAgentExecution } from '../../process-manager/utils/shellEscape';
 import { buildExpandedEnv } from '../../../shared/pathUtils';
 import type { SshRemoteConfig } from '../../../shared/types';
+import type { InteractionResponse } from '../../../shared/interaction-types';
 import { powerManager } from '../../power-manager';
 import { MaestroSettings } from './persistence';
 
@@ -708,6 +709,25 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 					shellEnvVars,
 					sshRemoteConfig
 				);
+			}
+		)
+	);
+
+	// Respond to a pending interaction request from a harness-backed agent.
+	// Routes the response to the ProcessManager which forwards it to the
+	// appropriate harness instance for resolution.
+	ipcMain.handle(
+		'process:respond-interaction',
+		withIpcErrorLogging(
+			handlerOpts('respond to interaction'),
+			async (sessionId: string, interactionId: string, response: InteractionResponse) => {
+				const processManager = requireProcessManager(getProcessManager);
+				logger.debug(`Responding to interaction`, LOG_CONTEXT, {
+					sessionId,
+					interactionId,
+					responseKind: response.kind,
+				});
+				return processManager.respondToInteraction(sessionId, interactionId, response);
 			}
 		)
 	);

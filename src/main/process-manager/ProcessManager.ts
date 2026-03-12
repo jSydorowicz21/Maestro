@@ -17,6 +17,7 @@ import { SshCommandRunner } from './runners/SshCommandRunner';
 import { selectExecutionMode } from './utils/executionMode';
 import { logger } from '../utils/logger';
 import type { SshRemoteConfig } from '../../shared/types';
+import type { InteractionResponse } from '../../shared/interaction-types';
 
 /**
  * ProcessManager orchestrates spawning and managing processes for sessions.
@@ -279,6 +280,48 @@ export class ProcessManager extends EventEmitter {
 			});
 			return false;
 		}
+	}
+
+	/**
+	 * Respond to a pending interaction request from a harness-backed agent.
+	 *
+	 * Only valid for sessions running with the 'harness' backend. Classic
+	 * (PTY / child-process) sessions do not use the structured interaction
+	 * protocol. When harness adapters are registered (Phase 2+) this will
+	 * delegate to harness.respondToInteraction().
+	 */
+	respondToInteraction(
+		sessionId: string,
+		interactionId: string,
+		response: InteractionResponse
+	): void {
+		const execution = this.processes.get(sessionId);
+		if (!execution) {
+			logger.warn(
+				'[ProcessManager] respondToInteraction() - No execution found for session',
+				'ProcessManager',
+				{ sessionId, interactionId }
+			);
+			return;
+		}
+
+		if (execution.backend !== 'harness') {
+			logger.warn(
+				'[ProcessManager] respondToInteraction() called on non-harness execution',
+				'ProcessManager',
+				{ sessionId, interactionId, backend: execution.backend }
+			);
+			return;
+		}
+
+		// Harness response delegation — Phase 2+
+		// When harness adapters land, this will call:
+		//   execution.harness.respondToInteraction(interactionId, response)
+		logger.warn(
+			'[ProcessManager] respondToInteraction() - harness adapters not yet registered',
+			'ProcessManager',
+			{ sessionId, interactionId, responseKind: response.kind }
+		);
 	}
 
 	/**

@@ -361,6 +361,101 @@ describe('Process Preload API', () => {
 		});
 	});
 
+	describe('respondToInteraction', () => {
+		it('should invoke process:respond-interaction with correct arguments', async () => {
+			mockInvoke.mockResolvedValue(undefined);
+
+			const response = {
+				kind: 'approve' as const,
+				message: 'Approved by user',
+			};
+
+			await api.respondToInteraction('session-123', 'int-001', response);
+
+			expect(mockInvoke).toHaveBeenCalledWith(
+				'process:respond-interaction',
+				'session-123',
+				'int-001',
+				response
+			);
+		});
+
+		it('should send deny response with interrupt flag', async () => {
+			mockInvoke.mockResolvedValue(undefined);
+
+			const response = {
+				kind: 'deny' as const,
+				message: 'User denied',
+				interrupt: true,
+			};
+
+			await api.respondToInteraction('session-456', 'int-002', response);
+
+			expect(mockInvoke).toHaveBeenCalledWith(
+				'process:respond-interaction',
+				'session-456',
+				'int-002',
+				response
+			);
+		});
+
+		it('should send clarification-answer response', async () => {
+			mockInvoke.mockResolvedValue(undefined);
+
+			const response = {
+				kind: 'clarification-answer' as const,
+				answers: [
+					{ questionIndex: 0, selectedOptionLabels: ['main'] },
+				],
+			};
+
+			await api.respondToInteraction('session-789', 'int-003', response);
+
+			expect(mockInvoke).toHaveBeenCalledWith(
+				'process:respond-interaction',
+				'session-789',
+				'int-003',
+				response
+			);
+		});
+
+		it('should send cancel response', async () => {
+			mockInvoke.mockResolvedValue(undefined);
+
+			const response = {
+				kind: 'cancel' as const,
+				message: 'User cancelled',
+			};
+
+			await api.respondToInteraction('session-123', 'int-004', response);
+
+			expect(mockInvoke).toHaveBeenCalledWith(
+				'process:respond-interaction',
+				'session-123',
+				'int-004',
+				response
+			);
+		});
+
+		it('should send text response', async () => {
+			mockInvoke.mockResolvedValue(undefined);
+
+			const response = {
+				kind: 'text' as const,
+				text: 'Free text answer from user',
+			};
+
+			await api.respondToInteraction('session-123', 'int-005', response);
+
+			expect(mockInvoke).toHaveBeenCalledWith(
+				'process:respond-interaction',
+				'session-123',
+				'int-005',
+				response
+			);
+		});
+	});
+
 	describe('onRemoteCommand', () => {
 		it('should register listener and invoke callback with all parameters', () => {
 			const callback = vi.fn();

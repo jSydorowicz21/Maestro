@@ -10,7 +10,7 @@
  */
 
 import { ipcRenderer } from 'electron';
-import type { InteractionRequest } from '../../shared/interaction-types';
+import type { InteractionRequest, InteractionResponse } from '../../shared/interaction-types';
 
 /**
  * Helper to log via the main process logger.
@@ -474,11 +474,22 @@ export function createProcessApi() {
 			ipcRenderer.on('process:interaction-request', handler);
 			return () => ipcRenderer.removeListener('process:interaction-request', handler);
 		},
+
+		/**
+		 * Send a response to a pending interaction request.
+		 * Routes through the main process to the harness that owns the interaction.
+		 */
+		respondToInteraction: (
+			sessionId: string,
+			interactionId: string,
+			response: InteractionResponse
+		): Promise<void> =>
+			ipcRenderer.invoke('process:respond-interaction', sessionId, interactionId, response),
 	};
 }
 
 // Re-export interaction types for consumers of the preload API
-export type { InteractionRequest } from '../../shared/interaction-types';
+export type { InteractionRequest, InteractionResponse } from '../../shared/interaction-types';
 
 /**
  * TypeScript type for the process API

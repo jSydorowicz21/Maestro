@@ -177,6 +177,29 @@ interface InteractionRequestPayload {
 	allowFreeText?: boolean;
 }
 
+/**
+ * Interaction response sent from renderer to harness (provider-neutral).
+ * Mirrors the shared InteractionResponse union in interaction-types.ts.
+ * Used by window.maestro.process.respondToInteraction.
+ */
+interface InteractionResponsePayload {
+	kind: 'approve' | 'deny' | 'text' | 'clarification-answer' | 'cancel';
+	// Approve fields
+	updatedInput?: Record<string, unknown>;
+	updatedPermissions?: Record<string, unknown>[];
+	// Deny / cancel fields
+	message?: string;
+	interrupt?: boolean;
+	// Text response field
+	text?: string;
+	// Clarification answer fields
+	answers?: Array<{
+		questionIndex: number;
+		selectedOptionLabels?: string[];
+		text?: string;
+	}>;
+}
+
 type HistoryEntryType = 'AUTO' | 'USER';
 
 /**
@@ -376,6 +399,11 @@ interface MaestroAPI {
 		onInteractionRequest: (
 			callback: (sessionId: string, request: InteractionRequestPayload) => void
 		) => () => void;
+		respondToInteraction: (
+			sessionId: string,
+			interactionId: string,
+			response: InteractionResponsePayload
+		) => Promise<void>;
 	};
 	agentError: {
 		clearError: (sessionId: string) => Promise<{ success: boolean }>;

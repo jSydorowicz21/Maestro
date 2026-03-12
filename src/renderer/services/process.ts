@@ -5,7 +5,7 @@
 
 import { createIpcMethod } from './ipcWrapper';
 import type { ProcessConfig } from '../types';
-import type { InteractionRequest } from '../../shared/interaction-types';
+import type { InteractionRequest, InteractionResponse } from '../../shared/interaction-types';
 
 export type { ProcessConfig } from '../types';
 
@@ -131,4 +131,19 @@ export const processService = {
 			handler as unknown as (sessionId: string, request: unknown) => void
 		);
 	},
+
+	/**
+	 * Send a response to a pending interaction request.
+	 * Routes through the main process to the harness that owns the interaction.
+	 */
+	respondToInteraction: (
+		sessionId: string,
+		interactionId: string,
+		response: InteractionResponse
+	): Promise<void> =>
+		createIpcMethod({
+			call: () => window.maestro.process.respondToInteraction(sessionId, interactionId, response),
+			errorContext: 'Respond to interaction',
+			rethrow: true,
+		}),
 };
