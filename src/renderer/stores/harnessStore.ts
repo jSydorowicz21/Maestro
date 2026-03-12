@@ -209,7 +209,10 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
 			let updated: SessionRuntimeMetadata;
 
 			if (event.replace) {
-				// Full snapshot: replace included fields, keep omitted fields
+				// Spec rule: "replace: true means the payload is a full snapshot
+				// for the included fields." Included fields replace entirely;
+				// omitted fields (undefined/null) mean "no change."
+				// An empty array (e.g., skills: []) IS included and clears it.
 				updated = {
 					skills: event.skills ?? existing.skills,
 					slashCommands: event.slashCommands ?? existing.slashCommands,
@@ -218,7 +221,11 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
 					capabilities: event.capabilities ?? existing.capabilities,
 				};
 			} else {
-				// Incremental merge: merge arrays, merge capability flags
+				// Spec rule: "Providers may emit partial updates over time."
+				// Incremental merge: id-bearing arrays merge by id (new entries
+				// with same id replace old), slash commands dedup by value,
+				// capabilities shallow-merge (individual flags can be flipped).
+				// Omitted fields (undefined) are left unchanged.
 				updated = {
 					skills: event.skills
 						? mergeById(existing.skills, event.skills)
