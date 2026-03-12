@@ -109,6 +109,9 @@ import { SendToAgentModal, type SendToAgentOptions } from './SendToAgentModal';
 import { TransferProgressModal } from './TransferProgressModal';
 import { LeaderboardRegistrationModal } from './LeaderboardRegistrationModal';
 
+// Harness Interaction Modal
+import { InteractionRequestModal } from './InteractionRequest';
+
 // Re-export types for consumers
 export type { PRDetails, FlatFileItem, RecoveryAction, MergeOptions, SendToAgentOptions };
 
@@ -1670,6 +1673,9 @@ export const AppAgentModals = memo(function AppAgentModals({
 }: AppAgentModalsProps) {
 	return (
 		<>
+			{/* --- INTERACTION REQUEST MODAL (harness mid-turn interactions) --- */}
+			<InteractionRequestModal theme={theme} />
+
 			{/* --- LEADERBOARD REGISTRATION MODAL --- */}
 			{leaderboardRegistrationOpen && (
 				<LeaderboardRegistrationModal
