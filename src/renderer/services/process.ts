@@ -129,8 +129,10 @@ export const processService = {
 	onInteractionRequest(
 		handler: (sessionId: string, request: InteractionRequest) => void
 	): () => void {
+		// IPC boundary wrapper: the preload API declares InteractionRequestPayload
+		// (a global alias for InteractionRequest). Single cast bridges the type systems.
 		return window.maestro.process.onInteractionRequest(
-			handler as unknown as (sessionId: string, request: unknown) => void
+			(sessionId, request) => handler(sessionId, request as InteractionRequest)
 		);
 	},
 
@@ -170,8 +172,10 @@ export const processService = {
 	onRuntimeMetadata(
 		handler: (sessionId: string, metadata: RuntimeMetadataEvent) => void
 	): () => void {
+		// IPC boundary wrapper: the preload API declares RuntimeMetadataPayload
+		// (a global alias for RuntimeMetadataEvent). Single cast bridges the type systems.
 		return window.maestro.process.onRuntimeMetadata(
-			handler as unknown as (sessionId: string, metadata: unknown) => void
+			(sessionId, metadata) => handler(sessionId, metadata as RuntimeMetadataEvent)
 		);
 	},
 };
