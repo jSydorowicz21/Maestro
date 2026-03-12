@@ -50,6 +50,7 @@ import { parseSynopsis } from '../../../shared/synopsis';
 import { autorunSynopsisPrompt } from '../../../prompts';
 import type { RightPanelHandle } from '../../components/RightPanel';
 import { useGroupChatStore } from '../../stores/groupChatStore';
+import { useHarnessStore } from '../../stores/harnessStore';
 
 // ============================================================================
 // Types
@@ -675,6 +676,11 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						};
 					})
 				);
+
+				// Clear harness state (pending interactions + runtime metadata) on AI exit
+				if (isFromAi) {
+					useHarnessStore.getState().clearSession(actualSessionId);
+				}
 
 				// Refresh git branches/tags after terminal command completes
 				if (!isFromAi) {
@@ -1539,6 +1545,33 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 		);
 
 		// ================================================================
+		// onInteractionRequest — Handle harness interaction requests
+		// (tool approvals, clarification questions)
+		// ================================================================
+		const unsubscribeInteractionRequest = window.maestro.process.onInteractionRequest?.(
+			(sessionId: string, request) => {
+				// Session IDs arrive as "actualSessionId-ai-tabId"
+				const aiTabMatch = sessionId.match(/^(.+)-ai-(.+)$/);
+				const actualSessionId = aiTabMatch ? aiTabMatch[1] : sessionId;
+
+				useHarnessStore.getState().addInteraction(actualSessionId, request);
+			}
+		);
+
+		// ================================================================
+		// onRuntimeMetadata — Handle harness runtime metadata events
+		// (skills, models, agents, capabilities)
+		// ================================================================
+		const unsubscribeRuntimeMetadata = window.maestro.process.onRuntimeMetadata?.(
+			(sessionId: string, metadata) => {
+				const aiTabMatch = sessionId.match(/^(.+)-ai-(.+)$/);
+				const actualSessionId = aiTabMatch ? aiTabMatch[1] : sessionId;
+
+				useHarnessStore.getState().applyRuntimeMetadata(actualSessionId, metadata);
+			}
+		);
+
+		// ================================================================
 		// Cleanup — unsubscribe all listeners on unmount
 		// ================================================================
 		return () => {
@@ -1553,6 +1586,8 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 			unsubscribeThinkingChunk?.();
 			unsubscribeSshRemote?.();
 			unsubscribeToolExecution?.();
+			unsubscribeInteractionRequest?.();
+			unsubscribeRuntimeMetadata?.();
 			// Cancel any pending thinking chunk RAF and clear buffer
 			if (thinkingChunkRafIdRef.current !== null) {
 				cancelAnimationFrame(thinkingChunkRafIdRef.current);
