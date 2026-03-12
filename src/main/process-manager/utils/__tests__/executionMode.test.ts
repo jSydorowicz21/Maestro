@@ -211,6 +211,115 @@ describe('selectExecutionMode', () => {
 	});
 
 	// -----------------------------------------------------------------------
+	// Edge case: both SSH fields set simultaneously
+	// -----------------------------------------------------------------------
+	describe('both SSH fields set simultaneously', () => {
+		it('returns classic when both sshRemoteId and sshRemoteHost are set', () => {
+			const config = makeConfig({
+				sshRemoteId: 'remote-1',
+				sshRemoteHost: '192.168.1.1',
+			});
+			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('SSH');
+		});
+
+		it('returns classic when both SSH fields are set even with harness preference', () => {
+			const config = makeConfig({
+				sshRemoteId: 'remote-1',
+				sshRemoteHost: '192.168.1.1',
+				preferredExecutionMode: 'harness',
+			});
+			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('classic');
+		});
+	});
+
+	// -----------------------------------------------------------------------
+	// Edge case: unrecognized preferredExecutionMode → fallback
+	// -----------------------------------------------------------------------
+	describe('unrecognized preferredExecutionMode falls back to classic', () => {
+		it('returns classic for an unknown mode string', () => {
+			const config = makeConfig({
+				preferredExecutionMode: 'invalid-mode' as any,
+			});
+			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('Fallback');
+			expect(result.reason).toContain('invalid-mode');
+		});
+
+		it('returns classic for empty string mode', () => {
+			const config = makeConfig({
+				preferredExecutionMode: '' as any,
+			});
+			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('Fallback');
+		});
+	});
+
+	// -----------------------------------------------------------------------
+	// Edge case: explicit querySource: undefined
+	// -----------------------------------------------------------------------
+	describe('querySource undefined is treated as user query', () => {
+		it('returns harness for capable agent when querySource is explicitly undefined', () => {
+			const config = makeConfig({ querySource: undefined });
+			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('harness');
+		});
+
+		it('returns classic for incapable agent regardless of querySource', () => {
+			const config = makeConfig({
+				toolType: 'terminal',
+				querySource: undefined,
+			});
+			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('classic');
+		});
+	});
+
+	// -----------------------------------------------------------------------
+	// Result shape contract
+	// -----------------------------------------------------------------------
+	describe('result shape contract', () => {
+		it('always returns both mode and reason fields', () => {
+			const configs = [
+				makeConfig(),
+				makeConfig({ sshRemoteId: 'r' }),
+				makeConfig({ querySource: 'auto' }),
+				makeConfig({ toolType: 'terminal' }),
+				makeConfig({ preferredExecutionMode: 'classic' }),
+				makeConfig({ preferredExecutionMode: 'harness' }),
+				makeConfig({ preferredExecutionMode: 'auto' }),
+			];
+
+			for (const config of configs) {
+				const result = selectExecutionMode(config);
+				expect(result).toHaveProperty('mode');
+				expect(result).toHaveProperty('reason');
+				expect(typeof result.mode).toBe('string');
+				expect(typeof result.reason).toBe('string');
+				expect(result.reason.length).toBeGreaterThan(0);
+			}
+		});
+
+		it('mode is always classic or harness', () => {
+			const configs = [
+				makeConfig(),
+				makeConfig({ sshRemoteId: 'r' }),
+				makeConfig({ querySource: 'auto' }),
+				makeConfig({ preferredExecutionMode: 'unknown' as any }),
+			];
+
+			for (const config of configs) {
+				const result = selectExecutionMode(config);
+				expect(['classic', 'harness']).toContain(result.mode);
+			}
+		});
+	});
+
+	// -----------------------------------------------------------------------
 	// Classic and harness coexistence in the same model
 	// -----------------------------------------------------------------------
 	describe('classic and harness records coexist', () => {
