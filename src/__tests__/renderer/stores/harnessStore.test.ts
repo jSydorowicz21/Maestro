@@ -11,6 +11,7 @@ import {
 	selectSessionInteractions,
 	selectHasPendingInteractions,
 	selectSessionRuntimeMetadata,
+	selectSessionRuntimeCapabilities,
 	getHarnessState,
 	getHarnessActions,
 } from '../../../renderer/stores/harnessStore';
@@ -1092,6 +1093,609 @@ describe('harnessStore', () => {
 			expect(typeof actions.applyRuntimeMetadata).toBe('function');
 			expect(typeof actions.clearSessionMetadata).toBe('function');
 			expect(typeof actions.clearSession).toBe('function');
+		});
+	});
+
+	// ========================================================================
+	// Validation: Runtime metadata merge and cleanup
+	// ========================================================================
+
+	describe('validation — runtime metadata merge and cleanup', () => {
+		// --- selectSessionRuntimeCapabilities selector ---
+
+		describe('selectSessionRuntimeCapabilities', () => {
+			it('returns undefined for session with no metadata', () => {
+				const state = useHarnessStore.getState();
+				expect(selectSessionRuntimeCapabilities(state, 'unknown')).toBeUndefined();
+			});
+
+			it('returns capability flags for session with metadata', () => {
+				useHarnessStore.getState().applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					capabilities: {
+						supportsInteractionRequests: true,
+						supportsMidTurnInput: true,
+					},
+				});
+
+				const state = useHarnessStore.getState();
+				const caps = selectSessionRuntimeCapabilities(state, 'session-1');
+				expect(caps).toBeDefined();
+				expect(caps!.supportsInteractionRequests).toBe(true);
+				expect(caps!.supportsMidTurnInput).toBe(true);
+			});
+
+			it('returns empty object when metadata exists but no capabilities were sent', () => {
+				useHarnessStore.getState().applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [{ id: 's1', name: 'Skill' }],
+				});
+
+				const state = useHarnessStore.getState();
+				const caps = selectSessionRuntimeCapabilities(state, 'session-1');
+				expect(caps).toEqual({});
+			});
+
+			it('reflects capability updates after incremental merge', () => {
+				const actions = useHarnessStore.getState();
+
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					capabilities: { supportsInteractionRequests: true },
+				});
+
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					capabilities: { supportsSkillsEnumeration: true },
+				});
+
+				const caps = selectSessionRuntimeCapabilities(
+					useHarnessStore.getState(),
+					'session-1'
+				);
+				expect(caps!.supportsInteractionRequests).toBe(true);
+				expect(caps!.supportsSkillsEnumeration).toBe(true);
+			});
+
+			it('returns undefined after clearSession', () => {
+				useHarnessStore.getState().applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					capabilities: { supportsInteractionRequests: true },
+				});
+
+				useHarnessStore.getState().clearSession('session-1');
+
+				const caps = selectSessionRuntimeCapabilities(
+					useHarnessStore.getState(),
+					'session-1'
+				);
+				expect(caps).toBeUndefined();
+			});
+		});
+
+		// --- Incremental merge with empty arrays (no-op behavior) ---
+
+		describe('incremental merge with empty arrays', () => {
+			it('empty incoming skills array in incremental mode preserves existing skills', () => {
+				const actions = useHarnessStore.getState();
+
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [{ id: 's1', name: 'Skill A' }],
+				});
+
+				// Incremental with empty array — mergeById returns existing items
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [],
+				});
+
+				const metadata = useHarnessStore.getState().runtimeMetadata['session-1'];
+				expect(metadata.skills).toHaveLength(1);
+				expect(metadata.skills[0].id).toBe('s1');
+			});
+
+			it('empty incoming slash commands in incremental mode preserves existing commands', () => {
+				const actions = useHarnessStore.getState();
+
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					slashCommands: ['/help', '/compact'],
+				});
+
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					slashCommands: [],
+				});
+
+				const metadata = useHarnessStore.getState().runtimeMetadata['session-1'];
+				expect(metadata.slashCommands).toEqual(['/help', '/compact']);
+			});
+
+			it('contrasts with replace mode where empty arrays clear the field', () => {
+				const actions = useHarnessStore.getState();
+
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [{ id: 's1', name: 'Skill A' }],
+					slashCommands: ['/help'],
+				});
+
+				// Incremental with empty: preserves
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [],
+				});
+				expect(useHarnessStore.getState().runtimeMetadata['session-1'].skills).toHaveLength(1);
+
+				// Replace with empty: clears
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					replace: true,
+					skills: [],
+				});
+				expect(useHarnessStore.getState().runtimeMetadata['session-1'].skills).toEqual([]);
+			});
+		});
+
+		// --- Rapid-fire events and determinism ---
+
+		describe('rapid-fire event processing', () => {
+			it('10 sequential incremental events accumulate correctly', () => {
+				const actions = useHarnessStore.getState();
+
+				for (let i = 0; i < 10; i++) {
+					actions.applyRuntimeMetadata('session-1', {
+						sessionId: 'session-1',
+						source: 'claude-code',
+						skills: [{ id: `skill-${i}`, name: `Skill ${i}` }],
+					});
+				}
+
+				const metadata = useHarnessStore.getState().runtimeMetadata['session-1'];
+				expect(metadata.skills).toHaveLength(10);
+				// Verify ordering: existing first, new appended
+				expect(metadata.skills[0].id).toBe('skill-0');
+				expect(metadata.skills[9].id).toBe('skill-9');
+			});
+
+			it('10 events updating the same skill id always takes the last value', () => {
+				const actions = useHarnessStore.getState();
+
+				for (let i = 0; i < 10; i++) {
+					actions.applyRuntimeMetadata('session-1', {
+						sessionId: 'session-1',
+						source: 'claude-code',
+						skills: [{ id: 'skill-1', name: `Version ${i}` }],
+					});
+				}
+
+				const metadata = useHarnessStore.getState().runtimeMetadata['session-1'];
+				expect(metadata.skills).toHaveLength(1);
+				expect(metadata.skills[0].name).toBe('Version 9');
+			});
+
+			it('interleaved field updates across events produce correct composite state', () => {
+				const actions = useHarnessStore.getState();
+
+				// Event 1: skills + commands
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [{ id: 's1', name: 'A' }],
+					slashCommands: ['/help'],
+				});
+
+				// Event 2: models + capabilities
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					availableModels: [{ id: 'opus' }],
+					capabilities: { supportsInteractionRequests: true },
+				});
+
+				// Event 3: agents + more skills
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					availableAgents: [{ id: 'reviewer' }],
+					skills: [{ id: 's2', name: 'B' }],
+				});
+
+				// Event 4: replace only commands (everything else preserved)
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					replace: true,
+					slashCommands: ['/new-only'],
+				});
+
+				const metadata = useHarnessStore.getState().runtimeMetadata['session-1'];
+				expect(metadata.skills).toHaveLength(2);
+				expect(metadata.slashCommands).toEqual(['/new-only']);
+				expect(metadata.availableModels).toHaveLength(1);
+				expect(metadata.availableAgents).toHaveLength(1);
+				expect(metadata.capabilities.supportsInteractionRequests).toBe(true);
+			});
+		});
+
+		// --- Mixed source providers on same session ---
+
+		describe('mixed provider sources', () => {
+			it('events from different sources merge into the same session metadata', () => {
+				const actions = useHarnessStore.getState();
+
+				// Source A provides skills
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [{ id: 's1', name: 'Commit' }],
+				});
+
+				// Source B provides models (same session, different source)
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'codex',
+					availableModels: [{ id: 'gpt-4o' }],
+				});
+
+				const metadata = useHarnessStore.getState().runtimeMetadata['session-1'];
+				expect(metadata.skills).toHaveLength(1);
+				expect(metadata.availableModels).toHaveLength(1);
+			});
+		});
+
+		// --- Cleanup idempotency ---
+
+		describe('cleanup idempotency', () => {
+			it('clearSession called twice does not throw or corrupt state', () => {
+				const actions = useHarnessStore.getState();
+
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [{ id: 's1', name: 'Skill' }],
+				});
+				actions.addInteraction('session-1', createToolApproval({ interactionId: 'int-1' }));
+
+				useHarnessStore.getState().clearSession('session-1');
+				const stateAfterFirst = useHarnessStore.getState();
+
+				// Second clear — should be a no-op
+				useHarnessStore.getState().clearSession('session-1');
+				const stateAfterSecond = useHarnessStore.getState();
+
+				// State references should be identical (no-op)
+				expect(stateAfterSecond.pendingInteractions).toBe(stateAfterFirst.pendingInteractions);
+				expect(stateAfterSecond.runtimeMetadata).toBe(stateAfterFirst.runtimeMetadata);
+			});
+
+			it('clearSessionMetadata called twice does not throw or corrupt state', () => {
+				useHarnessStore.getState().applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [{ id: 's1', name: 'Skill' }],
+				});
+
+				useHarnessStore.getState().clearSessionMetadata('session-1');
+				const stateAfterFirst = useHarnessStore.getState();
+
+				useHarnessStore.getState().clearSessionMetadata('session-1');
+				const stateAfterSecond = useHarnessStore.getState();
+
+				expect(stateAfterSecond.runtimeMetadata).toBe(stateAfterFirst.runtimeMetadata);
+			});
+
+			it('clearSessionInteractions called twice does not throw or corrupt state', () => {
+				useHarnessStore.getState().addInteraction('session-1', createToolApproval({ interactionId: 'int-1' }));
+
+				useHarnessStore.getState().clearSessionInteractions('session-1');
+				const stateAfterFirst = useHarnessStore.getState();
+
+				useHarnessStore.getState().clearSessionInteractions('session-1');
+				const stateAfterSecond = useHarnessStore.getState();
+
+				expect(stateAfterSecond.pendingInteractions).toBe(stateAfterFirst.pendingInteractions);
+			});
+		});
+
+		// --- Replace event touching only capabilities ---
+
+		describe('replace event scoped to capabilities only', () => {
+			it('replace with only capabilities preserves all data fields', () => {
+				const actions = useHarnessStore.getState();
+
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [{ id: 's1', name: 'Skill' }],
+					slashCommands: ['/help', '/compact'],
+					availableModels: [{ id: 'opus', label: 'Opus' }],
+					availableAgents: [{ id: 'a1', label: 'Agent 1' }],
+					capabilities: {
+						supportsInteractionRequests: true,
+						supportsMidTurnInput: true,
+						supportsSkillsEnumeration: true,
+					},
+				});
+
+				// Replace with only capabilities — all data fields should be preserved
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					replace: true,
+					capabilities: { supportsMidTurnInput: false },
+				});
+
+				const metadata = useHarnessStore.getState().runtimeMetadata['session-1'];
+				expect(metadata.skills).toHaveLength(1);
+				expect(metadata.slashCommands).toEqual(['/help', '/compact']);
+				expect(metadata.availableModels).toHaveLength(1);
+				expect(metadata.availableAgents).toHaveLength(1);
+				// Capabilities were replaced entirely
+				expect(metadata.capabilities).toEqual({ supportsMidTurnInput: false });
+			});
+		});
+
+		// --- clearSessionMetadata followed by incremental rebuilding ---
+
+		describe('metadata rebuild after clearSessionMetadata (reconnect flow)', () => {
+			it('clearing metadata then incrementally rebuilding produces clean state', () => {
+				const actions = useHarnessStore.getState();
+
+				// Initial population
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [{ id: 's1', name: 'Old Skill' }],
+					slashCommands: ['/old-cmd'],
+					capabilities: { supportsInteractionRequests: true },
+				});
+
+				// Provider reconnect: clear metadata
+				useHarnessStore.getState().clearSessionMetadata('session-1');
+				expect(useHarnessStore.getState().runtimeMetadata['session-1']).toBeUndefined();
+
+				// Incremental rebuild from new provider session
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [{ id: 's2', name: 'New Skill' }],
+				});
+
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					slashCommands: ['/new-cmd'],
+				});
+
+				const metadata = useHarnessStore.getState().runtimeMetadata['session-1'];
+				// Should have only new data, not old
+				expect(metadata.skills).toHaveLength(1);
+				expect(metadata.skills[0].id).toBe('s2');
+				expect(metadata.slashCommands).toEqual(['/new-cmd']);
+				// Old capabilities should be gone
+				expect(metadata.capabilities).toEqual({});
+			});
+
+			it('clearSessionMetadata preserves pending interactions during rebuild', () => {
+				const actions = useHarnessStore.getState();
+
+				// Session has both interactions and metadata
+				actions.addInteraction('session-1', createToolApproval({ interactionId: 'int-1' }));
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [{ id: 's1', name: 'Skill' }],
+				});
+
+				// Clear only metadata
+				useHarnessStore.getState().clearSessionMetadata('session-1');
+
+				// Rebuild metadata
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [{ id: 's2', name: 'New Skill' }],
+				});
+
+				const state = useHarnessStore.getState();
+				// Interactions survive the metadata rebuild cycle
+				expect(state.pendingInteractions['session-1']).toHaveLength(1);
+				expect(state.pendingInteractions['session-1'][0].interactionId).toBe('int-1');
+				// Metadata is fresh
+				expect(state.runtimeMetadata['session-1'].skills[0].id).toBe('s2');
+			});
+		});
+
+		// --- Complex mergeById scenarios ---
+
+		describe('complex mergeById behavior', () => {
+			it('incoming event with mix of updates and new items merges correctly', () => {
+				const actions = useHarnessStore.getState();
+
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					availableModels: [
+						{ id: 'opus', label: 'Opus 4' },
+						{ id: 'sonnet', label: 'Sonnet 4' },
+						{ id: 'haiku', label: 'Haiku 4' },
+					],
+				});
+
+				// Update opus, add flash, leave sonnet and haiku untouched
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					availableModels: [
+						{ id: 'opus', label: 'Opus 4.6' },
+						{ id: 'flash', label: 'Flash' },
+					],
+				});
+
+				const metadata = useHarnessStore.getState().runtimeMetadata['session-1'];
+				expect(metadata.availableModels).toHaveLength(4);
+				// Order: existing order preserved, new appended
+				expect(metadata.availableModels.map((m) => m.id)).toEqual([
+					'opus', 'sonnet', 'haiku', 'flash',
+				]);
+				// Updated item has new label
+				expect(metadata.availableModels[0].label).toBe('Opus 4.6');
+				// Untouched items retain original labels
+				expect(metadata.availableModels[1].label).toBe('Sonnet 4');
+				expect(metadata.availableModels[2].label).toBe('Haiku 4');
+			});
+
+			it('mergeById with agents handles complete id overlap (all updates, no new)', () => {
+				const actions = useHarnessStore.getState();
+
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					availableAgents: [
+						{ id: 'a1', label: 'Agent 1 v1' },
+						{ id: 'a2', label: 'Agent 2 v1' },
+					],
+				});
+
+				// All IDs overlap — pure update, no new items
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					availableAgents: [
+						{ id: 'a2', label: 'Agent 2 v2' },
+						{ id: 'a1', label: 'Agent 1 v2' },
+					],
+				});
+
+				const metadata = useHarnessStore.getState().runtimeMetadata['session-1'];
+				expect(metadata.availableAgents).toHaveLength(2);
+				// Insertion order preserved: a1 first (was first in existing)
+				expect(metadata.availableAgents[0]).toEqual({ id: 'a1', label: 'Agent 1 v2' });
+				expect(metadata.availableAgents[1]).toEqual({ id: 'a2', label: 'Agent 2 v2' });
+			});
+		});
+
+		// --- Full lifecycle round-trip ---
+
+		describe('full lifecycle round-trip', () => {
+			it('spawn → populate → replace → interrupt → resume → exit cycle', () => {
+				const actions = useHarnessStore.getState();
+
+				// 1. Spawn: initial metadata snapshot
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [{ id: 's1', name: 'Commit' }],
+					slashCommands: ['/help'],
+					capabilities: { supportsInteractionRequests: true },
+				});
+
+				let metadata = useHarnessStore.getState().runtimeMetadata['session-1'];
+				expect(metadata.skills).toHaveLength(1);
+				expect(metadata.capabilities.supportsInteractionRequests).toBe(true);
+
+				// 2. Incremental updates during execution
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [{ id: 's2', name: 'Review PR' }],
+					availableModels: [{ id: 'opus' }],
+				});
+				actions.addInteraction('session-1', createToolApproval({ interactionId: 'int-1' }));
+
+				metadata = useHarnessStore.getState().runtimeMetadata['session-1'];
+				expect(metadata.skills).toHaveLength(2);
+				expect(metadata.availableModels).toHaveLength(1);
+
+				// 3. Replace event (provider re-enumerates)
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					replace: true,
+					skills: [
+						{ id: 's1', name: 'Commit v2' },
+						{ id: 's2', name: 'Review PR v2' },
+						{ id: 's3', name: 'Lint' },
+					],
+				});
+
+				metadata = useHarnessStore.getState().runtimeMetadata['session-1'];
+				expect(metadata.skills).toHaveLength(3);
+				// Models preserved (not in replace event)
+				expect(metadata.availableModels).toHaveLength(1);
+
+				// 4. Interrupt: clears interactions but preserves metadata
+				useHarnessStore.getState().clearSessionInteractions('session-1');
+
+				let state = useHarnessStore.getState();
+				expect(state.pendingInteractions['session-1']).toBeUndefined();
+				expect(state.runtimeMetadata['session-1']).toBeDefined();
+				expect(state.runtimeMetadata['session-1'].skills).toHaveLength(3);
+
+				// 5. Resume: new interactions arrive, metadata continues accumulating
+				actions.addInteraction('session-1', createClarification({ interactionId: 'int-2' }));
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					capabilities: { supportsRuntimeModelChange: true },
+				});
+
+				state = useHarnessStore.getState();
+				expect(state.pendingInteractions['session-1']).toHaveLength(1);
+				expect(state.runtimeMetadata['session-1'].capabilities.supportsInteractionRequests).toBe(true);
+				expect(state.runtimeMetadata['session-1'].capabilities.supportsRuntimeModelChange).toBe(true);
+
+				// 6. Exit: full cleanup
+				useHarnessStore.getState().clearSession('session-1');
+
+				state = useHarnessStore.getState();
+				expect(state.pendingInteractions['session-1']).toBeUndefined();
+				expect(state.runtimeMetadata['session-1']).toBeUndefined();
+			});
+		});
+
+		// --- State reference identity (no unnecessary re-renders) ---
+
+		describe('state reference identity', () => {
+			it('no-op events do not create new state references', () => {
+				const actions = useHarnessStore.getState();
+
+				// Populate
+				actions.applyRuntimeMetadata('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					skills: [{ id: 's1', name: 'Skill' }],
+				});
+
+				// No-op: removing from unknown session
+				const stateBefore = useHarnessStore.getState();
+				actions.removeInteraction('session-1', 'nonexistent');
+				const stateAfter = useHarnessStore.getState();
+
+				expect(stateAfter.pendingInteractions).toBe(stateBefore.pendingInteractions);
+			});
+
+			it('clearing already-empty session produces no state change', () => {
+				const stateBefore = useHarnessStore.getState();
+				useHarnessStore.getState().clearSession('nonexistent');
+				const stateAfter = useHarnessStore.getState();
+
+				expect(stateAfter).toBe(stateBefore);
+			});
 		});
 	});
 });
