@@ -350,9 +350,9 @@ describe('groomContext', () => {
 		).rejects.toThrow('Failed to spawn grooming process');
 	});
 
-	it('throws when spawn returns pid <= 0', async () => {
+	it('throws when spawn returns null pid', async () => {
 		const detector = createMockAgentDetector(agent);
-		mockPM.spawn = vi.fn(() => ({ pid: 0, success: false }));
+		mockPM.spawn = vi.fn(() => ({ pid: null, success: false }));
 
 		await expect(
 			groomContext(

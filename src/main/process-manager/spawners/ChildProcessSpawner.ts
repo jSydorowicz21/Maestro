@@ -365,9 +365,10 @@ export class ChildProcessSpawner {
 			const managedProcess: ManagedProcess = {
 				sessionId,
 				toolType,
+				backend: 'child-process',
 				childProcess,
 				cwd,
-				pid: childProcess.pid || -1,
+				pid: childProcess.pid ?? null,
 				isTerminal: false,
 				isBatchMode,
 				isStreamJsonMode,
@@ -511,12 +512,12 @@ export class ChildProcessSpawner {
 				childProcess.stdin?.end();
 			}
 
-			return { pid: childProcess.pid || -1, success: true };
+			return { pid: childProcess.pid ?? null, success: true };
 		} catch (error) {
 			logger.error('[ProcessManager] Failed to spawn process', 'ProcessManager', {
 				error: String(error),
 			});
-			return { pid: -1, success: false };
+			return { pid: null, success: false };
 		}
 	}
 }

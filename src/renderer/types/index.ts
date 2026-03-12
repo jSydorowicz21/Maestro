@@ -20,6 +20,9 @@ export type {
 	Playbook,
 	ThinkingMode,
 	WorktreeRunTarget,
+	PermissionMode,
+	AgentExecutionConfig,
+	StructuredOutputConfig,
 } from '../../shared/types';
 
 // Re-export Symphony types for session metadata
@@ -520,7 +523,8 @@ export interface Session {
 	inputMode: 'terminal' | 'ai';
 	// AI process PID (for agents with persistent processes)
 	// For batch mode agents, this is 0 since processes spawn per-message
-	aiPid: number;
+	// Null for harness-backed runs that don't spawn a system process
+	aiPid: number | null;
 	// Terminal uses runCommand() which spawns fresh shells per command
 	// This field is kept for backwards compatibility but is always 0
 	terminalPid: number;
@@ -790,6 +794,10 @@ export interface ProcessConfig {
 	// Windows command line length workaround
 	sendPromptViaStdin?: boolean; // If true, send the prompt via stdin as JSON instead of command line
 	sendPromptViaStdinRaw?: boolean; // If true, send the prompt via stdin as raw text instead of command line
+	// Execution mode hint (ProcessManager has final say)
+	preferredExecutionMode?: 'auto' | 'classic' | 'harness';
+	// Provider-specific options (adapter-owned, opaque to shared layers)
+	providerOptions?: Record<string, unknown>;
 }
 
 // Directory entry from fs:readDir

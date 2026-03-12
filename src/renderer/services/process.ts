@@ -23,9 +23,10 @@ export interface ProcessSessionIdHandler {
 /**
  * Result from process spawn operation.
  * Includes SSH remote info when the agent is executed on a remote host.
+ * pid is null for harness-backed runs that don't spawn a system process.
  */
 export interface ProcessSpawnResult {
-	pid: number;
+	pid: number | null;
 	success: boolean;
 	sshRemote?: {
 		id: string;

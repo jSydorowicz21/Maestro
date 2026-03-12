@@ -112,6 +112,7 @@ export class PtySpawner {
 			const managedProcess: ManagedProcess = {
 				sessionId,
 				toolType,
+				backend: 'pty',
 				ptyProcess,
 				cwd,
 				pid: ptyProcess.pid,
@@ -166,7 +167,7 @@ export class PtySpawner {
 			logger.error('[ProcessManager] Failed to spawn PTY process', 'ProcessManager', {
 				error: String(error),
 			});
-			return { pid: -1, success: false };
+			return { pid: null, success: false };
 		}
 	}
 }

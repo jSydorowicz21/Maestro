@@ -357,7 +357,7 @@ describe('process IPC handlers', () => {
 			const mockAgent = { id: 'claude-code' };
 
 			mockAgentDetector.getAgent.mockResolvedValue(mockAgent);
-			mockProcessManager.spawn.mockReturnValue({ pid: -1, success: false });
+			mockProcessManager.spawn.mockReturnValue({ pid: null, success: false });
 
 			const handler = handlers.get('process:spawn');
 			const result = await handler!({} as any, {
@@ -368,7 +368,7 @@ describe('process IPC handlers', () => {
 				args: [],
 			});
 
-			expect(result.pid).toBe(-1);
+			expect(result.pid).toBeNull();
 			expect(result.success).toBe(false);
 		});
 

@@ -345,7 +345,7 @@ export async function groomContext(
 			customEnvVars: resolvedEnvVars,
 		});
 
-		if (!spawnResult || spawnResult.pid <= 0) {
+		if (!spawnResult || !spawnResult.success || spawnResult.pid == null) {
 			cleanup();
 			reject(new Error(`Failed to spawn grooming process for ${agentType}`));
 			return;

@@ -237,7 +237,7 @@ export function registerContextHandlers(deps: ContextHandlerDependencies): void 
 					args: baseArgs,
 				});
 
-				if (!spawnResult || spawnResult.pid <= 0) {
+				if (!spawnResult || !spawnResult.success || spawnResult.pid == null) {
 					throw new Error(`Failed to spawn grooming process for ${agentType}`);
 				}
 

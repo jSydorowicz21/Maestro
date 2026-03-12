@@ -19,6 +19,70 @@ export type ToolType = import('./agentIds').AgentId;
  */
 export type ThinkingMode = 'off' | 'on' | 'sticky';
 
+// ============================================================================
+// Shared Execution Types
+// ============================================================================
+
+/**
+ * Permission mode for agent execution.
+ * Shared across classic process execution and harness execution.
+ */
+export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'dontAsk';
+
+/**
+ * Structured output configuration for agent execution.
+ * Supported by all major agent SDKs (Claude, Codex, OpenCode).
+ */
+export interface StructuredOutputConfig {
+	type: 'json_schema';
+	schema: Record<string, unknown>;
+}
+
+/**
+ * Shared execution configuration contract across renderer, preload, main, and harness layers.
+ *
+ * Contains only fields that are genuinely cross-provider. Provider-specific
+ * options belong inside `providerOptions`, not as top-level fields.
+ *
+ * Note: This type defines the target contract. Existing `ProcessConfig` shapes
+ * in main, preload, and renderer will converge toward this over time.
+ */
+export interface AgentExecutionConfig {
+	sessionId: string;
+	toolType: ToolType;
+	cwd: string;
+
+	prompt?: string;
+	images?: string[];
+	resumeSessionId?: string;
+
+	modelId?: string;
+	systemPrompt?: string;
+	permissionMode?: PermissionMode;
+	maxTurns?: number;
+
+	customEnvVars?: Record<string, string>;
+	contextWindow?: number;
+
+	/** Structured output format (all three SDKs support this) */
+	outputFormat?: StructuredOutputConfig;
+
+	querySource?: 'user' | 'auto';
+	tabId?: string;
+	projectPath?: string;
+
+	/** Hint from callers; ProcessManager has final say on execution mode */
+	preferredExecutionMode?: 'auto' | 'classic' | 'harness';
+
+	/**
+	 * Adapter-owned provider-specific input. Never inspected by shared
+	 * hooks, services, or state containers. Must be set through typed
+	 * helper builders (e.g., buildClaudeProviderOptions()), not ad hoc
+	 * object construction.
+	 */
+	providerOptions?: Record<string, unknown>;
+}
+
 // Session group
 export interface Group {
 	id: string;

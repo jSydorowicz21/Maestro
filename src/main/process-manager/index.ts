@@ -3,6 +3,8 @@ export { ProcessManager } from './ProcessManager';
 
 // Types - all exported for consumers
 export type {
+	ExecutionBackend,
+	AgentExecution,
 	ProcessConfig,
 	ManagedProcess,
 	SpawnResult,

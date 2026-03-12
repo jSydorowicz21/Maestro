@@ -155,7 +155,7 @@ export function useSessionRestoration(): SessionRestorationReturn {
 				const defaultTabId = generateId();
 				return {
 					...session,
-					aiPid: -1,
+					aiPid: null,
 					terminalPid: 0,
 					state: 'error' as SessionState,
 					isLive: false,
@@ -233,7 +233,7 @@ export function useSessionRestoration(): SessionRestorationReturn {
 				console.error(`Agent not found for toolType: ${correctedSession.toolType}`);
 				return {
 					...correctedSession,
-					aiPid: -1,
+					aiPid: null,
 					terminalPid: 0,
 					state: 'error' as SessionState,
 					isLive: false,
@@ -319,7 +319,7 @@ export function useSessionRestoration(): SessionRestorationReturn {
 			console.error(`Error restoring session ${session.id}:`, error);
 			return {
 				...session,
-				aiPid: -1,
+				aiPid: null,
 				terminalPid: 0,
 				state: 'error' as SessionState,
 				isLive: false,

@@ -39,13 +39,18 @@ export interface ProcessConfig {
 	// Stats tracking options
 	querySource?: 'user' | 'auto'; // Whether this query is user-initiated or from Auto Run
 	tabId?: string; // Tab ID for multi-tab tracking
+	/** Hint from callers; ProcessManager has final say on execution mode */
+	preferredExecutionMode?: 'auto' | 'classic' | 'harness';
+	/** Provider-specific options (adapter-owned, opaque to shared layers) */
+	providerOptions?: Record<string, unknown>;
 }
 
 /**
- * Response from spawning a process
+ * Response from spawning a process.
+ * pid is null for harness-backed runs that don't spawn a system process.
  */
 export interface ProcessSpawnResponse {
-	pid: number;
+	pid: number | null;
 	success: boolean;
 	sshRemote?: { id: string; name: string; host: string };
 }
@@ -66,12 +71,13 @@ export interface RunCommandConfig {
 }
 
 /**
- * Active process information
+ * Active process information.
+ * pid is null for harness-backed runs.
  */
 export interface ActiveProcess {
 	sessionId: string;
 	toolType: string;
-	pid: number;
+	pid: number | null;
 	cwd: string;
 	isTerminal: boolean;
 	isBatchMode: boolean;

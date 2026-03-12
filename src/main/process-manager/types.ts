@@ -1,7 +1,15 @@
 import type { ChildProcess } from 'child_process';
 import type { IPty } from 'node-pty';
 import type { AgentOutputParser } from '../parsers';
-import type { AgentError } from '../../shared/types';
+import type { AgentError, PermissionMode } from '../../shared/types';
+
+/**
+ * Discriminator for the execution backend powering a run.
+ * - 'pty': PTY-based process (terminals, agents requiring TTY)
+ * - 'child-process': Standard child process (batch-mode agents)
+ * - 'harness': SDK-backed agent harness (future harness executions)
+ */
+export type ExecutionBackend = 'pty' | 'child-process' | 'harness';
 
 /**
  * Configuration for spawning a new process
@@ -36,18 +44,39 @@ export interface ProcessConfig {
 	sendPromptViaStdinRaw?: boolean;
 	/** Script to send via stdin for SSH execution (bypasses shell escaping) */
 	sshStdinScript?: string;
+	/** Permission mode for this execution */
+	permissionMode?: PermissionMode;
+	/** Hint from callers; ProcessManager has final say on execution mode */
+	preferredExecutionMode?: 'auto' | 'classic' | 'harness';
+	/** Provider-specific options (adapter-owned, opaque to ProcessManager) */
+	providerOptions?: Record<string, unknown>;
 }
 
 /**
- * Internal representation of a managed process
+ * Shared execution record for all AI runs managed by ProcessManager.
+ *
+ * Represents classic child-process, PTY, and future harness executions
+ * under one model. The `backend` discriminator determines which process
+ * handle fields are populated.
+ *
+ * Previously named ManagedProcess — the old name is retained as an alias
+ * for backwards compatibility.
  */
-export interface ManagedProcess {
+export interface AgentExecution {
 	sessionId: string;
 	toolType: string;
+	/** Discriminator for the execution backend */
+	backend: ExecutionBackend;
+	/** PTY process handle (populated when backend is 'pty') */
 	ptyProcess?: IPty;
+	/** Child process handle (populated when backend is 'child-process') */
 	childProcess?: ChildProcess;
 	cwd: string;
-	pid: number;
+	/**
+	 * OS process ID. Null or undefined for harness-backed runs
+	 * that don't spawn a system process.
+	 */
+	pid?: number | null;
 	isTerminal: boolean;
 	isBatchMode?: boolean;
 	isStreamJsonMode?: boolean;
@@ -76,6 +105,11 @@ export interface ManagedProcess {
 	dataBufferTimeout?: NodeJS.Timeout;
 }
 
+/**
+ * @deprecated Use AgentExecution instead. Retained for backwards compatibility.
+ */
+export type ManagedProcess = AgentExecution;
+
 export interface UsageTotals {
 	inputTokens: number;
 	outputTokens: number;
@@ -95,7 +129,11 @@ export interface UsageStats {
 }
 
 export interface SpawnResult {
-	pid: number;
+	/**
+	 * OS process ID. Null for harness-backed runs that don't spawn
+	 * a system process. Never use sentinel values like -1.
+	 */
+	pid: number | null;
 	success: boolean;
 }
 
@@ -138,4 +176,4 @@ export interface QueryCompleteData {
 
 // Re-export for backwards compatibility
 export type { ParsedEvent, AgentOutputParser } from '../parsers';
-export type { AgentError, AgentErrorType, SshRemoteConfig } from '../../shared/types';
+export type { AgentError, AgentErrorType, SshRemoteConfig, PermissionMode, AgentExecutionConfig, StructuredOutputConfig } from '../../shared/types';
