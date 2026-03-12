@@ -489,7 +489,7 @@ describe('harnessStore interaction plumbing', () => {
 		});
 	});
 
-	describe('all five response kinds through respondToInteraction', () => {
+	describe('all six response kinds through respondToInteraction', () => {
 		it('dispatches approve with updatedInput and updatedPermissions', async () => {
 			const req = makeToolApproval({ interactionId: 'int-approve-full' });
 			useHarnessStore.getState().addInteraction('session-1', req);
@@ -577,6 +577,21 @@ describe('harnessStore interaction plumbing', () => {
 			await useHarnessStore.getState().respondToInteraction('session-1', 'int-cancel', response);
 
 			expect(mockRespondToInteraction).toHaveBeenCalledWith('session-1', 'int-cancel', response);
+		});
+
+		it('dispatches timeout response with interactionKind', async () => {
+			const req = makeToolApproval({ interactionId: 'int-timeout' });
+			useHarnessStore.getState().addInteraction('session-1', req);
+
+			const response: InteractionResponse = {
+				kind: 'timeout',
+				interactionKind: 'tool-approval',
+				message: 'Timed out waiting for user response',
+			};
+
+			await useHarnessStore.getState().respondToInteraction('session-1', 'int-timeout', response);
+
+			expect(mockRespondToInteraction).toHaveBeenCalledWith('session-1', 'int-timeout', response);
 		});
 	});
 
@@ -715,17 +730,27 @@ describe('harnessStore interaction plumbing', () => {
 			useHarnessStore.getState().addInteraction('session-1', req1);
 			useHarnessStore.getState().addInteraction('session-1', req2);
 
-			// This will fail at IPC level but optimistic removal already happened
+			// IPC-first strategy: on failure the error is re-thrown and the
+			// interaction stays pending so the user can retry.
+			await expect(
+				useHarnessStore.getState().respondToInteraction('session-1', 'int-ipc-fail', {
+					kind: 'approve',
+				})
+			).rejects.toThrow('Network error');
+
+			// Failed interaction stays pending — user can retry
+			const pending = useHarnessStore.getState().pendingInteractions['session-1'];
+			expect(pending).toHaveLength(2);
+			expect(pending[0].interactionId).toBe('int-ipc-fail');
+			expect(pending[1].interactionId).toBe('int-ipc-ok');
+
+			// Retry the failed interaction successfully
+			mockRespondToInteraction.mockResolvedValueOnce(undefined);
 			await useHarnessStore.getState().respondToInteraction('session-1', 'int-ipc-fail', {
 				kind: 'approve',
 			});
 
-			// Store should still be functional
-			const pending = useHarnessStore.getState().pendingInteractions['session-1'];
-			expect(pending).toHaveLength(1);
-			expect(pending[0].interactionId).toBe('int-ipc-ok');
-
-			// Can still respond to remaining interactions
+			// Now respond to the second interaction
 			mockRespondToInteraction.mockResolvedValueOnce(undefined);
 			await useHarnessStore.getState().respondToInteraction('session-1', 'int-ipc-ok', {
 				kind: 'approve',

@@ -313,13 +313,14 @@ describe('event payload serialization', () => {
 			expectSerializable(response);
 		});
 
-		it('all five response kinds survive round-trip in batch', () => {
+		it('all six response kinds survive round-trip in batch', () => {
 			const responses: InteractionResponse[] = [
 				{ kind: 'approve', updatedInput: { a: 1 } },
 				{ kind: 'deny', interrupt: true },
 				{ kind: 'text', text: 'hello' },
 				{ kind: 'clarification-answer', answers: [{ questionIndex: 0, selectedOptionLabels: ['x'] }] },
 				{ kind: 'cancel' },
+				{ kind: 'timeout', interactionKind: 'tool-approval', message: 'Timed out' },
 			];
 			for (const response of responses) {
 				expectSerializable(response);

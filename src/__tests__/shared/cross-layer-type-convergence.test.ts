@@ -93,15 +93,16 @@ describe('cross-layer type convergence', () => {
 			expect(asUnion.kind).toBe('clarification');
 		});
 
-		it('interaction responses should cover all Day 1 response kinds', () => {
+		it('interaction responses should cover all response kinds', () => {
 			const responses: InteractionResponse[] = [
 				{ kind: 'approve' },
 				{ kind: 'deny', message: 'No', interrupt: true },
 				{ kind: 'text', text: 'Free text' },
 				{ kind: 'clarification-answer', answers: [{ questionIndex: 0, selectedOptionLabels: ['main'] }] },
 				{ kind: 'cancel', message: 'Cancelled' },
+				{ kind: 'timeout', interactionKind: 'tool-approval', message: 'Timed out' },
 			];
-			expect(responses).toHaveLength(5);
+			expect(responses).toHaveLength(6);
 
 			const responseKinds = responses.map((r) => r.kind);
 			expect(responseKinds).toContain('approve');
@@ -109,6 +110,7 @@ describe('cross-layer type convergence', () => {
 			expect(responseKinds).toContain('text');
 			expect(responseKinds).toContain('clarification-answer');
 			expect(responseKinds).toContain('cancel');
+			expect(responseKinds).toContain('timeout');
 		});
 	});
 
@@ -475,6 +477,7 @@ describe('cross-layer type convergence', () => {
 					],
 				},
 				{ kind: 'cancel', message: 'User cancelled' },
+				{ kind: 'timeout', interactionKind: 'tool-approval', message: 'Timed out' },
 			];
 
 			for (const response of responses) {
