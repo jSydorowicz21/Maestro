@@ -22,6 +22,10 @@ const mockProcess = {
 	onData: vi.fn(),
 	onExit: vi.fn(),
 	onSessionId: vi.fn(),
+	onToolExecution: vi.fn(),
+	onInteractionRequest: vi.fn(),
+	respondToInteraction: vi.fn(),
+	onRuntimeMetadata: vi.fn(),
 };
 
 // Setup mock before each test
@@ -459,6 +463,243 @@ describe('processService', () => {
 			processService.onSessionId(handler);
 
 			expect(handler).toHaveBeenCalledWith('session-1', 'claude-abc123');
+		});
+	});
+
+	describe('onInteractionRequest', () => {
+		test('registers interaction request handler and returns cleanup function', () => {
+			const cleanup = vi.fn();
+			mockProcess.onInteractionRequest.mockReturnValue(cleanup);
+			const handler = vi.fn();
+
+			const result = processService.onInteractionRequest(handler);
+
+			expect(mockProcess.onInteractionRequest).toHaveBeenCalledTimes(1);
+			expect(result).toBe(cleanup);
+		});
+
+		test('cleanup function can be called', () => {
+			const cleanup = vi.fn();
+			mockProcess.onInteractionRequest.mockReturnValue(cleanup);
+			const handler = vi.fn();
+
+			const result = processService.onInteractionRequest(handler);
+			result();
+
+			expect(cleanup).toHaveBeenCalled();
+		});
+
+		test('handler receives sessionId and interaction request', () => {
+			const cleanup = vi.fn();
+			mockProcess.onInteractionRequest.mockImplementation((h: any) => {
+				h('session-1', {
+					interactionId: 'int-1',
+					sessionId: 'session-1',
+					agentId: 'claude-code',
+					kind: 'tool-approval',
+					timestamp: 1710000000000,
+					toolUseId: 'tu-1',
+					toolName: 'Bash',
+					toolInput: { command: 'ls' },
+				});
+				return cleanup;
+			});
+			const handler = vi.fn();
+
+			processService.onInteractionRequest(handler);
+
+			expect(handler).toHaveBeenCalledWith('session-1', expect.objectContaining({
+				kind: 'tool-approval',
+				toolName: 'Bash',
+			}));
+		});
+
+		test('handler receives clarification requests', () => {
+			const cleanup = vi.fn();
+			mockProcess.onInteractionRequest.mockImplementation((h: any) => {
+				h('session-2', {
+					interactionId: 'int-2',
+					sessionId: 'session-2',
+					agentId: 'codex',
+					kind: 'clarification',
+					timestamp: 1710000000000,
+					questions: [{ question: 'Which?', header: 'Q', options: [], multiSelect: false }],
+					allowFreeText: true,
+				});
+				return cleanup;
+			});
+			const handler = vi.fn();
+
+			processService.onInteractionRequest(handler);
+
+			expect(handler).toHaveBeenCalledWith('session-2', expect.objectContaining({
+				kind: 'clarification',
+				allowFreeText: true,
+			}));
+		});
+	});
+
+	describe('respondToInteraction', () => {
+		test('sends approve response', async () => {
+			mockProcess.respondToInteraction.mockResolvedValue(undefined);
+
+			await processService.respondToInteraction('session-1', 'int-1', { kind: 'approve' });
+
+			expect(mockProcess.respondToInteraction).toHaveBeenCalledWith(
+				'session-1', 'int-1', { kind: 'approve' }
+			);
+		});
+
+		test('sends deny response with interrupt', async () => {
+			mockProcess.respondToInteraction.mockResolvedValue(undefined);
+
+			await processService.respondToInteraction('session-1', 'int-2', {
+				kind: 'deny',
+				message: 'Not allowed',
+				interrupt: true,
+			});
+
+			expect(mockProcess.respondToInteraction).toHaveBeenCalledWith(
+				'session-1', 'int-2',
+				{ kind: 'deny', message: 'Not allowed', interrupt: true }
+			);
+		});
+
+		test('sends clarification-answer response with structured answers', async () => {
+			mockProcess.respondToInteraction.mockResolvedValue(undefined);
+
+			await processService.respondToInteraction('session-1', 'int-3', {
+				kind: 'clarification-answer',
+				answers: [
+					{ questionIndex: 0, selectedOptionLabels: ['Option A'] },
+					{ questionIndex: 1, text: 'Free text answer' },
+				],
+			});
+
+			expect(mockProcess.respondToInteraction).toHaveBeenCalledWith(
+				'session-1', 'int-3',
+				expect.objectContaining({
+					kind: 'clarification-answer',
+					answers: expect.arrayContaining([
+						expect.objectContaining({ questionIndex: 0 }),
+						expect.objectContaining({ text: 'Free text answer' }),
+					]),
+				})
+			);
+		});
+
+		test('sends cancel response', async () => {
+			mockProcess.respondToInteraction.mockResolvedValue(undefined);
+
+			await processService.respondToInteraction('session-1', 'int-4', {
+				kind: 'cancel',
+				message: 'User cancelled',
+			});
+
+			expect(mockProcess.respondToInteraction).toHaveBeenCalledWith(
+				'session-1', 'int-4',
+				{ kind: 'cancel', message: 'User cancelled' }
+			);
+		});
+
+		test('throws error and logs when respondToInteraction fails', async () => {
+			const error = new Error('Interaction response failed');
+			mockProcess.respondToInteraction.mockRejectedValue(error);
+
+			await expect(
+				processService.respondToInteraction('session-1', 'int-5', { kind: 'approve' })
+			).rejects.toThrow('Interaction response failed');
+			expect(console.error).toHaveBeenCalledWith('Respond to interaction error:', error);
+		});
+	});
+
+	describe('onRuntimeMetadata', () => {
+		test('registers runtime metadata handler and returns cleanup function', () => {
+			const cleanup = vi.fn();
+			mockProcess.onRuntimeMetadata.mockReturnValue(cleanup);
+			const handler = vi.fn();
+
+			const result = processService.onRuntimeMetadata(handler);
+
+			expect(mockProcess.onRuntimeMetadata).toHaveBeenCalledTimes(1);
+			expect(result).toBe(cleanup);
+		});
+
+		test('cleanup function can be called', () => {
+			const cleanup = vi.fn();
+			mockProcess.onRuntimeMetadata.mockReturnValue(cleanup);
+			const handler = vi.fn();
+
+			const result = processService.onRuntimeMetadata(handler);
+			result();
+
+			expect(cleanup).toHaveBeenCalled();
+		});
+
+		test('handler receives full metadata snapshot', () => {
+			const cleanup = vi.fn();
+			mockProcess.onRuntimeMetadata.mockImplementation((h: any) => {
+				h('session-1', {
+					sessionId: 'session-1',
+					source: 'claude-code',
+					replace: true,
+					skills: [{ id: 'commit', name: 'Commit' }],
+					slashCommands: ['/help'],
+					availableModels: [{ id: 'claude-opus-4-6', label: 'Opus' }],
+					availableAgents: [{ id: 'task-agent' }],
+					capabilities: {
+						supportsInteractionRequests: true,
+						supportsRuntimeModelChange: true,
+					},
+				});
+				return cleanup;
+			});
+			const handler = vi.fn();
+
+			processService.onRuntimeMetadata(handler);
+
+			expect(handler).toHaveBeenCalledWith('session-1', expect.objectContaining({
+				replace: true,
+				source: 'claude-code',
+				skills: expect.arrayContaining([expect.objectContaining({ id: 'commit' })]),
+			}));
+		});
+
+		test('handler receives partial metadata update', () => {
+			const cleanup = vi.fn();
+			mockProcess.onRuntimeMetadata.mockImplementation((h: any) => {
+				h('session-2', {
+					sessionId: 'session-2',
+					source: 'codex',
+					slashCommands: ['/test'],
+				});
+				return cleanup;
+			});
+			const handler = vi.fn();
+
+			processService.onRuntimeMetadata(handler);
+
+			const received = handler.mock.calls[0][1];
+			expect(received.slashCommands).toEqual(['/test']);
+			expect(received.skills).toBeUndefined();
+			expect(received.replace).toBeUndefined();
+		});
+
+		test('registers multiple metadata handlers independently', () => {
+			const cleanup1 = vi.fn();
+			const cleanup2 = vi.fn();
+			mockProcess.onRuntimeMetadata
+				.mockReturnValueOnce(cleanup1)
+				.mockReturnValueOnce(cleanup2);
+			const handler1 = vi.fn();
+			const handler2 = vi.fn();
+
+			const result1 = processService.onRuntimeMetadata(handler1);
+			const result2 = processService.onRuntimeMetadata(handler2);
+
+			expect(mockProcess.onRuntimeMetadata).toHaveBeenCalledTimes(2);
+			expect(result1).toBe(cleanup1);
+			expect(result2).toBe(cleanup2);
 		});
 	});
 
