@@ -277,6 +277,43 @@ describe('ClaudeCodeHarness', () => {
 
 			h.kill();
 		});
+
+		it('should log warning and exclude images from initial message when config has images', async () => {
+			const { logger } = await import('../../utils/logger');
+			const config = createTestConfig({
+				prompt: 'Analyze this image',
+				images: ['/path/to/screenshot.png'],
+			});
+
+			let capturedPrompt: AsyncIterable<SDKUserMessage> | null = null;
+			const queryFn: SDKQueryFunction = (cfg) => {
+				capturedPrompt = cfg.prompt as AsyncIterable<SDKUserMessage>;
+				return mockFn.query;
+			};
+
+			const h = new ClaudeCodeHarness(queryFn);
+			await h.spawn(config);
+
+			// Warning logged about unsupported images
+			expect(logger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('Image input is not supported in harness mode'),
+				expect.any(String),
+			);
+
+			// Consume the streaming prompt to verify content
+			const messages: SDKUserMessage[] = [];
+			for await (const msg of capturedPrompt!) {
+				messages.push(msg);
+			}
+			expect(messages).toHaveLength(1);
+
+			// Only text content — no image blocks
+			const contentTypes = messages[0].content.map((b: any) => b.type);
+			expect(contentTypes).toEqual(['text']);
+			expect(messages[0].content[0]).toEqual({ type: 'text', text: 'Analyze this image' });
+
+			h.kill();
+		});
 	});
 
 	// ====================================================================
@@ -1346,6 +1383,43 @@ describe('ClaudeCodeHarness', () => {
 
 		it('should warn and no-op when not running', () => {
 			harness.write({ type: 'text', text: 'Not running' });
+			expect(mockFn.query.streamInput).not.toHaveBeenCalled();
+		});
+
+		it('should log warning and send text only when images accompany text', async () => {
+			const { logger } = await import('../../utils/logger');
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.write({ type: 'message', text: 'Describe this', images: ['/path/to/img.png'] });
+
+			// Warning logged about unsupported images
+			expect(logger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('Image input is not supported in harness mode'),
+				expect.any(String),
+			);
+
+			// streamInput still called because text was provided
+			expect(mockFn.query.streamInput).toHaveBeenCalledOnce();
+		});
+
+		it('should log warning and skip streamInput when only images are provided (no text)', async () => {
+			const { logger } = await import('../../utils/logger');
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			// Reset streamInput call count from spawn
+			vi.mocked(mockFn.query.streamInput).mockClear();
+
+			harness.write({ type: 'message', images: ['/a.png', '/b.png'] });
+
+			// Warning logged about images-only input
+			expect(logger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('images only and no text'),
+				expect.any(String),
+			);
+
+			// streamInput NOT called — nothing to send
 			expect(mockFn.query.streamInput).not.toHaveBeenCalled();
 		});
 	});

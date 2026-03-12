@@ -223,6 +223,16 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 			return;
 		}
 
+		// If the input is images-only (no text), skip entirely — nothing to send
+		if (input.type === 'message' && !input.text && input.images && input.images.length > 0) {
+			logger.warn(
+				`${LOG_CONTEXT} write() called with images only and no text. ` +
+				`Image input is not supported in harness mode (Phase 1). Nothing to send.`,
+				LOG_CONTEXT
+			);
+			return;
+		}
+
 		const message = this.buildUserMessage(input);
 
 		// Use streamInput for follow-up messages after the initial prompt
@@ -1095,21 +1105,12 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 			content.push({ type: 'text', text: config.prompt });
 		}
 
-		if (config.images) {
-			for (const imagePath of config.images) {
-				// TODO(Phase 2): Read file and base64-encode it here.
-				// Currently passes the path as a placeholder — the SDK
-				// layer may handle path-based images directly in a future
-				// version, or we add fs.readFileSync + base64 encoding.
-				content.push({
-					type: 'image',
-					source: {
-						type: 'base64',
-						media_type: 'image/png',
-						data: imagePath,
-					},
-				});
-			}
+		if (config.images && config.images.length > 0) {
+			logger.warn(
+				`${LOG_CONTEXT} Image input is not supported in harness mode (Phase 1). ` +
+				`${config.images.length} image(s) will be skipped.`,
+				LOG_CONTEXT
+			);
 		}
 
 		// Ensure at least one content block
@@ -1132,18 +1133,12 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 			if (input.text) {
 				content.push({ type: 'text', text: input.text });
 			}
-			if (input.images) {
-				for (const imagePath of input.images) {
-					// TODO(Phase 2): Read file and base64-encode (see buildInitialMessage)
-					content.push({
-						type: 'image',
-						source: {
-							type: 'base64',
-							media_type: 'image/png',
-							data: imagePath,
-						},
-					});
-				}
+			if (input.images && input.images.length > 0) {
+				logger.warn(
+					`${LOG_CONTEXT} Image input is not supported in harness mode (Phase 1). ` +
+					`${input.images.length} image(s) will be skipped.`,
+					LOG_CONTEXT
+				);
 			}
 		}
 
