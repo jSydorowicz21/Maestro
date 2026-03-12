@@ -419,6 +419,100 @@ describe('ProcessManager: Unified Execution Ownership', () => {
 	});
 
 	// ===================================================================
+	// updateRuntimeSettings() guards
+	// ===================================================================
+	describe('updateRuntimeSettings() guards', () => {
+		it('warns and returns for missing session', async () => {
+			await pm.updateRuntimeSettings('nonexistent', { model: 'claude-3-opus' });
+
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('No execution found'),
+				'ProcessManager',
+				expect.objectContaining({
+					sessionId: 'nonexistent',
+				})
+			);
+		});
+
+		it('warns and returns when called on pty backend', async () => {
+			const execution = makePtyExecution();
+			injectExecution(pm, execution);
+
+			await pm.updateRuntimeSettings('pty-session-1', { model: 'claude-3-opus' });
+
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('non-harness execution'),
+				'ProcessManager',
+				expect.objectContaining({
+					sessionId: 'pty-session-1',
+					backend: 'pty',
+				})
+			);
+		});
+
+		it('warns and returns when called on child-process backend', async () => {
+			const execution = makeChildProcessExecution();
+			injectExecution(pm, execution);
+
+			await pm.updateRuntimeSettings('cp-session-1', { permissionMode: 'default' as any });
+
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('non-harness execution'),
+				'ProcessManager',
+				expect.objectContaining({
+					sessionId: 'cp-session-1',
+					backend: 'child-process',
+				})
+			);
+		});
+
+		it('reaches harness delegation stub for harness backend', async () => {
+			const execution = makeHarnessExecution();
+			injectExecution(pm, execution);
+
+			await pm.updateRuntimeSettings('harness-session-1', { model: 'claude-3-opus' });
+
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('harness adapters not yet registered'),
+				'ProcessManager',
+				expect.objectContaining({
+					sessionId: 'harness-session-1',
+					settingsKeys: ['model'],
+				})
+			);
+		});
+
+		it('logs all settings keys in the stub warning', async () => {
+			const execution = makeHarnessExecution();
+			injectExecution(pm, execution);
+
+			await pm.updateRuntimeSettings('harness-session-1', {
+				model: 'claude-3-opus',
+				permissionMode: 'default' as any,
+				providerOptions: { reasoningEffort: 'high' },
+			});
+
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('harness adapters not yet registered'),
+				'ProcessManager',
+				expect.objectContaining({
+					settingsKeys: expect.arrayContaining(['model', 'permissionMode', 'providerOptions']),
+				})
+			);
+		});
+
+		it('returns Promise<void> (is async)', () => {
+			const execution = makeHarnessExecution();
+			injectExecution(pm, execution);
+
+			const result = pm.updateRuntimeSettings('harness-session-1', { model: 'test' });
+
+			// Should return a promise
+			expect(result).toBeInstanceOf(Promise);
+		});
+	});
+
+	// ===================================================================
 	// Nullable PID in harness-backed executions
 	// ===================================================================
 	describe('nullable PID for harness-backed executions', () => {

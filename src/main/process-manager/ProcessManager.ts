@@ -18,6 +18,7 @@ import { selectExecutionMode } from './utils/executionMode';
 import { logger } from '../utils/logger';
 import type { SshRemoteConfig } from '../../shared/types';
 import type { InteractionResponse } from '../../shared/interaction-types';
+import type { HarnessRuntimeSettings } from '../../shared/harness-types';
 
 /**
  * ProcessManager orchestrates spawning and managing processes for sessions.
@@ -367,6 +368,47 @@ export class ProcessManager extends EventEmitter {
 			'[ProcessManager] respondToInteraction() - harness adapters not yet registered',
 			'ProcessManager',
 			{ sessionId, interactionId, responseKind: response.kind }
+		);
+	}
+
+	/**
+	 * Update runtime settings on a harness-backed execution.
+	 *
+	 * Only valid for sessions running with the 'harness' backend. Classic
+	 * (PTY / child-process) sessions do not support runtime settings updates.
+	 * When harness adapters are registered (Phase 2+) this will delegate to
+	 * harness.updateRuntimeSettings().
+	 */
+	async updateRuntimeSettings(
+		sessionId: string,
+		settings: HarnessRuntimeSettings
+	): Promise<void> {
+		const execution = this.processes.get(sessionId);
+		if (!execution) {
+			logger.warn(
+				'[ProcessManager] updateRuntimeSettings() - No execution found for session',
+				'ProcessManager',
+				{ sessionId }
+			);
+			return;
+		}
+
+		if (execution.backend !== 'harness') {
+			logger.warn(
+				'[ProcessManager] updateRuntimeSettings() called on non-harness execution',
+				'ProcessManager',
+				{ sessionId, backend: execution.backend }
+			);
+			return;
+		}
+
+		// Harness settings delegation — Phase 2+
+		// When harness adapters land, this will call:
+		//   await execution.harness.updateRuntimeSettings(settings)
+		logger.warn(
+			'[ProcessManager] updateRuntimeSettings() - harness adapters not yet registered',
+			'ProcessManager',
+			{ sessionId, settingsKeys: Object.keys(settings) }
 		);
 	}
 
