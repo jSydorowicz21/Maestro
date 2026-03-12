@@ -99,7 +99,8 @@ function formatRuntime(startTime: number): string {
 // Interface for the detailed process view
 interface ProcessDetailData {
 	processSessionId: string;
-	pid: number;
+	/** OS process ID. Null for harness-backed runs that don't spawn a system process. */
+	pid: number | null;
 	toolType: string;
 	cwd: string;
 	startTime: number;
@@ -646,7 +647,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 
 	// Open detail view for a process node
 	const openProcessDetail = (node: ProcessNode) => {
-		if (!node.processSessionId || !node.pid) return;
+		if (!node.processSessionId) return;
 
 		// Find the session name from the label (it's the part before " - ")
 		const labelParts = node.label.split(' - ');
@@ -654,7 +655,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 
 		setDetailView({
 			processSessionId: node.processSessionId,
-			pid: node.pid,
+			pid: node.pid ?? null,
 			toolType: node.toolType || 'unknown',
 			cwd: node.cwd || '',
 			startTime: node.startTime || Date.now(),
@@ -1049,7 +1050,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 							</span>
 						)}
 						<span className="text-xs font-mono" style={{ color: theme.colors.textDim }}>
-							PID: {node.pid}
+							PID: {node.pid ?? 'N/A'}
 						</span>
 						{node.startTime && (
 							<span className="text-xs font-mono" style={{ color: theme.colors.textDim }}>
@@ -1298,7 +1299,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 									className="text-lg font-mono"
 									style={{ color: theme.colors.textMain, userSelect: 'text', cursor: 'text' }}
 								>
-									{detailView.pid}
+									{detailView.pid ?? 'N/A (harness)'}
 								</code>
 							</div>
 

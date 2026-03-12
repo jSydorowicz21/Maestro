@@ -12,7 +12,8 @@ import { sanitizePath } from './sanitize';
 export interface ProcessInfo {
 	sessionId: string;
 	toolType: string;
-	pid: number;
+	/** OS process ID. Null for harness-backed runs that don't spawn a system process. */
+	pid: number | null;
 	cwd: string; // Sanitized
 	isTerminal: boolean;
 	isBatchMode: boolean;
@@ -39,7 +40,7 @@ export async function collectProcesses(
 		const processInfo: ProcessInfo = {
 			sessionId: proc.sessionId || 'unknown',
 			toolType: proc.toolType || 'unknown',
-			pid: proc.pid || 0,
+			pid: proc.pid ?? null,
 			cwd: sanitizePath(proc.cwd || ''),
 			isTerminal: !!proc.isTerminal,
 			isBatchMode: !!proc.isBatchMode,

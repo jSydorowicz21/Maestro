@@ -41,7 +41,7 @@ export interface GroomingProcessManager {
 		};
 		// Custom environment variables (resolved via applyAgentConfigOverrides)
 		customEnvVars?: Record<string, string>;
-	}): { pid: number; success?: boolean } | null;
+	}): { pid: number | null; success?: boolean } | null;
 	on(event: string, handler: (...args: unknown[]) => void): void;
 	off(event: string, handler: (...args: unknown[]) => void): void;
 	kill(sessionId: string): void;
@@ -345,6 +345,8 @@ export async function groomContext(
 			customEnvVars: resolvedEnvVars,
 		});
 
+		// Note: pid == null check rejects harness-backed runs (Phase 2+ will relax this
+		// when context grooming over harness is implemented).
 		if (!spawnResult || !spawnResult.success || spawnResult.pid == null) {
 			cleanup();
 			reject(new Error(`Failed to spawn grooming process for ${agentType}`));
