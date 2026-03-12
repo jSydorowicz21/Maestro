@@ -400,11 +400,8 @@ describe('interaction helper response distinguishability', () => {
 		}
 	});
 
-	it('DEFAULT_INTERACTION_TIMEOUT_MS is positive and reasonable', () => {
-		expect(DEFAULT_INTERACTION_TIMEOUT_MS).toBeGreaterThan(0);
-		// Should be between 1 minute and 30 minutes
-		expect(DEFAULT_INTERACTION_TIMEOUT_MS).toBeGreaterThanOrEqual(60_000);
-		expect(DEFAULT_INTERACTION_TIMEOUT_MS).toBeLessThanOrEqual(30 * 60_000);
+	it('DEFAULT_INTERACTION_TIMEOUT_MS is exactly 5 minutes', () => {
+		expect(DEFAULT_INTERACTION_TIMEOUT_MS).toBe(5 * 60 * 1000);
 	});
 });
 
