@@ -640,7 +640,7 @@ describe('restoreSession — Error handling', () => {
 		});
 
 		expect(restored!.state).toBe('error');
-		expect(restored!.aiPid).toBe(-1);
+		expect(restored!.aiPid).toBeNull();
 		expect(restored!.isLive).toBe(false);
 	});
 
@@ -655,7 +655,7 @@ describe('restoreSession — Error handling', () => {
 		});
 
 		expect(restored!.state).toBe('error');
-		expect(restored!.aiPid).toBe(-1);
+		expect(restored!.aiPid).toBeNull();
 	});
 });
 

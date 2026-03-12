@@ -288,6 +288,8 @@ describe('process IPC handlers', () => {
 				'process:resize',
 				'process:getActiveProcesses',
 				'process:runCommand',
+				'process:respond-interaction',
+				'process:update-runtime-settings',
 			];
 
 			for (const channel of expectedChannels) {
