@@ -334,6 +334,14 @@ export const useModalStore = create<ModalStore>()((set, get) => ({
 			if (current?.open && current.data === data) return state;
 			const newModals = new Map(state.modals);
 			newModals.set(id, { open: true, data });
+			// DEBUG: Trace rename modal open/close
+			if (id === 'renameTab') {
+				console.log('[DEBUG renameTab] openModal called', {
+					data,
+					wasOpen: current?.open,
+					hadData: !!current?.data,
+				});
+			}
 			return { modals: newModals };
 		});
 	},
@@ -345,6 +353,10 @@ export const useModalStore = create<ModalStore>()((set, get) => ({
 			if (!current?.open) return state;
 			const newModals = new Map(state.modals);
 			newModals.set(id, { open: false, data: undefined });
+			// DEBUG: Trace rename modal close
+			if (id === 'renameTab') {
+				console.log('[DEBUG renameTab] closeModal called', new Error().stack);
+			}
 			return { modals: newModals };
 		});
 	},
@@ -490,8 +502,8 @@ export function getModalActions() {
 		},
 
 		// Quick Actions Modal
-		setQuickActionOpen: (open: boolean) =>
-			open ? openModal('quickAction', { initialMode: 'main' }) : closeModal('quickAction'),
+		setQuickActionOpen: (open: boolean, mode?: 'main' | 'move-to-group' | 'agents') =>
+			open ? openModal('quickAction', { initialMode: mode ?? 'main' }) : closeModal('quickAction'),
 		setQuickActionInitialMode: (mode: 'main' | 'move-to-group' | 'agents') =>
 			updateModalData('quickAction', { initialMode: mode }),
 
