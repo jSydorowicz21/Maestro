@@ -2865,4 +2865,532 @@ describe('ClaudeCodeHarness', () => {
 			expect((result as any).interrupt).toBe(true);
 		});
 	});
+
+	// ====================================================================
+	// Validation: Invalid Interaction IDs and Cleanup on Kill/Interrupt
+	// ====================================================================
+
+	describe('validation — invalid interaction IDs and cleanup on kill/interrupt', () => {
+		// ------- Invalid interaction IDs -------
+
+		it('should throw for UUID-format ID that was never issued by the harness', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			// A properly formatted UUID, but one the harness never created
+			const fakeUuid = '00000000-0000-4000-8000-000000000000';
+
+			await expect(
+				harness.respondToInteraction(fakeUuid, { kind: 'approve' })
+			).rejects.toThrow('Unknown or expired interaction ID');
+
+			expect(harness.isRunning()).toBe(true);
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+
+		it('should reject an ID from a previous harness lifecycle (spawn → kill → new harness)', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			// Create an interaction in the first lifecycle
+			const p1 = mockFn.canUseTool!(
+				'Bash',
+				{ command: 'test' },
+				{ signal: new AbortController().signal, toolUseID: 'lifecycle-1' }
+			);
+			await flushMicrotasks();
+
+			const firstLifecycleId = capturedRequest!.interactionId;
+
+			// Kill resolves it with termination
+			harness.kill();
+			const r1 = await p1;
+			expect(r1.behavior).toBe('deny');
+
+			// Create a fresh harness instance (simulating the next lifecycle)
+			const newMock = createMockQueryFn();
+			const newHarness = new ClaudeCodeHarness(newMock.queryFn);
+			const result = await newHarness.spawn(createTestConfig());
+			expect(result.success).toBe(true);
+
+			// The old ID from the first harness lifecycle should be rejected
+			await expect(
+				newHarness.respondToInteraction(firstLifecycleId, { kind: 'approve' })
+			).rejects.toThrow('Unknown or expired interaction ID');
+
+			// New harness is still running, no corruption
+			expect(newHarness.isRunning()).toBe(true);
+			expect(newHarness.getPendingInteractionCount()).toBe(0);
+
+			newHarness.kill();
+		});
+
+		it('should reject IDs cleared by stream completion', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			const p1 = mockFn.canUseTool!(
+				'Bash',
+				{ command: 'test' },
+				{ signal: new AbortController().signal, toolUseID: 'stream-end-1' }
+			);
+			await flushMicrotasks();
+
+			const streamEndId = capturedRequest!.interactionId;
+			expect(harness.getPendingInteractionCount()).toBe(1);
+
+			// Complete the SDK message stream — triggers finally-block resolveAllPending
+			mockFn.complete();
+			await flushMicrotasks();
+
+			const r1 = await p1;
+			expect(r1.behavior).toBe('deny');
+			expect((r1 as any).message).toBe('Session terminated');
+
+			// ID is gone — should throw
+			await expect(
+				harness.respondToInteraction(streamEndId, { kind: 'approve' })
+			).rejects.toThrow('Unknown or expired interaction ID');
+		});
+
+		it('should not corrupt existing pending interactions when responding with invalid IDs', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const requests: InteractionRequest[] = [];
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				requests.push(req);
+			});
+
+			// Create a real interaction
+			const p1 = mockFn.canUseTool!(
+				'Read',
+				{ path: '/valid.ts' },
+				{ signal: new AbortController().signal, toolUseID: 'corrupt-test-1' }
+			);
+			await flushMicrotasks();
+
+			const validId = requests[0].interactionId;
+			expect(harness.getPendingInteractionCount()).toBe(1);
+
+			// Fire several invalid IDs — these should not affect the valid pending interaction
+			for (const badId of ['fake-1', 'fake-2', '', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee']) {
+				await expect(
+					harness.respondToInteraction(badId, { kind: 'approve' })
+				).rejects.toThrow('Unknown or expired interaction ID');
+			}
+
+			// Valid interaction is still pending and uncorrupted
+			expect(harness.getPendingInteractionCount()).toBe(1);
+			expect(harness.hasPendingInteraction(validId)).toBe(true);
+
+			// Resolve the valid one — it should still work perfectly
+			await harness.respondToInteraction(validId, { kind: 'approve' });
+			const r1 = await p1;
+			expect(r1.behavior).toBe('allow');
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+
+		it('should interleave valid and invalid responses correctly without confusion', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const requests: InteractionRequest[] = [];
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				requests.push(req);
+			});
+
+			// Create two real interactions
+			const p1 = mockFn.canUseTool!(
+				'Bash', { command: 'first' },
+				{ signal: new AbortController().signal, toolUseID: 'interleave-1' }
+			);
+			await flushMicrotasks();
+
+			const p2 = mockFn.canUseTool!(
+				'Write', { path: '/a.ts', content: '' },
+				{ signal: new AbortController().signal, toolUseID: 'interleave-2' }
+			);
+			await flushMicrotasks();
+
+			expect(harness.getPendingInteractionCount()).toBe(2);
+
+			// Invalid response attempt
+			await expect(
+				harness.respondToInteraction('totally-bogus', { kind: 'approve' })
+			).rejects.toThrow('Unknown or expired interaction ID');
+
+			// Valid response to first
+			await harness.respondToInteraction(requests[0].interactionId, {
+				kind: 'deny', message: 'nope',
+			});
+
+			// Another invalid attempt
+			await expect(
+				harness.respondToInteraction('also-bogus', { kind: 'deny' })
+			).rejects.toThrow('Unknown or expired interaction ID');
+
+			// Valid response to second
+			await harness.respondToInteraction(requests[1].interactionId, {
+				kind: 'approve',
+			});
+
+			const [r1, r2] = await Promise.all([p1, p2]);
+			expect(r1.behavior).toBe('deny');
+			expect((r1 as any).message).toBe('nope');
+			expect(r2.behavior).toBe('allow');
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+
+		// ------- Cleanup on kill -------
+
+		it('kill() should resolve mixed tool-approval and clarification with correct SDK shapes per kind', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.on('interaction-request', () => {});
+
+			// Tool approval
+			const pTool = mockFn.canUseTool!(
+				'Bash', { command: 'rm file' },
+				{ signal: new AbortController().signal, toolUseID: 'kill-mix-1' }
+			);
+			await flushMicrotasks();
+
+			// Clarification
+			const pClarify = mockFn.canUseTool!(
+				'AskUserQuestion',
+				{ questions: [{ question: 'Which?', header: 'Q', options: [], multiSelect: false }] },
+				{ signal: new AbortController().signal, toolUseID: 'kill-mix-2' }
+			);
+			await flushMicrotasks();
+
+			// Second tool approval
+			const pTool2 = mockFn.canUseTool!(
+				'Write', { path: '/f.ts', content: '' },
+				{ signal: new AbortController().signal, toolUseID: 'kill-mix-3' }
+			);
+			await flushMicrotasks();
+
+			expect(harness.getPendingInteractionCount()).toBe(3);
+
+			harness.kill();
+
+			const [rTool, rClarify, rTool2] = await Promise.all([pTool, pClarify, pTool2]);
+
+			// Tool approvals → deny with interrupt flag and "Session terminated" message
+			expect(rTool.behavior).toBe('deny');
+			expect((rTool as any).message).toBe('Session terminated');
+			expect((rTool as any).interrupt).toBe(true);
+
+			// Clarification → cancel → SDK deny with "Session terminated" message, no interrupt flag
+			expect(rClarify.behavior).toBe('deny');
+			expect((rClarify as any).message).toBe('Session terminated');
+
+			// Second tool approval → same as first
+			expect(rTool2.behavior).toBe('deny');
+			expect((rTool2 as any).message).toBe('Session terminated');
+			expect((rTool2 as any).interrupt).toBe(true);
+
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+
+		it('kill() after partial resolution only terminates unresolved interactions', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const requests: InteractionRequest[] = [];
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				requests.push(req);
+			});
+
+			const p1 = mockFn.canUseTool!(
+				'Bash', { command: 'first' },
+				{ signal: new AbortController().signal, toolUseID: 'partial-kill-1' }
+			);
+			await flushMicrotasks();
+
+			const p2 = mockFn.canUseTool!(
+				'Write', { path: '/f.ts', content: '' },
+				{ signal: new AbortController().signal, toolUseID: 'partial-kill-2' }
+			);
+			await flushMicrotasks();
+
+			const p3 = mockFn.canUseTool!(
+				'Read', { path: '/g.ts' },
+				{ signal: new AbortController().signal, toolUseID: 'partial-kill-3' }
+			);
+			await flushMicrotasks();
+
+			expect(harness.getPendingInteractionCount()).toBe(3);
+
+			// Resolve the first one manually
+			await harness.respondToInteraction(requests[0].interactionId, { kind: 'approve' });
+			const r1 = await p1;
+			expect(r1.behavior).toBe('allow');
+			expect(harness.getPendingInteractionCount()).toBe(2);
+
+			// Now kill — only the remaining two get termination responses
+			harness.kill();
+
+			const [r2, r3] = await Promise.all([p2, p3]);
+			expect(r2.behavior).toBe('deny');
+			expect((r2 as any).message).toBe('Session terminated');
+			expect(r3.behavior).toBe('deny');
+			expect((r3 as any).message).toBe('Session terminated');
+
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+
+		it('kill() makes hasPendingInteraction() return false for ALL prior IDs', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const requests: InteractionRequest[] = [];
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				requests.push(req);
+			});
+
+			mockFn.canUseTool!(
+				'Bash', { command: 'a' },
+				{ signal: new AbortController().signal, toolUseID: 'has-check-k1' }
+			);
+			await flushMicrotasks();
+
+			mockFn.canUseTool!(
+				'Write', { path: '/f.ts', content: '' },
+				{ signal: new AbortController().signal, toolUseID: 'has-check-k2' }
+			);
+			await flushMicrotasks();
+
+			const allIds = requests.map((r) => r.interactionId);
+			expect(allIds.every((id) => harness.hasPendingInteraction(id))).toBe(true);
+
+			harness.kill();
+			await flushMicrotasks();
+
+			// Every ID should now be gone
+			expect(allIds.every((id) => !harness.hasPendingInteraction(id))).toBe(true);
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+
+		it('kill() calls SDK close() exactly once regardless of pending count', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.on('interaction-request', () => {});
+
+			// Create three pending interactions
+			for (let i = 0; i < 3; i++) {
+				mockFn.canUseTool!(
+					'Bash', { command: `cmd-${i}` },
+					{ signal: new AbortController().signal, toolUseID: `close-once-${i}` }
+				);
+				await flushMicrotasks();
+			}
+			expect(harness.getPendingInteractionCount()).toBe(3);
+
+			harness.kill();
+
+			expect(mockFn.query.close).toHaveBeenCalledTimes(1);
+		});
+
+		it('kill() then immediate respondToInteraction fails cleanly for every cleared ID', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const requests: InteractionRequest[] = [];
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				requests.push(req);
+			});
+
+			for (let i = 0; i < 3; i++) {
+				mockFn.canUseTool!(
+					'Bash', { command: `post-kill-${i}` },
+					{ signal: new AbortController().signal, toolUseID: `post-kill-id-${i}` }
+				);
+				await flushMicrotasks();
+			}
+
+			harness.kill();
+			await flushMicrotasks();
+
+			// Every ID should throw with a consistent error
+			for (const req of requests) {
+				await expect(
+					harness.respondToInteraction(req.interactionId, { kind: 'approve' })
+				).rejects.toThrow('Unknown or expired interaction ID');
+			}
+		});
+
+		// ------- Cleanup on interrupt -------
+
+		it('interrupt() should resolve mixed tool-approval and clarification with correct shapes per kind', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.on('interaction-request', () => {});
+
+			// Tool approval
+			const pTool = mockFn.canUseTool!(
+				'Edit', { file: 'test.ts' },
+				{ signal: new AbortController().signal, toolUseID: 'int-mix-1' }
+			);
+			await flushMicrotasks();
+
+			// Clarification
+			const pClarify = mockFn.canUseTool!(
+				'AskUserQuestion',
+				{ questions: [{ question: 'Name?', header: 'N', options: [], multiSelect: false }] },
+				{ signal: new AbortController().signal, toolUseID: 'int-mix-2' }
+			);
+			await flushMicrotasks();
+
+			expect(harness.getPendingInteractionCount()).toBe(2);
+
+			await harness.interrupt();
+
+			const [rTool, rClarify] = await Promise.all([pTool, pClarify]);
+
+			// Tool approval → deny with interrupt flag
+			expect(rTool.behavior).toBe('deny');
+			expect((rTool as any).message).toBe('Session interrupted');
+			expect((rTool as any).interrupt).toBe(true);
+
+			// Clarification → cancel → SDK deny
+			expect(rClarify.behavior).toBe('deny');
+			expect((rClarify as any).message).toBe('Session interrupted');
+
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+
+		it('interrupt() after partial resolution only interrupts unresolved interactions', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const requests: InteractionRequest[] = [];
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				requests.push(req);
+			});
+
+			const p1 = mockFn.canUseTool!(
+				'Bash', { command: 'first' },
+				{ signal: new AbortController().signal, toolUseID: 'partial-int-1' }
+			);
+			await flushMicrotasks();
+
+			const p2 = mockFn.canUseTool!(
+				'Write', { path: '/f.ts', content: '' },
+				{ signal: new AbortController().signal, toolUseID: 'partial-int-2' }
+			);
+			await flushMicrotasks();
+
+			expect(harness.getPendingInteractionCount()).toBe(2);
+
+			// Resolve the second one manually
+			await harness.respondToInteraction(requests[1].interactionId, { kind: 'deny', message: 'No writes' });
+			const r2 = await p2;
+			expect(r2.behavior).toBe('deny');
+			expect((r2 as any).message).toBe('No writes');
+			expect(harness.getPendingInteractionCount()).toBe(1);
+
+			// Interrupt — only the first (still pending) gets interrupt response
+			await harness.interrupt();
+
+			const r1 = await p1;
+			expect(r1.behavior).toBe('deny');
+			expect((r1 as any).message).toBe('Session interrupted');
+			expect((r1 as any).interrupt).toBe(true);
+
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+
+		it('interrupt() makes hasPendingInteraction() return false for ALL prior IDs', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const requests: InteractionRequest[] = [];
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				requests.push(req);
+			});
+
+			mockFn.canUseTool!(
+				'Bash', { command: 'x' },
+				{ signal: new AbortController().signal, toolUseID: 'has-check-i1' }
+			);
+			await flushMicrotasks();
+
+			mockFn.canUseTool!(
+				'Read', { path: '/z.ts' },
+				{ signal: new AbortController().signal, toolUseID: 'has-check-i2' }
+			);
+			await flushMicrotasks();
+
+			const allIds = requests.map((r) => r.interactionId);
+			expect(allIds.every((id) => harness.hasPendingInteraction(id))).toBe(true);
+
+			await harness.interrupt();
+			await flushMicrotasks();
+
+			expect(allIds.every((id) => !harness.hasPendingInteraction(id))).toBe(true);
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+
+		it('interrupt() calls SDK interrupt() exactly once regardless of pending count', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.on('interaction-request', () => {});
+
+			for (let i = 0; i < 4; i++) {
+				mockFn.canUseTool!(
+					'Bash', { command: `cmd-${i}` },
+					{ signal: new AbortController().signal, toolUseID: `int-once-${i}` }
+				);
+				await flushMicrotasks();
+			}
+			expect(harness.getPendingInteractionCount()).toBe(4);
+
+			await harness.interrupt();
+
+			expect(mockFn.query.interrupt).toHaveBeenCalledTimes(1);
+		});
+
+		it('interrupt() then immediate respondToInteraction fails cleanly for every cleared ID', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const requests: InteractionRequest[] = [];
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				requests.push(req);
+			});
+
+			for (let i = 0; i < 3; i++) {
+				mockFn.canUseTool!(
+					'Bash', { command: `post-int-${i}` },
+					{ signal: new AbortController().signal, toolUseID: `post-int-id-${i}` }
+				);
+				await flushMicrotasks();
+			}
+
+			await harness.interrupt();
+			await flushMicrotasks();
+
+			for (const req of requests) {
+				await expect(
+					harness.respondToInteraction(req.interactionId, { kind: 'approve' })
+				).rejects.toThrow('Unknown or expired interaction ID');
+			}
+		});
+	});
 });
