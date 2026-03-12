@@ -2397,4 +2397,472 @@ describe('ClaudeCodeHarness', () => {
 			).rejects.toThrow('Unknown or expired interaction ID');
 		});
 	});
+
+	// ====================================================================
+	// Validation: Pending Interaction Storage Invariants
+	// ====================================================================
+
+	describe('validation — pending interaction storage', () => {
+		it('should assign unique interactionIds to concurrent interactions', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const ids: string[] = [];
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				ids.push(req.interactionId);
+			});
+
+			// Create three concurrent interactions
+			const p1 = mockFn.canUseTool!(
+				'Bash', { command: 'cmd1' },
+				{ signal: new AbortController().signal, toolUseID: 'unique-1' }
+			);
+			await flushMicrotasks();
+
+			const p2 = mockFn.canUseTool!(
+				'Write', { path: '/f.ts', content: '' },
+				{ signal: new AbortController().signal, toolUseID: 'unique-2' }
+			);
+			await flushMicrotasks();
+
+			const p3 = mockFn.canUseTool!(
+				'AskUserQuestion',
+				{ questions: [{ question: 'Q?', header: 'H', options: [], multiSelect: false }] },
+				{ signal: new AbortController().signal, toolUseID: 'unique-3' }
+			);
+			await flushMicrotasks();
+
+			expect(ids).toHaveLength(3);
+			// All IDs must be distinct
+			expect(new Set(ids).size).toBe(3);
+			// All IDs should be valid UUID format
+			for (const id of ids) {
+				expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+			}
+
+			// Clean up
+			harness.kill();
+			await Promise.all([p1, p2, p3]);
+		});
+
+		it('should store correct kind for tool-approval and clarification interactions', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const requests: InteractionRequest[] = [];
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				requests.push(req);
+			});
+
+			// Tool approval
+			const p1 = mockFn.canUseTool!(
+				'Bash', { command: 'ls' },
+				{ signal: new AbortController().signal, toolUseID: 'kind-check-1' }
+			);
+			await flushMicrotasks();
+
+			// Clarification
+			const p2 = mockFn.canUseTool!(
+				'AskUserQuestion',
+				{ questions: [{ question: 'Which?', header: 'Q', options: [], multiSelect: false }] },
+				{ signal: new AbortController().signal, toolUseID: 'kind-check-2' }
+			);
+			await flushMicrotasks();
+
+			expect(requests).toHaveLength(2);
+			expect(requests[0].kind).toBe('tool-approval');
+			expect(requests[1].kind).toBe('clarification');
+
+			// Verify the pending map entries match
+			const pendingMap = (harness as any).pendingInteractions as Map<string, any>;
+			const entry1 = pendingMap.get(requests[0].interactionId);
+			const entry2 = pendingMap.get(requests[1].interactionId);
+			expect(entry1.kind).toBe('tool-approval');
+			expect(entry2.kind).toBe('clarification');
+
+			// Clean up
+			harness.kill();
+			await Promise.all([p1, p2]);
+		});
+
+		it('should retain originalSdkInput for clarification but not tool-approval', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const requests: InteractionRequest[] = [];
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				requests.push(req);
+			});
+
+			// Tool approval — no originalSdkInput
+			const p1 = mockFn.canUseTool!(
+				'Bash', { command: 'test' },
+				{ signal: new AbortController().signal, toolUseID: 'sdk-input-1' }
+			);
+			await flushMicrotasks();
+
+			// Clarification — should store originalSdkInput
+			const askInput = {
+				questions: [{ question: 'Name?', header: 'N', options: [], multiSelect: false }],
+			};
+			const p2 = mockFn.canUseTool!(
+				'AskUserQuestion', askInput,
+				{ signal: new AbortController().signal, toolUseID: 'sdk-input-2' }
+			);
+			await flushMicrotasks();
+
+			const pendingMap = (harness as any).pendingInteractions as Map<string, any>;
+			const toolEntry = pendingMap.get(requests[0].interactionId);
+			const clarEntry = pendingMap.get(requests[1].interactionId);
+
+			// Tool approval has no originalSdkInput
+			expect(toolEntry.originalSdkInput).toBeUndefined();
+
+			// Clarification retains the SDK input for response translation
+			expect(clarEntry.originalSdkInput).toBeDefined();
+			expect(clarEntry.originalSdkInput.questions).toBeDefined();
+
+			// Clean up
+			harness.kill();
+			await Promise.all([p1, p2]);
+		});
+
+		it('should selectively resolve one interaction while others remain pending', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const requests: InteractionRequest[] = [];
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				requests.push(req);
+			});
+
+			const p1 = mockFn.canUseTool!(
+				'Bash', { command: 'first' },
+				{ signal: new AbortController().signal, toolUseID: 'selective-1' }
+			);
+			await flushMicrotasks();
+
+			const p2 = mockFn.canUseTool!(
+				'Write', { path: '/a.ts', content: '' },
+				{ signal: new AbortController().signal, toolUseID: 'selective-2' }
+			);
+			await flushMicrotasks();
+
+			const p3 = mockFn.canUseTool!(
+				'Read', { path: '/b.ts' },
+				{ signal: new AbortController().signal, toolUseID: 'selective-3' }
+			);
+			await flushMicrotasks();
+
+			expect(harness.getPendingInteractionCount()).toBe(3);
+
+			// Resolve only the middle one
+			await harness.respondToInteraction(requests[1].interactionId, { kind: 'approve' });
+			const r2 = await p2;
+
+			expect(r2.behavior).toBe('allow');
+			expect(harness.getPendingInteractionCount()).toBe(2);
+
+			// First and third should still be pending
+			expect(harness.hasPendingInteraction(requests[0].interactionId)).toBe(true);
+			expect(harness.hasPendingInteraction(requests[1].interactionId)).toBe(false);
+			expect(harness.hasPendingInteraction(requests[2].interactionId)).toBe(true);
+
+			// Resolve remaining
+			await harness.respondToInteraction(requests[0].interactionId, { kind: 'deny', message: 'No' });
+			await harness.respondToInteraction(requests[2].interactionId, { kind: 'approve' });
+			const [r1, r3] = await Promise.all([p1, p3]);
+
+			expect(r1.behavior).toBe('deny');
+			expect(r3.behavior).toBe('allow');
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+
+		it('should emit interaction-request with valid timestamp', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const beforeTime = Date.now();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			const resultPromise = mockFn.canUseTool!(
+				'Bash', { command: 'test' },
+				{ signal: new AbortController().signal, toolUseID: 'timestamp-1' }
+			);
+			await flushMicrotasks();
+
+			const afterTime = Date.now();
+
+			expect(capturedRequest).not.toBeNull();
+			expect(capturedRequest!.timestamp).toBeGreaterThanOrEqual(beforeTime);
+			expect(capturedRequest!.timestamp).toBeLessThanOrEqual(afterTime);
+
+			await harness.respondToInteraction(capturedRequest!.interactionId, { kind: 'approve' });
+			await resultPromise;
+		});
+	});
+
+	// ====================================================================
+	// Validation: Timeout Handling Edge Cases
+	// ====================================================================
+
+	describe('validation — timeout handling', () => {
+		it('should translate timeout response through correct SDK pipeline for tool-approval', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.on('interaction-request', () => {});
+
+			const resultPromise = mockFn.canUseTool!(
+				'Bash', { command: 'test' },
+				{ signal: new AbortController().signal, toolUseID: 'timeout-pipeline-1' }
+			);
+			await flushMicrotasks();
+
+			// Let timeout fire
+			vi.advanceTimersByTime(DEFAULT_INTERACTION_TIMEOUT_MS + 100);
+			await flushMicrotasks();
+
+			const result = await resultPromise;
+			// Timeout response → deny → translateResponseToSdk → SDK deny
+			expect(result.behavior).toBe('deny');
+			expect((result as any).message).toBe('Timed out waiting for user response');
+			// Timeout deny does NOT include interrupt flag
+			expect((result as any).interrupt).toBeUndefined();
+		});
+
+		it('should translate timeout response through correct SDK pipeline for clarification', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.on('interaction-request', () => {});
+
+			const resultPromise = mockFn.canUseTool!(
+				'AskUserQuestion',
+				{ questions: [{ question: 'Pick?', header: 'P', options: [], multiSelect: false }] },
+				{ signal: new AbortController().signal, toolUseID: 'timeout-pipeline-2' }
+			);
+			await flushMicrotasks();
+
+			vi.advanceTimersByTime(DEFAULT_INTERACTION_TIMEOUT_MS + 100);
+			await flushMicrotasks();
+
+			const result = await resultPromise;
+			// Clarification timeout → cancel → translateResponseToSdk → SDK deny
+			expect(result.behavior).toBe('deny');
+			expect((result as any).message).toBe('Timed out waiting for user response');
+		});
+
+		it('should not corrupt pending map when timeout fires on already-deleted entry', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.on('interaction-request', () => {});
+
+			// Create two interactions simultaneously
+			const p1 = mockFn.canUseTool!(
+				'Bash', { command: 'first' },
+				{ signal: new AbortController().signal, toolUseID: 'map-integrity-1' }
+			);
+			await flushMicrotasks();
+
+			const p2 = mockFn.canUseTool!(
+				'Write', { path: '/f.ts', content: '' },
+				{ signal: new AbortController().signal, toolUseID: 'map-integrity-2' }
+			);
+			await flushMicrotasks();
+
+			expect(harness.getPendingInteractionCount()).toBe(2);
+
+			// Kill resolves both — but their timeouts are still scheduled
+			harness.kill();
+			const [r1, r2] = await Promise.all([p1, p2]);
+			expect(r1.behavior).toBe('deny');
+			expect(r2.behavior).toBe('deny');
+
+			expect(harness.getPendingInteractionCount()).toBe(0);
+
+			// Advance past all timeouts — should not corrupt state
+			vi.advanceTimersByTime(DEFAULT_INTERACTION_TIMEOUT_MS + 1000);
+			await flushMicrotasks();
+
+			// Map is still clean, no phantom entries
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+	});
+
+	// ====================================================================
+	// Validation: Response Resolution Correctness
+	// ====================================================================
+
+	describe('validation — response resolution', () => {
+		it('should resolve interactions out of creation order', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const requests: InteractionRequest[] = [];
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				requests.push(req);
+			});
+
+			// Create three interactions
+			const p1 = mockFn.canUseTool!(
+				'Bash', { command: 'first' },
+				{ signal: new AbortController().signal, toolUseID: 'order-1' }
+			);
+			await flushMicrotasks();
+
+			const p2 = mockFn.canUseTool!(
+				'Write', { path: '/f.ts', content: '' },
+				{ signal: new AbortController().signal, toolUseID: 'order-2' }
+			);
+			await flushMicrotasks();
+
+			const p3 = mockFn.canUseTool!(
+				'Read', { path: '/g.ts' },
+				{ signal: new AbortController().signal, toolUseID: 'order-3' }
+			);
+			await flushMicrotasks();
+
+			// Resolve in reverse order: 3, 1, 2
+			await harness.respondToInteraction(requests[2].interactionId, { kind: 'approve' });
+			const r3 = await p3;
+			expect(r3.behavior).toBe('allow');
+
+			await harness.respondToInteraction(requests[0].interactionId, { kind: 'deny', message: 'No' });
+			const r1 = await p1;
+			expect(r1.behavior).toBe('deny');
+			expect((r1 as any).message).toBe('No');
+
+			await harness.respondToInteraction(requests[1].interactionId, { kind: 'approve' });
+			const r2 = await p2;
+			expect(r2.behavior).toBe('allow');
+
+			// Each SDK promise resolved to the correct response for its own interaction
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+
+		it('should translate approve with updatedInput only (no updatedPermissions)', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			const resultPromise = mockFn.canUseTool!(
+				'Bash', { command: 'echo hello' },
+				{ signal: new AbortController().signal, toolUseID: 'approve-input-only' }
+			);
+			await flushMicrotasks();
+
+			await harness.respondToInteraction(capturedRequest!.interactionId, {
+				kind: 'approve',
+				updatedInput: { command: 'echo world' },
+				// No updatedPermissions
+			});
+
+			const result = await resultPromise;
+			expect(result.behavior).toBe('allow');
+			expect((result as any).updatedInput).toEqual({ command: 'echo world' });
+			expect((result as any).updatedPermissions).toBeUndefined();
+		});
+
+		it('should translate text response with empty string', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			const resultPromise = mockFn.canUseTool!(
+				'Bash', { command: 'test' },
+				{ signal: new AbortController().signal, toolUseID: 'empty-text-1' }
+			);
+			await flushMicrotasks();
+
+			await harness.respondToInteraction(capturedRequest!.interactionId, {
+				kind: 'text',
+				text: '',
+			});
+
+			const result = await resultPromise;
+			expect(result.behavior).toBe('allow');
+			expect((result as any).updatedInput).toEqual({ text: '' });
+		});
+
+		it('should match each SDK promise to the correct response when resolved concurrently', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const requests: InteractionRequest[] = [];
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				requests.push(req);
+			});
+
+			const p1 = mockFn.canUseTool!(
+				'Bash', { command: 'first' },
+				{ signal: new AbortController().signal, toolUseID: 'concurrent-1' }
+			);
+			await flushMicrotasks();
+
+			const p2 = mockFn.canUseTool!(
+				'Write', { path: '/a.ts', content: 'content' },
+				{ signal: new AbortController().signal, toolUseID: 'concurrent-2' }
+			);
+			await flushMicrotasks();
+
+			// Respond to both, then await both
+			await harness.respondToInteraction(requests[0].interactionId, {
+				kind: 'deny', message: 'denied-first',
+			});
+			await harness.respondToInteraction(requests[1].interactionId, {
+				kind: 'approve', updatedInput: { modified: true },
+			});
+
+			const [r1, r2] = await Promise.all([p1, p2]);
+
+			// First interaction's SDK promise → deny
+			expect(r1.behavior).toBe('deny');
+			expect((r1 as any).message).toBe('denied-first');
+
+			// Second interaction's SDK promise → allow with updated input
+			expect(r2.behavior).toBe('allow');
+			expect((r2 as any).updatedInput).toEqual({ modified: true });
+		});
+
+		it('should translate deny with message and interrupt flag correctly', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			const resultPromise = mockFn.canUseTool!(
+				'Bash', { command: 'rm -rf /' },
+				{ signal: new AbortController().signal, toolUseID: 'deny-full-1' }
+			);
+			await flushMicrotasks();
+
+			await harness.respondToInteraction(capturedRequest!.interactionId, {
+				kind: 'deny',
+				message: 'Dangerous operation blocked',
+				interrupt: true,
+			});
+
+			const result = await resultPromise;
+			expect(result.behavior).toBe('deny');
+			expect((result as any).message).toBe('Dangerous operation blocked');
+			expect((result as any).interrupt).toBe(true);
+		});
+	});
 });
