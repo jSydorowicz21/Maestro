@@ -50,6 +50,13 @@ import type {
 	SDKPermissionMode,
 	SDKContentBlock,
 	SDKResultMessage,
+	SDKSystemMessage,
+	SDKAssistantMessage,
+	SDKToolUseSummaryMessage,
+	SDKRateLimitEvent,
+	SDKStatusMessage,
+	SDKToolProgressMessage,
+	SDKAuthStatusMessage,
 } from './claude-sdk-types';
 import { logger } from '../utils/logger';
 
@@ -803,54 +810,63 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 				this.handleResultMessage(sessionId, message as SDKResultMessage);
 				break;
 
-			case 'tool_use_summary':
+			case 'tool_use_summary': {
+				const toolMsg = message as SDKToolUseSummaryMessage;
 				this.emit('tool-execution', sessionId, {
-					toolName: (message as any).tool_name || 'unknown',
+					toolName: toolMsg.tool_name || 'unknown',
 					state: {
-						input: (message as any).input,
-						output: (message as any).output,
-						error: (message as any).error,
+						input: toolMsg.input,
+						output: toolMsg.output,
+						error: toolMsg.error,
 					},
 					timestamp: Date.now(),
 				});
 				break;
+			}
 
-			case 'rate_limit':
+			case 'rate_limit': {
+				const rlMsg = message as SDKRateLimitEvent;
 				this.emit('agent-error', sessionId, {
 					type: 'rate_limited',
-					message: (message as any).message || 'Rate limit hit',
+					message: rlMsg.message || 'Rate limit hit',
 					recoverable: true,
 					agentId: this.agentId,
 					sessionId,
 					timestamp: Date.now(),
 				});
 				break;
+			}
 
-			case 'status':
-				this.emit('data', sessionId, (message as any).message || '');
+			case 'status': {
+				const statusMsg = message as SDKStatusMessage;
+				this.emit('data', sessionId, statusMsg.message || '');
 				break;
+			}
 
 			case 'compact_boundary':
 				this.emit('data', sessionId, '[Context compacted]');
 				break;
 
-			case 'tool_progress':
+			case 'tool_progress': {
+				const progMsg = message as SDKToolProgressMessage;
 				this.emit('tool-execution', sessionId, {
-					toolName: (message as any).tool_name || 'unknown',
+					toolName: progMsg.tool_name || 'unknown',
 					state: {
 						progress: true,
-						content: (message as any).content,
-						tool_use_id: (message as any).tool_use_id,
+						content: progMsg.content,
+						tool_use_id: progMsg.tool_use_id,
 					},
 					timestamp: Date.now(),
 				});
 				break;
+			}
 
-			case 'auth_status':
-				if ((message as any).status === 'error' || (message as any).status === 'expired') {
+			case 'auth_status': {
+				const authMsg = message as SDKAuthStatusMessage;
+				if (authMsg.status === 'error' || authMsg.status === 'expired') {
 					this.emit('agent-error', sessionId, {
 						type: 'auth_expired',
-						message: (message as any).message || 'Authentication error',
+						message: authMsg.message || 'Authentication error',
 						recoverable: true,
 						agentId: this.agentId,
 						sessionId,
@@ -858,6 +874,7 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 					});
 				}
 				break;
+			}
 
 			default:
 				// Unknown message types are logged but not surfaced
@@ -875,7 +892,7 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 	 * supported-runtime discovery APIs for supplemental data (models).
 	 */
 	private handleSystemMessage(sessionId: string, message: SDKMessage): void {
-		const sys = message as any;
+		const sys = message as SDKSystemMessage;
 		if (sys.subtype !== 'init') return;
 
 		// Emit session-id
@@ -896,7 +913,7 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 		};
 
 		if (sys.skills) {
-			metadata.skills = sys.skills.map((s: any) => ({
+			metadata.skills = sys.skills.map((s) => ({
 				id: s.name,
 				name: s.name,
 				description: s.description,
@@ -904,13 +921,14 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 		}
 
 		if (sys.slash_commands) {
+			// Defensive: SDK may emit strings or objects in this array
 			metadata.slashCommands = sys.slash_commands.map((c: any) =>
 				typeof c === 'string' ? c : c.name
 			);
 		}
 
 		if (sys.agents) {
-			metadata.availableAgents = sys.agents.map((a: any) => ({
+			metadata.availableAgents = sys.agents.map((a) => ({
 				id: a.name,
 				label: a.description,
 			}));
@@ -987,14 +1005,14 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 	 * emits data and thinking-chunk events.
 	 */
 	private handleAssistantMessage(sessionId: string, message: SDKMessage): void {
-		const msg = message as any;
+		const msg = message as SDKAssistantMessage;
 		const content: SDKContentBlock[] = msg.message?.content || [];
 
 		for (const block of content) {
 			if (block.type === 'text') {
 				this.emit('data', sessionId, block.text);
 			} else if (block.type === 'thinking') {
-				this.emit('thinking-chunk', sessionId, (block as any).thinking);
+				this.emit('thinking-chunk', sessionId, block.thinking);
 			}
 		}
 	}
@@ -1072,15 +1090,16 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 
 		if (config.images) {
 			for (const imagePath of config.images) {
-				// Image conversion is deferred — in production, the harness
-				// would read the file and base64-encode it. For now, pass
-				// the path as a placeholder that the SDK layer can handle.
+				// TODO(Phase 2): Read file and base64-encode it here.
+				// Currently passes the path as a placeholder — the SDK
+				// layer may handle path-based images directly in a future
+				// version, or we add fs.readFileSync + base64 encoding.
 				content.push({
 					type: 'image',
 					source: {
 						type: 'base64',
 						media_type: 'image/png',
-						data: imagePath, // Placeholder — real impl reads file
+						data: imagePath,
 					},
 				});
 			}
@@ -1108,6 +1127,7 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 			}
 			if (input.images) {
 				for (const imagePath of input.images) {
+					// TODO(Phase 2): Read file and base64-encode (see buildInitialMessage)
 					content.push({
 						type: 'image',
 						source: {

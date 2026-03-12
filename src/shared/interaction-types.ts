@@ -11,7 +11,7 @@
  * so that any provider's harness adapter can produce or consume them without
  * the renderer needing provider-specific decoding logic.
  *
- * Day 1 interaction kinds: tool-approval, clarification.
+ * Phase 1 interaction kinds: tool-approval, clarification.
  * Future kinds (auth prompts, file pickers, etc.) can be added later
  * without breaking existing contracts.
  */
@@ -24,7 +24,7 @@ import type { ToolType } from './types';
 
 /**
  * Discriminator for interaction request types.
- * Day 1 supports tool approvals and clarification questions only.
+ * Phase 1 supports tool approvals and clarification questions only.
  */
 export type InteractionKind = 'tool-approval' | 'clarification';
 

@@ -59,7 +59,7 @@ export interface HarnessSpawnResult {
 /**
  * Runtime settings that can be updated on a running harness.
  *
- * Day 1 notes:
+ * Phase 1 notes:
  * - `permissionMode: 'bypassPermissions'` is the single source of truth for "allow all"
  * - `model` maps to Claude's query.setModel() and supports model-switching UI
  * - Provider-specific runtime controls (e.g., reasoning effort) belong in
