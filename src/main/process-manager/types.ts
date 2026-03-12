@@ -2,6 +2,7 @@ import type { ChildProcess } from 'child_process';
 import type { IPty } from 'node-pty';
 import type { AgentOutputParser } from '../parsers';
 import type { AgentError, PermissionMode } from '../../shared/types';
+import type { AgentHarness } from '../harness/agent-harness';
 
 /**
  * Discriminator for the execution backend powering a run.
@@ -71,6 +72,8 @@ export interface AgentExecution {
 	ptyProcess?: IPty;
 	/** Child process handle (populated when backend is 'child-process') */
 	childProcess?: ChildProcess;
+	/** Harness instance (populated when backend is 'harness') */
+	harness?: AgentHarness;
 	cwd: string;
 	/**
 	 * OS process ID. Null or undefined for harness-backed runs
