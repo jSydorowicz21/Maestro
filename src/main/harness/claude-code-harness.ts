@@ -91,6 +91,7 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 	readonly agentId: ToolType = 'claude-code' as ToolType;
 
 	private _running = false;
+	private _disposed = false;
 	private _query: SDKQuery | null = null;
 	private _abortController: AbortController | null = null;
 	private _queryFn: SDKQueryFunction;
@@ -117,6 +118,10 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 	// ========================================================================
 
 	async spawn(config: AgentExecutionConfig): Promise<HarnessSpawnResult> {
+		if (this._disposed) {
+			logger.warn(`${LOG_CONTEXT} spawn() called on disposed harness`, LOG_CONTEXT);
+			return { success: false, pid: null };
+		}
 		if (this._running) {
 			logger.warn(`${LOG_CONTEXT} spawn() called while already running`, LOG_CONTEXT);
 			return { success: false, pid: null };
@@ -187,6 +192,10 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 	}
 
 	write(input: HarnessInput): void {
+		if (this._disposed) {
+			logger.warn(`${LOG_CONTEXT} write() called on disposed harness`, LOG_CONTEXT);
+			return;
+		}
 		if (!this._query || !this._running) {
 			logger.warn(`${LOG_CONTEXT} write() called but harness is not running`, LOG_CONTEXT);
 			return;
@@ -203,6 +212,11 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 	}
 
 	async interrupt(): Promise<void> {
+		if (this._disposed) {
+			logger.warn(`${LOG_CONTEXT} interrupt() called on disposed harness`, LOG_CONTEXT);
+			return;
+		}
+
 		// Resolve all pending interactions with interrupt responses
 		this.resolveAllPending(createInterruptResponse);
 
@@ -216,6 +230,8 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 	}
 
 	kill(): void {
+		if (this._disposed) return; // Already fully cleaned up
+
 		// Resolve all pending interactions with termination responses
 		this.resolveAllPending(createTerminationResponse);
 
@@ -236,7 +252,38 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 		this._abortController = null;
 	}
 
+	dispose(): void {
+		if (this._disposed) return; // Already disposed — idempotent
+
+		// Kill if still running (resolves pending interactions, closes SDK)
+		if (this._running || this._query) {
+			this.kill();
+		}
+
+		// Final safety net: clear any remaining pending interactions
+		// (should be empty after kill, but enforce the invariant)
+		if (this.pendingInteractions.size > 0) {
+			this.resolveAllPending(createTerminationResponse);
+		}
+
+		// Remove all event listeners to prevent memory leaks
+		this.removeAllListeners();
+
+		// Mark as disposed — all future calls will no-op or throw
+		this._disposed = true;
+	}
+
+	isDisposed(): boolean {
+		return this._disposed;
+	}
+
 	async respondToInteraction(interactionId: string, response: InteractionResponse): Promise<void> {
+		if (this._disposed) {
+			const message = `Cannot respond to interaction on disposed harness: ${interactionId}`;
+			logger.warn(`${LOG_CONTEXT} ${message}`, LOG_CONTEXT);
+			throw new Error(message);
+		}
+
 		const pending = this.pendingInteractions.get(interactionId);
 		if (!pending) {
 			const message = `Unknown or expired interaction ID: ${interactionId}`;
@@ -254,6 +301,10 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 	}
 
 	async updateRuntimeSettings(settings: HarnessRuntimeSettings): Promise<void> {
+		if (this._disposed) {
+			logger.warn(`${LOG_CONTEXT} updateRuntimeSettings() called on disposed harness`, LOG_CONTEXT);
+			return;
+		}
 		if (!this._query || !this._running) {
 			logger.warn(
 				`${LOG_CONTEXT} updateRuntimeSettings() called but harness is not running`,

@@ -1719,4 +1719,280 @@ describe('ClaudeCodeHarness', () => {
 			});
 		});
 	});
+
+	// ====================================================================
+	// Deterministic Cleanup — dispose(), disposal guards, resource release
+	// ====================================================================
+
+	describe('deterministic cleanup', () => {
+		it('dispose() should kill a running harness and resolve pending interactions', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.on('interaction-request', () => {});
+
+			const p1 = mockFn.canUseTool!(
+				'Bash',
+				{ command: 'test' },
+				{ signal: new AbortController().signal, toolUseID: 'dispose-1' }
+			);
+			await flushMicrotasks();
+
+			expect(harness.getPendingInteractionCount()).toBe(1);
+			expect(harness.isRunning()).toBe(true);
+
+			harness.dispose();
+
+			const r1 = await p1;
+			expect(r1.behavior).toBe('deny');
+			expect((r1 as any).message).toBe('Session terminated');
+			expect(harness.getPendingInteractionCount()).toBe(0);
+			expect(harness.isRunning()).toBe(false);
+			expect(harness.isDisposed()).toBe(true);
+		});
+
+		it('dispose() should be idempotent', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.dispose();
+			harness.dispose(); // Second call should not throw
+
+			expect(harness.isDisposed()).toBe(true);
+		});
+
+		it('dispose() should work on a never-started harness', () => {
+			harness.dispose();
+
+			expect(harness.isDisposed()).toBe(true);
+			expect(harness.isRunning()).toBe(false);
+		});
+
+		it('dispose() should remove all event listeners', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const listener = vi.fn();
+			harness.on('data', listener);
+			harness.on('exit', listener);
+			harness.on('interaction-request', listener);
+
+			expect(harness.listenerCount('data')).toBeGreaterThan(0);
+
+			harness.dispose();
+
+			expect(harness.listenerCount('data')).toBe(0);
+			expect(harness.listenerCount('exit')).toBe(0);
+			expect(harness.listenerCount('interaction-request')).toBe(0);
+		});
+
+		it('dispose() should call SDK close() and abort the controller', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.dispose();
+
+			expect(mockFn.query.close).toHaveBeenCalledOnce();
+		});
+
+		it('spawn() should fail on disposed harness', async () => {
+			harness.dispose();
+
+			const result = await harness.spawn(createTestConfig());
+			expect(result.success).toBe(false);
+		});
+
+		it('write() should no-op on disposed harness', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.dispose();
+
+			// Should not throw
+			harness.write({ type: 'text', text: 'hello' });
+			expect(mockFn.query.streamInput).not.toHaveBeenCalled();
+		});
+
+		it('interrupt() should no-op on disposed harness', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.dispose();
+
+			// Should not throw
+			await harness.interrupt();
+			// interrupt() was not called on the query because kill() already closed it
+		});
+
+		it('kill() should no-op on disposed harness', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.dispose();
+
+			// Should not throw — kill() is idempotent after dispose
+			harness.kill();
+			expect(harness.isDisposed()).toBe(true);
+		});
+
+		it('respondToInteraction() should throw on disposed harness', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.on('interaction-request', () => {});
+
+			const p1 = mockFn.canUseTool!(
+				'Bash',
+				{ command: 'test' },
+				{ signal: new AbortController().signal, toolUseID: 'disposed-respond-1' }
+			);
+			await flushMicrotasks();
+
+			// Capture the interaction ID before disposing
+			let capturedInteractionId = '';
+			harness.removeAllListeners('interaction-request');
+			// The interaction is already pending, so we need to find its ID
+			// We can't easily get the ID after it was created, so just dispose and try a fake one
+			harness.dispose();
+
+			const r1 = await p1; // Resolved by dispose → kill → resolveAllPending
+			expect(r1.behavior).toBe('deny');
+
+			await expect(
+				harness.respondToInteraction('any-id', { kind: 'approve' })
+			).rejects.toThrow('Cannot respond to interaction on disposed harness');
+		});
+
+		it('updateRuntimeSettings() should no-op on disposed harness', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.dispose();
+
+			// Should not throw
+			await harness.updateRuntimeSettings({ model: 'new-model' });
+		});
+
+		it('should clear timeout handles when kill() is called during pending timeout', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.on('interaction-request', () => {});
+
+			const p1 = mockFn.canUseTool!(
+				'Bash',
+				{ command: 'test' },
+				{ signal: new AbortController().signal, toolUseID: 'timeout-clear-1' }
+			);
+			await flushMicrotasks();
+
+			expect(harness.getPendingInteractionCount()).toBe(1);
+
+			// Kill resolves the interaction, clearing the timeout
+			harness.kill();
+
+			const r1 = await p1;
+			expect(r1.behavior).toBe('deny');
+
+			// Advancing past the default timeout should not cause issues
+			vi.advanceTimersByTime(DEFAULT_INTERACTION_TIMEOUT_MS + 1000);
+			await flushMicrotasks();
+
+			// No double-resolution or errors — just the one resolve from kill
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+
+		it('should clear timeout handles when interrupt() is called during pending timeout', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.on('interaction-request', () => {});
+
+			const p1 = mockFn.canUseTool!(
+				'Bash',
+				{ command: 'test' },
+				{ signal: new AbortController().signal, toolUseID: 'timeout-interrupt-1' }
+			);
+			await flushMicrotasks();
+
+			await harness.interrupt();
+
+			const r1 = await p1;
+			expect(r1.behavior).toBe('deny');
+			expect((r1 as any).message).toBe('Session interrupted');
+
+			// Advancing past timeout should not cause double-resolution
+			vi.advanceTimersByTime(DEFAULT_INTERACTION_TIMEOUT_MS + 1000);
+			await flushMicrotasks();
+
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+
+		it('should handle dispose() after interrupt() without errors', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			await harness.interrupt();
+			harness.dispose(); // Should not throw
+
+			expect(harness.isDisposed()).toBe(true);
+			expect(harness.isRunning()).toBe(false);
+		});
+
+		it('should handle dispose() after kill() without errors', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.kill();
+			harness.dispose(); // Should not throw
+
+			expect(harness.isDisposed()).toBe(true);
+		});
+
+		it('should resolve multiple concurrent pending interactions on dispose()', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.on('interaction-request', () => {});
+
+			const p1 = mockFn.canUseTool!(
+				'Bash',
+				{ command: 'cmd1' },
+				{ signal: new AbortController().signal, toolUseID: 'multi-dispose-1' }
+			);
+			await flushMicrotasks();
+
+			const p2 = mockFn.canUseTool!(
+				'Write',
+				{ path: '/f.ts', content: '' },
+				{ signal: new AbortController().signal, toolUseID: 'multi-dispose-2' }
+			);
+			await flushMicrotasks();
+
+			const p3 = mockFn.canUseTool!(
+				'AskUserQuestion',
+				{ questions: [{ question: 'Q?', header: 'H', options: [], multiSelect: false }] },
+				{ signal: new AbortController().signal, toolUseID: 'multi-dispose-3' }
+			);
+			await flushMicrotasks();
+
+			expect(harness.getPendingInteractionCount()).toBe(3);
+
+			harness.dispose();
+
+			const [r1, r2, r3] = await Promise.all([p1, p2, p3]);
+
+			// Tool approvals → deny with terminate message
+			expect(r1.behavior).toBe('deny');
+			expect((r1 as any).message).toBe('Session terminated');
+			expect(r2.behavior).toBe('deny');
+			expect((r2 as any).message).toBe('Session terminated');
+
+			// Clarification → cancel → deny
+			expect(r3.behavior).toBe('deny');
+			expect((r3 as any).message).toBe('Session terminated');
+
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+	});
 });

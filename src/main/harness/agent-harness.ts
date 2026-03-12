@@ -142,6 +142,23 @@ export interface AgentHarness extends EventEmitter {
 	kill(): void;
 
 	/**
+	 * Dispose the harness, releasing all resources.
+	 *
+	 * Performs full deterministic cleanup:
+	 * 1. Kills the execution if still running (resolves pending interactions)
+	 * 2. Clears all pending interaction timeouts
+	 * 3. Removes all event listeners
+	 * 4. Marks the harness as disposed — all subsequent calls no-op or throw
+	 *
+	 * ProcessManager should call this when removing the execution record.
+	 * Safe to call multiple times (idempotent).
+	 */
+	dispose(): void;
+
+	/** Whether the harness has been disposed */
+	isDisposed(): boolean;
+
+	/**
 	 * Respond to a pending interaction request.
 	 * The harness translates the generic InteractionResponse into the
 	 * provider-specific format internally.
