@@ -5,7 +5,7 @@ import { stripAllAnsiCodes } from '../../utils/terminalFilter';
 import { logger } from '../../utils/logger';
 import { matchSshErrorPattern } from '../../parsers/error-patterns';
 import { appendToBuffer } from '../utils/bufferUtils';
-import type { ManagedProcess, AgentError } from '../types';
+import type { AgentExecution, AgentError } from '../types';
 
 /**
  * Matches Codex Rust tracing log lines emitted to stderr.
@@ -16,7 +16,7 @@ const CODEX_TRACING_LINE =
 	/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[\d.]*Z\s+(?:TRACE|DEBUG|INFO|WARN|ERROR)\s+\w+/;
 
 interface StderrHandlerDependencies {
-	processes: Map<string, ManagedProcess>;
+	processes: Map<string, AgentExecution>;
 	emitter: EventEmitter;
 }
 
@@ -25,7 +25,7 @@ interface StderrHandlerDependencies {
  * Detects agent errors, SSH errors, and accumulates stderr for exit analysis.
  */
 export class StderrHandler {
-	private processes: Map<string, ManagedProcess>;
+	private processes: Map<string, AgentExecution>;
 	private emitter: EventEmitter;
 
 	constructor(deps: StderrHandlerDependencies) {

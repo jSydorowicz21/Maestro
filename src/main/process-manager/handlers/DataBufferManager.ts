@@ -1,14 +1,14 @@
 import { EventEmitter } from 'events';
 import { logger } from '../../utils/logger';
 import { DATA_BUFFER_FLUSH_INTERVAL, DATA_BUFFER_SIZE_THRESHOLD } from '../constants';
-import type { ManagedProcess } from '../types';
+import type { AgentExecution } from '../types';
 
 /**
  * Manages data buffering for process output to reduce IPC event frequency.
  */
 export class DataBufferManager {
 	constructor(
-		private processes: Map<string, ManagedProcess>,
+		private processes: Map<string, AgentExecution>,
 		private emitter: EventEmitter
 	) {}
 

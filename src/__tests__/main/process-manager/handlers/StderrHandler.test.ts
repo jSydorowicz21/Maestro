@@ -36,11 +36,11 @@ vi.mock('../../../../main/process-manager/utils/bufferUtils', () => ({
 // ── Imports (after mocks) ──────────────────────────────────────────────────
 
 import { StderrHandler } from '../../../../main/process-manager/handlers/StderrHandler';
-import type { ManagedProcess } from '../../../../main/process-manager/types';
+import type { AgentExecution } from '../../../../main/process-manager/types';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function createMockProcess(overrides: Partial<ManagedProcess> = {}): ManagedProcess {
+function createMockProcess(overrides: Partial<AgentExecution> = {}): AgentExecution {
 	return {
 		sessionId: 'test-session',
 		toolType: 'claude-code',
@@ -51,11 +51,11 @@ function createMockProcess(overrides: Partial<ManagedProcess> = {}): ManagedProc
 		stderrBuffer: '',
 		errorEmitted: false,
 		...overrides,
-	} as ManagedProcess;
+	} as AgentExecution;
 }
 
-function createTestContext(processOverrides: Partial<ManagedProcess> = {}) {
-	const processes = new Map<string, ManagedProcess>();
+function createTestContext(processOverrides: Partial<AgentExecution> = {}) {
+	const processes = new Map<string, AgentExecution>();
 	const emitter = new EventEmitter();
 	const sessionId = 'test-session';
 	const proc = createMockProcess({ sessionId, ...processOverrides });

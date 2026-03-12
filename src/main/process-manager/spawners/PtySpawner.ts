@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import * as pty from 'node-pty';
 import { stripControlSequences } from '../../utils/terminalFilter';
 import { logger } from '../../utils/logger';
-import type { ProcessConfig, ManagedProcess, SpawnResult } from '../types';
+import type { ProcessConfig, AgentExecution, SpawnResult } from '../types';
 import type { DataBufferManager } from '../handlers/DataBufferManager';
 import { buildPtyTerminalEnv, buildChildProcessEnv } from '../utils/envBuilder';
 import { isWindows } from '../../../shared/platformDetection';
@@ -13,7 +13,7 @@ import { isWindows } from '../../../shared/platformDetection';
  */
 export class PtySpawner {
 	constructor(
-		private processes: Map<string, ManagedProcess>,
+		private processes: Map<string, AgentExecution>,
 		private emitter: EventEmitter,
 		private bufferManager: DataBufferManager
 	) {}
@@ -109,7 +109,7 @@ export class PtySpawner {
 				env: ptyEnv as Record<string, string>,
 			});
 
-			const managedProcess: ManagedProcess = {
+			const managedProcess: AgentExecution = {
 				sessionId,
 				toolType,
 				backend: 'pty',

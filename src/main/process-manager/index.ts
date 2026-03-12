@@ -6,7 +6,6 @@ export type {
 	ExecutionBackend,
 	AgentExecution,
 	ProcessConfig,
-	ManagedProcess,
 	SpawnResult,
 	CommandResult,
 	UsageStats,

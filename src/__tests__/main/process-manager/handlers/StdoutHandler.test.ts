@@ -48,11 +48,11 @@ vi.mock('../../../../main/parsers/error-patterns', () => ({
 // ── Imports (after mocks) ──────────────────────────────────────────────────
 
 import { StdoutHandler } from '../../../../main/process-manager/handlers/StdoutHandler';
-import type { ManagedProcess } from '../../../../main/process-manager/types';
+import type { AgentExecution } from '../../../../main/process-manager/types';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function createMockProcess(overrides: Partial<ManagedProcess> = {}): ManagedProcess {
+function createMockProcess(overrides: Partial<AgentExecution> = {}): AgentExecution {
 	return {
 		sessionId: 'test-session',
 		toolType: 'claude-code',
@@ -75,7 +75,7 @@ function createMockProcess(overrides: Partial<ManagedProcess> = {}): ManagedProc
 		sshRemoteHost: undefined,
 		streamedText: '',
 		...overrides,
-	} as ManagedProcess;
+	} as AgentExecution;
 }
 
 function createMockBufferManager() {
@@ -85,8 +85,8 @@ function createMockBufferManager() {
 	};
 }
 
-function createTestContext(processOverrides: Partial<ManagedProcess> = {}) {
-	const processes = new Map<string, ManagedProcess>();
+function createTestContext(processOverrides: Partial<AgentExecution> = {}) {
+	const processes = new Map<string, AgentExecution>();
 	const emitter = new EventEmitter();
 	const bufferManager = createMockBufferManager();
 	const sessionId = 'test-session';

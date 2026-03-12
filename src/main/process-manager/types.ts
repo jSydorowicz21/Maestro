@@ -62,8 +62,6 @@ export interface ProcessConfig {
  * under one model. The `backend` discriminator determines which process
  * handle fields are populated.
  *
- * Previously named ManagedProcess — the old name is retained as an alias
- * for backwards compatibility.
  */
 export interface AgentExecution {
 	sessionId: string;
@@ -109,11 +107,6 @@ export interface AgentExecution {
 	dataBuffer?: string;
 	dataBufferTimeout?: NodeJS.Timeout;
 }
-
-/**
- * @deprecated Use AgentExecution instead. Retained for backwards compatibility.
- */
-export type ManagedProcess = AgentExecution;
 
 export interface UsageTotals {
 	inputTokens: number;

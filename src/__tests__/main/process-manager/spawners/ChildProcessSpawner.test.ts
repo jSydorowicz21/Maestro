@@ -92,7 +92,7 @@ vi.mock('../../../../main/process-manager/utils/shellEscape', () => ({
 // ── Imports (after mocks) ──────────────────────────────────────────────────
 
 import { ChildProcessSpawner } from '../../../../main/process-manager/spawners/ChildProcessSpawner';
-import type { ManagedProcess, ProcessConfig } from '../../../../main/process-manager/types';
+import type { AgentExecution, ProcessConfig } from '../../../../main/process-manager/types';
 import { getAgentCapabilities } from '../../../../main/agents';
 import { buildStreamJsonMessage } from '../../../../main/process-manager/utils/streamJsonBuilder';
 import {
@@ -103,7 +103,7 @@ import {
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function createTestContext() {
-	const processes = new Map<string, ManagedProcess>();
+	const processes = new Map<string, AgentExecution>();
 	const emitter = new EventEmitter();
 	const bufferManager = {
 		emitDataBuffered: vi.fn(),

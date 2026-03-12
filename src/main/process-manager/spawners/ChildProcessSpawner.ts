@@ -7,7 +7,7 @@ import * as fs from 'fs';
 import { logger } from '../../utils/logger';
 import { getOutputParser } from '../../parsers';
 import { getAgentCapabilities } from '../../agents';
-import type { ProcessConfig, ManagedProcess, SpawnResult } from '../types';
+import type { ProcessConfig, AgentExecution, SpawnResult } from '../types';
 import type { DataBufferManager } from '../handlers/DataBufferManager';
 import { StdoutHandler } from '../handlers/StdoutHandler';
 import { StderrHandler } from '../handlers/StderrHandler';
@@ -28,7 +28,7 @@ export class ChildProcessSpawner {
 	private exitHandler: ExitHandler;
 
 	constructor(
-		private processes: Map<string, ManagedProcess>,
+		private processes: Map<string, AgentExecution>,
 		private emitter: EventEmitter,
 		private bufferManager: DataBufferManager
 	) {
@@ -362,7 +362,7 @@ export class ChildProcessSpawner {
 					finalArgs.length > 0 ? finalArgs[finalArgs.length - 1]?.substring(0, 500) : undefined,
 			});
 
-			const managedProcess: ManagedProcess = {
+			const managedProcess: AgentExecution = {
 				sessionId,
 				toolType,
 				backend: 'child-process',

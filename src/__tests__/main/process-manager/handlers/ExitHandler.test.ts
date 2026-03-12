@@ -44,12 +44,12 @@ vi.mock('../../../../main/process-manager/utils/imageUtils', () => ({
 
 import { ExitHandler } from '../../../../main/process-manager/handlers/ExitHandler';
 import { DataBufferManager } from '../../../../main/process-manager/handlers/DataBufferManager';
-import type { ManagedProcess } from '../../../../main/process-manager/types';
+import type { AgentExecution } from '../../../../main/process-manager/types';
 import type { AgentOutputParser, ParsedEvent } from '../../../../main/parsers';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function createMockProcess(overrides: Partial<ManagedProcess> = {}): ManagedProcess {
+function createMockProcess(overrides: Partial<AgentExecution> = {}): AgentExecution {
 	return {
 		sessionId: 'test-session',
 		toolType: 'claude-code',
@@ -73,7 +73,7 @@ function createMockProcess(overrides: Partial<ManagedProcess> = {}): ManagedProc
 		sshRemoteHost: undefined,
 		streamedText: '',
 		...overrides,
-	} as ManagedProcess;
+	} as AgentExecution;
 }
 
 function createMockOutputParser(overrides: Partial<AgentOutputParser> = {}): AgentOutputParser {
@@ -93,7 +93,7 @@ function createMockOutputParser(overrides: Partial<AgentOutputParser> = {}): Age
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('ExitHandler', () => {
-	let processes: Map<string, ManagedProcess>;
+	let processes: Map<string, AgentExecution>;
 	let emitter: EventEmitter;
 	let bufferManager: DataBufferManager;
 	let exitHandler: ExitHandler;

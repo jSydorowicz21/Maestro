@@ -5,11 +5,11 @@ import { logger } from '../../utils/logger';
 import { matchSshErrorPattern } from '../../parsers/error-patterns';
 import { aggregateModelUsage } from '../../parsers/usage-aggregator';
 import { cleanupTempFiles } from '../utils/imageUtils';
-import type { ManagedProcess, AgentError } from '../types';
+import type { AgentExecution, AgentError } from '../types';
 import type { DataBufferManager } from './DataBufferManager';
 
 interface ExitHandlerDependencies {
-	processes: Map<string, ManagedProcess>;
+	processes: Map<string, AgentExecution>;
 	emitter: EventEmitter;
 	bufferManager: DataBufferManager;
 }
@@ -19,7 +19,7 @@ interface ExitHandlerDependencies {
  * Processes final batch mode output, detects errors, and emits events.
  */
 export class ExitHandler {
-	private processes: Map<string, ManagedProcess>;
+	private processes: Map<string, AgentExecution>;
 	private emitter: EventEmitter;
 	private bufferManager: DataBufferManager;
 
@@ -234,7 +234,7 @@ export class ExitHandler {
 	/**
 	 * Handle batch mode exit - parse accumulated JSON
 	 */
-	private handleBatchModeExit(sessionId: string, managedProcess: ManagedProcess): void {
+	private handleBatchModeExit(sessionId: string, managedProcess: AgentExecution): void {
 		try {
 			const jsonResponse = JSON.parse(managedProcess.jsonBuffer!);
 

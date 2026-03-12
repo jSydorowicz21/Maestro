@@ -3,7 +3,7 @@
 import { EventEmitter } from 'events';
 import type {
 	ProcessConfig,
-	ManagedProcess,
+	AgentExecution,
 	SpawnResult,
 	CommandResult,
 	ParsedEvent,
@@ -30,7 +30,7 @@ import type { HarnessRuntimeSettings } from '../../shared/harness-types';
  * - Execute commands (local and SSH remote)
  */
 export class ProcessManager extends EventEmitter {
-	private processes: Map<string, ManagedProcess> = new Map();
+	private processes: Map<string, AgentExecution> = new Map();
 	private bufferManager: DataBufferManager;
 	private ptySpawner: PtySpawner;
 	private childProcessSpawner: ChildProcessSpawner;
@@ -454,14 +454,14 @@ export class ProcessManager extends EventEmitter {
 	/**
 	 * Get all active processes
 	 */
-	getAll(): ManagedProcess[] {
+	getAll(): AgentExecution[] {
 		return Array.from(this.processes.values());
 	}
 
 	/**
 	 * Get a specific process
 	 */
-	get(sessionId: string): ManagedProcess | undefined {
+	get(sessionId: string): AgentExecution | undefined {
 		return this.processes.get(sessionId);
 	}
 

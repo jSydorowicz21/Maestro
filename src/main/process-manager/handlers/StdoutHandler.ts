@@ -7,11 +7,11 @@ import { appendToBuffer } from '../utils/bufferUtils';
 import { aggregateModelUsage, type ModelStats } from '../../parsers/usage-aggregator';
 import { matchSshErrorPattern } from '../../parsers/error-patterns';
 import { FALLBACK_CONTEXT_WINDOW } from '../../../shared/agentConstants';
-import type { ManagedProcess, UsageStats, UsageTotals, AgentError } from '../types';
+import type { AgentExecution, UsageStats, UsageTotals, AgentError } from '../types';
 import type { DataBufferManager } from './DataBufferManager';
 
 interface StdoutHandlerDependencies {
-	processes: Map<string, ManagedProcess>;
+	processes: Map<string, AgentExecution>;
 	emitter: EventEmitter;
 	bufferManager: DataBufferManager;
 }
@@ -32,7 +32,7 @@ interface StdoutHandlerDependencies {
  * @see https://codelynx.dev/posts/calculate-claude-code-context
  */
 function normalizeUsageToDelta(
-	managedProcess: ManagedProcess,
+	managedProcess: AgentExecution,
 	usageStats: {
 		inputTokens: number;
 		outputTokens: number;
@@ -102,7 +102,7 @@ function normalizeUsageToDelta(
  * Extracts session IDs, usage stats, and result data from agent output.
  */
 export class StdoutHandler {
-	private processes: Map<string, ManagedProcess>;
+	private processes: Map<string, AgentExecution>;
 	private emitter: EventEmitter;
 	private bufferManager: DataBufferManager;
 
@@ -141,7 +141,7 @@ export class StdoutHandler {
 
 	private handleStreamJsonData(
 		sessionId: string,
-		managedProcess: ManagedProcess,
+		managedProcess: AgentExecution,
 		output: string
 	): void {
 		managedProcess.jsonBuffer = (managedProcess.jsonBuffer || '') + output;
@@ -158,7 +158,7 @@ export class StdoutHandler {
 		}
 	}
 
-	private processLine(sessionId: string, managedProcess: ManagedProcess, line: string): void {
+	private processLine(sessionId: string, managedProcess: AgentExecution, line: string): void {
 		const { outputParser, toolType } = managedProcess;
 
 		// ── Single JSON parse for the entire line ──
@@ -236,9 +236,9 @@ export class StdoutHandler {
 
 	private handleParsedEvent(
 		sessionId: string,
-		managedProcess: ManagedProcess,
+		managedProcess: AgentExecution,
 		parsed: unknown,
-		outputParser: NonNullable<ManagedProcess['outputParser']>
+		outputParser: NonNullable<AgentExecution['outputParser']>
 	): void {
 		const event = outputParser.parseJsonObject(parsed);
 
@@ -434,7 +434,7 @@ export class StdoutHandler {
 
 	private handleLegacyMessage(
 		sessionId: string,
-		managedProcess: ManagedProcess,
+		managedProcess: AgentExecution,
 		msg: unknown
 	): void {
 		const msgRecord = msg as Record<string, unknown>;
@@ -488,7 +488,7 @@ export class StdoutHandler {
 	}
 
 	private buildUsageStats(
-		managedProcess: ManagedProcess,
+		managedProcess: AgentExecution,
 		usage: {
 			inputTokens: number;
 			outputTokens: number;
