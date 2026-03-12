@@ -42,7 +42,9 @@ vi.mock('../../main/agents/capabilities', () => ({
 }));
 
 import { ProcessManager } from '../../main/process-manager/ProcessManager';
-import type { AgentExecution } from '../../main/process-manager/types';
+import type { AgentExecution, ProcessManagerEvents } from '../../main/process-manager/types';
+import type { InteractionRequest } from '../../shared/interaction-types';
+import type { RuntimeMetadataEvent } from '../../shared/runtime-metadata-types';
 import { logger } from '../../main/utils/logger';
 
 // Cast to access mock functions
@@ -186,15 +188,15 @@ describe('ProcessManager: Unified Execution Ownership', () => {
 	// write() routing by backend
 	// ===================================================================
 	describe('write() backend routing', () => {
-		it('returns false and logs warning for harness backend', () => {
+		it('returns true and logs error for harness backend (unreachable in Phase 1)', () => {
 			const execution = makeHarnessExecution();
 			injectExecution(pm, execution);
 
 			const result = pm.write('harness-session-1', 'hello');
 
-			expect(result).toBe(false);
-			expect(mockLogger.warn).toHaveBeenCalledWith(
-				expect.stringContaining('harness write not yet implemented'),
+			expect(result).toBe(true);
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				expect.stringContaining('unreachable in Phase 1'),
 				'ProcessManager',
 				expect.objectContaining({ sessionId: 'harness-session-1' })
 			);
@@ -236,15 +238,15 @@ describe('ProcessManager: Unified Execution Ownership', () => {
 	// interrupt() routing by backend
 	// ===================================================================
 	describe('interrupt() backend routing', () => {
-		it('returns false and logs warning for harness backend', () => {
+		it('returns true and logs error for harness backend (unreachable in Phase 1)', () => {
 			const execution = makeHarnessExecution();
 			injectExecution(pm, execution);
 
 			const result = pm.interrupt('harness-session-1');
 
-			expect(result).toBe(false);
-			expect(mockLogger.warn).toHaveBeenCalledWith(
-				expect.stringContaining('harness interrupt not yet implemented'),
+			expect(result).toBe(true);
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				expect.stringContaining('unreachable in Phase 1'),
 				'ProcessManager',
 				expect.objectContaining({ sessionId: 'harness-session-1' })
 			);
@@ -629,7 +631,7 @@ describe('ProcessManager: Unified Execution Ownership', () => {
 
 			expect(pm.write('pty-1', 'a')).toBe(true);
 			expect(pm.write('cp-1', 'b')).toBe(true);
-			expect(pm.write('h-1', 'c')).toBe(false); // harness stub
+			expect(pm.write('h-1', 'c')).toBe(true); // harness stub (unreachable in Phase 1)
 
 			expect(ptyExec.ptyProcess!.write).toHaveBeenCalledWith('a');
 			expect(cpExec.childProcess!.stdin!.write).toHaveBeenCalledWith('b');
@@ -667,5 +669,30 @@ describe('ProcessManager: Unified Execution Ownership', () => {
 			const result = pm.resize('pty-session-1', 120, 40);
 			expect(result).toBe(true);
 		});
+	});
+});
+
+// ===================================================================
+// Type-level tests for ProcessManagerEvents
+// ===================================================================
+describe('ProcessManagerEvents type includes harness event signatures', () => {
+	it('interaction-request event signature accepts InteractionRequest', () => {
+		// Type-level assertion: if ProcessManagerEvents does not include
+		// 'interaction-request', this assignment would fail at compile time.
+		const handler: ProcessManagerEvents['interaction-request'] = (
+			_sessionId: string,
+			_request: InteractionRequest
+		) => {};
+		expect(typeof handler).toBe('function');
+	});
+
+	it('runtime-metadata event signature accepts RuntimeMetadataEvent', () => {
+		// Type-level assertion: if ProcessManagerEvents does not include
+		// 'runtime-metadata', this assignment would fail at compile time.
+		const handler: ProcessManagerEvents['runtime-metadata'] = (
+			_sessionId: string,
+			_metadata: RuntimeMetadataEvent
+		) => {};
+		expect(typeof handler).toBe('function');
 	});
 });

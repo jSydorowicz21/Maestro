@@ -564,6 +564,7 @@ describe('event payload serialization', () => {
 				{ kind: 'text', text: 'hello' },
 				{ kind: 'clarification-answer', answers: [{ questionIndex: 0, selectedOptionLabels: ['A'] }] },
 				{ kind: 'cancel', message: 'bye' },
+				{ kind: 'timeout', interactionKind: 'tool-approval', message: 'Timed out' },
 			];
 
 			for (const original of responses) {
@@ -583,6 +584,10 @@ describe('event payload serialization', () => {
 						break;
 					case 'cancel':
 						expect(parsed).toHaveProperty('kind', 'cancel');
+						break;
+					case 'timeout':
+						expect(parsed.interactionKind).toBe('tool-approval');
+						expect(typeof parsed.message).toBe('string');
 						break;
 					default: {
 						const _exhaustive: never = parsed;

@@ -355,6 +355,7 @@ describe('renderer-facing harness type re-exports', () => {
 					case 'text': return 'text';
 					case 'clarification-answer': return 'answered';
 					case 'cancel': return 'cancelled';
+					case 'timeout': return 'timed-out';
 				}
 			}
 
@@ -363,6 +364,7 @@ describe('renderer-facing harness type re-exports', () => {
 			expect(handleResponse({ kind: 'text', text: 'x' })).toBe('text');
 			expect(handleResponse({ kind: 'clarification-answer', answers: [] })).toBe('answered');
 			expect(handleResponse({ kind: 'cancel' })).toBe('cancelled');
+			expect(handleResponse({ kind: 'timeout', interactionKind: 'tool-approval' })).toBe('timed-out');
 		});
 
 		it('renderer RuntimeMetadataEvent capabilities use Partial<HarnessRuntimeCapabilities>', () => {

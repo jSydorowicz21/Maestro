@@ -20,14 +20,12 @@ export const DEFAULT_INTERACTION_TIMEOUT_MS = 5 * 60 * 1000;
 /**
  * Create a timeout response for an expired interaction.
  *
- * - Tool approvals time out to deny
- * - Clarification requests time out to cancel
+ * Returns a dedicated 'timeout' kind that carries the original interaction kind
+ * so downstream code knows what timed out. This is semantically distinct from
+ * user-initiated 'deny' or 'cancel' responses.
  */
 export function createInteractionTimeoutResponse(kind: InteractionKind): InteractionResponse {
-	if (kind === 'tool-approval') {
-		return { kind: 'deny', message: 'Timed out waiting for user response' };
-	}
-	return { kind: 'cancel', message: 'Timed out waiting for user response' };
+	return { kind: 'timeout', interactionKind: kind, message: 'Timed out waiting for user response' };
 }
 
 /**

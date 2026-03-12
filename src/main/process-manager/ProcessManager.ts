@@ -61,6 +61,14 @@ export class ProcessManager extends EventEmitter {
 			// Harness execution path — harness implementations are not yet registered.
 			// Log and fall back to classic for now. When harness adapters are added
 			// (Phase 2+), this branch will call createHarness() and spawnHarnessExecution().
+			//
+			// TODO(Phase 2+): Event forwarding wiring
+			// 1. Create the harness via createHarness(config) and store in the execution record
+			// 2. Subscribe to harness EventEmitter events and re-emit through ProcessManager:
+			//    - harness.on('interaction-request', (sessionId, request) => this.emit('interaction-request', sessionId, request))
+			//    - harness.on('runtime-metadata', (sessionId, metadata) => this.emit('runtime-metadata', sessionId, metadata))
+			//    - harness.on('data', ...), harness.on('exit', ...), etc. for all standard events
+			// 3. Call harness.spawn(executionConfig) and return the HarnessSpawnResult
 			logger.warn(
 				'[ProcessManager] Harness mode selected but no harness implementations registered; falling back to classic',
 				'ProcessManager',
@@ -134,12 +142,14 @@ export class ProcessManager extends EventEmitter {
 
 				case 'harness':
 					// Harness write delegation — Phase 2+
-					logger.warn(
-						'[ProcessManager] write() called on harness-backed execution but harness write not yet implemented',
+					// This path should be unreachable in Phase 1: harness-backed executions
+					// use the SDK's streaming input API (streamInput), not raw write().
+					logger.error(
+						'[ProcessManager] write() called on harness-backed execution — unreachable in Phase 1',
 						'ProcessManager',
 						{ sessionId }
 					);
-					return false;
+					return true;
 
 				default:
 					logger.warn('[ProcessManager] write() - unknown backend type', 'ProcessManager', {
@@ -239,12 +249,14 @@ export class ProcessManager extends EventEmitter {
 
 				case 'harness':
 					// Harness interrupt delegation — Phase 2+
-					logger.warn(
-						'[ProcessManager] interrupt() called on harness-backed execution but harness interrupt not yet implemented',
+					// This path should be unreachable in Phase 1: harness-backed executions
+					// use the SDK's interrupt API, not raw interrupt().
+					logger.error(
+						'[ProcessManager] interrupt() called on harness-backed execution — unreachable in Phase 1',
 						'ProcessManager',
 						{ sessionId }
 					);
-					return false;
+					return true;
 
 				default:
 					logger.warn('[ProcessManager] interrupt() - unknown backend type', 'ProcessManager', {

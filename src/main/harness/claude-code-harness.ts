@@ -684,6 +684,12 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 					message: response.message || 'User cancelled',
 				};
 
+			case 'timeout':
+				return {
+					behavior: 'deny',
+					message: response.message || 'Timed out waiting for user response',
+				};
+
 			default:
 				return {
 					behavior: 'deny',

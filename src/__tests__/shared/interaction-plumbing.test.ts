@@ -337,7 +337,7 @@ describe('interaction helper response distinguishability', () => {
 	describe('clarification responses never carry interrupt flag', () => {
 		it('timeout for clarification has no interrupt flag', () => {
 			const response = createInteractionTimeoutResponse('clarification');
-			expect(response.kind).toBe('cancel');
+			expect(response.kind).toBe('timeout');
 			expect('interrupt' in response).toBe(false);
 		});
 
@@ -355,11 +355,12 @@ describe('interaction helper response distinguishability', () => {
 	});
 
 	describe('tool-approval responses carry correct interrupt semantics', () => {
-		it('timeout deny has NO interrupt flag (timeout is not an interrupt)', () => {
+		it('timeout has NO interrupt flag (timeout is a distinct kind)', () => {
 			const response = createInteractionTimeoutResponse('tool-approval');
-			expect(response.kind).toBe('deny');
-			if (response.kind === 'deny') {
-				expect(response.interrupt).toBeUndefined();
+			expect(response.kind).toBe('timeout');
+			expect('interrupt' in response).toBe(false);
+			if (response.kind === 'timeout') {
+				expect(response.interactionKind).toBe('tool-approval');
 			}
 		});
 

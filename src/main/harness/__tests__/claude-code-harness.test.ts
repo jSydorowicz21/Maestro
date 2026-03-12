@@ -566,7 +566,7 @@ describe('ClaudeCodeHarness', () => {
 	// ====================================================================
 
 	describe('timeout behavior', () => {
-		it('should resolve tool approval to deny on timeout', async () => {
+		it('should resolve tool approval to SDK deny via timeout kind on timeout', async () => {
 			await harness.spawn(createTestConfig());
 			await flushMicrotasks();
 
@@ -591,7 +591,7 @@ describe('ClaudeCodeHarness', () => {
 			expect(harness.getPendingInteractionCount()).toBe(0);
 		});
 
-		it('should resolve clarification to cancel on timeout', async () => {
+		it('should resolve clarification to SDK deny via timeout kind on timeout', async () => {
 			await harness.spawn(createTestConfig());
 			await flushMicrotasks();
 
@@ -609,7 +609,7 @@ describe('ClaudeCodeHarness', () => {
 			await flushMicrotasks();
 
 			const result = await resultPromise;
-			// Clarification timeout → cancel → SDK deny
+			// Clarification timeout → timeout kind → SDK deny
 			expect(result.behavior).toBe('deny');
 			expect((result as any).message).toBe('Timed out waiting for user response');
 		});
@@ -1515,6 +1515,59 @@ describe('ClaudeCodeHarness', () => {
 			const result = await resultPromise;
 			expect(result.behavior).toBe('deny');
 			expect((result as any).message).toBe('User cancelled');
+		});
+
+		it('should translate timeout to SDK deny with timeout message', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			const resultPromise = mockFn.canUseTool!(
+				'Bash',
+				{ command: 'test' },
+				{ signal: new AbortController().signal, toolUseID: 'trans-timeout-1' }
+			);
+			await flushMicrotasks();
+
+			await harness.respondToInteraction(capturedRequest!.interactionId, {
+				kind: 'timeout',
+				interactionKind: 'tool-approval',
+				message: 'Timed out waiting for user response',
+			});
+
+			const result = await resultPromise;
+			expect(result.behavior).toBe('deny');
+			expect((result as any).message).toBe('Timed out waiting for user response');
+		});
+
+		it('should translate timeout without message to SDK deny with default message', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			const resultPromise = mockFn.canUseTool!(
+				'Bash',
+				{ command: 'test' },
+				{ signal: new AbortController().signal, toolUseID: 'trans-timeout-2' }
+			);
+			await flushMicrotasks();
+
+			await harness.respondToInteraction(capturedRequest!.interactionId, {
+				kind: 'timeout',
+				interactionKind: 'tool-approval',
+			});
+
+			const result = await resultPromise;
+			expect(result.behavior).toBe('deny');
+			expect((result as any).message).toBe('Timed out waiting for user response');
 		});
 
 		it('should translate clarification-answer with multiple questions', async () => {
@@ -2626,10 +2679,10 @@ describe('ClaudeCodeHarness', () => {
 			await flushMicrotasks();
 
 			const result = await resultPromise;
-			// Timeout response → deny → translateResponseToSdk → SDK deny
+			// Timeout response → timeout kind → translateResponseToSdk → SDK deny
 			expect(result.behavior).toBe('deny');
 			expect((result as any).message).toBe('Timed out waiting for user response');
-			// Timeout deny does NOT include interrupt flag
+			// Timeout does NOT include interrupt flag
 			expect((result as any).interrupt).toBeUndefined();
 		});
 
@@ -2650,7 +2703,7 @@ describe('ClaudeCodeHarness', () => {
 			await flushMicrotasks();
 
 			const result = await resultPromise;
-			// Clarification timeout → cancel → translateResponseToSdk → SDK deny
+			// Clarification timeout → timeout kind → translateResponseToSdk → SDK deny
 			expect(result.behavior).toBe('deny');
 			expect((result as any).message).toBe('Timed out waiting for user response');
 		});

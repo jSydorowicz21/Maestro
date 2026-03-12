@@ -3,6 +3,8 @@ import type { IPty } from 'node-pty';
 import type { AgentOutputParser } from '../parsers';
 import type { AgentError, PermissionMode } from '../../shared/types';
 import type { AgentHarness } from '../harness/agent-harness';
+import type { InteractionRequest } from '../../shared/interaction-types';
+import type { RuntimeMetadataEvent } from '../../shared/runtime-metadata-types';
 
 /**
  * Discriminator for the execution backend powering a run.
@@ -159,6 +161,8 @@ export interface ProcessManagerEvents {
 	'tool-execution': (sessionId: string, tool: ToolExecution) => void;
 	'slash-commands': (sessionId: string, commands: unknown[]) => void;
 	'query-complete': (sessionId: string, data: QueryCompleteData) => void;
+	'interaction-request': (sessionId: string, request: InteractionRequest) => void;
+	'runtime-metadata': (sessionId: string, metadata: RuntimeMetadataEvent) => void;
 }
 
 export interface ToolExecution {

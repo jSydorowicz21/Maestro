@@ -160,4 +160,5 @@ export type InteractionResponse =
 	| { kind: 'deny'; message?: string; interrupt?: boolean }
 	| { kind: 'text'; text: string }
 	| { kind: 'clarification-answer'; answers: ClarificationAnswer[] }
-	| { kind: 'cancel'; message?: string };
+	| { kind: 'cancel'; message?: string }
+	| { kind: 'timeout'; interactionKind: InteractionKind; message?: string };

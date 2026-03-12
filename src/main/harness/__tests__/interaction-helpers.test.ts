@@ -23,27 +23,34 @@ describe('interaction-helpers', () => {
 	});
 
 	describe('createInteractionTimeoutResponse', () => {
-		it('should return deny for tool-approval', () => {
+		it('should return timeout with interactionKind for tool-approval', () => {
 			const response = createInteractionTimeoutResponse('tool-approval');
 			expect(response).toEqual({
-				kind: 'deny',
+				kind: 'timeout',
+				interactionKind: 'tool-approval',
 				message: 'Timed out waiting for user response',
 			});
 		});
 
-		it('should return cancel for clarification', () => {
+		it('should return timeout with interactionKind for clarification', () => {
 			const response = createInteractionTimeoutResponse('clarification');
 			expect(response).toEqual({
-				kind: 'cancel',
+				kind: 'timeout',
+				interactionKind: 'clarification',
 				message: 'Timed out waiting for user response',
 			});
 		});
 
-		it('should not include interrupt flag on timeout deny', () => {
-			const response = createInteractionTimeoutResponse('tool-approval');
-			expect(response.kind).toBe('deny');
-			if (response.kind === 'deny') {
-				expect(response.interrupt).toBeUndefined();
+		it('timeout kind carries interactionKind for downstream use', () => {
+			const toolResponse = createInteractionTimeoutResponse('tool-approval');
+			const clarResponse = createInteractionTimeoutResponse('clarification');
+			expect(toolResponse.kind).toBe('timeout');
+			expect(clarResponse.kind).toBe('timeout');
+			if (toolResponse.kind === 'timeout') {
+				expect(toolResponse.interactionKind).toBe('tool-approval');
+			}
+			if (clarResponse.kind === 'timeout') {
+				expect(clarResponse.interactionKind).toBe('clarification');
 			}
 		});
 	});

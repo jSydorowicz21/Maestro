@@ -42,4 +42,19 @@ export function setupForwardingListeners(
 	processManager.on('command-exit', (sessionId: string, code: number) => {
 		safeSend('process:command-exit', sessionId, code);
 	});
+
+	// TODO(Phase 2+): Forward harness-specific events to the renderer.
+	// When harness adapters emit through ProcessManager (see ProcessManager.spawn() TODO),
+	// add forwarding here using the same safeSend pattern:
+	//
+	//   processManager.on('interaction-request', (sessionId: string, request: InteractionRequest) => {
+	//       safeSend('process:interaction-request', sessionId, request);
+	//   });
+	//
+	//   processManager.on('runtime-metadata', (sessionId: string, metadata: RuntimeMetadataEvent) => {
+	//       safeSend('process:runtime-metadata', sessionId, metadata);
+	//   });
+	//
+	// The renderer will need corresponding preload bridge entries and store handlers
+	// (see preload.ts and renderer harnessStore) to receive these events.
 }

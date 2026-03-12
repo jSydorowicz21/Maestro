@@ -707,23 +707,23 @@ describe('Nullable PID Handling', () => {
 			expect(pm.get('harness-1')).toBeUndefined();
 		});
 
-		it('interrupt() on harness execution returns false gracefully', () => {
+		it('interrupt() on harness execution returns true (unreachable in Phase 1)', () => {
 			const execution = makeHarnessExecution({ pid: null });
 			injectExecution(pm, execution);
 
 			const result = pm.interrupt('harness-1');
-			expect(result).toBe(false);
+			expect(result).toBe(true);
 
 			// Execution should still exist (interrupt doesn't remove it)
 			expect(pm.get('harness-1')).toBeDefined();
 		});
 
-		it('write() on harness execution returns false gracefully', () => {
+		it('write() on harness execution returns true (unreachable in Phase 1)', () => {
 			const execution = makeHarnessExecution({ pid: null });
 			injectExecution(pm, execution);
 
 			const result = pm.write('harness-1', 'test data');
-			expect(result).toBe(false);
+			expect(result).toBe(true);
 		});
 
 		it('resize() on harness execution returns false', () => {
@@ -768,25 +768,25 @@ describe('Nullable PID Handling', () => {
 			);
 		});
 
-		it('write() harness warning log does not crash with null PID', () => {
+		it('write() harness error log does not crash with null PID', () => {
 			injectExecution(pm, makeHarnessExecution({ pid: null }));
 
 			pm.write('harness-1', 'data');
 
-			expect(mockLogger.warn).toHaveBeenCalledWith(
-				expect.stringContaining('harness write not yet implemented'),
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				expect.stringContaining('unreachable in Phase 1'),
 				'ProcessManager',
 				expect.objectContaining({ sessionId: 'harness-1' })
 			);
 		});
 
-		it('interrupt() harness warning log does not crash with null PID', () => {
+		it('interrupt() harness error log does not crash with null PID', () => {
 			injectExecution(pm, makeHarnessExecution({ pid: null }));
 
 			pm.interrupt('harness-1');
 
-			expect(mockLogger.warn).toHaveBeenCalledWith(
-				expect.stringContaining('harness interrupt not yet implemented'),
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				expect.stringContaining('unreachable in Phase 1'),
 				'ProcessManager',
 				expect.objectContaining({ sessionId: 'harness-1' })
 			);
