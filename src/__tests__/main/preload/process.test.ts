@@ -65,6 +65,27 @@ describe('Process Preload API', () => {
 
 			expect(result.sshRemote).toEqual({ id: 'remote-1', name: 'My Server', host: 'example.com' });
 		});
+
+		it('should pass harness-specific config fields (preferredExecutionMode, providerOptions)', async () => {
+			const config: ProcessConfig = {
+				sessionId: 'session-harness',
+				toolType: 'claude-code',
+				cwd: '/home/user/project',
+				command: 'claude',
+				args: [],
+				preferredExecutionMode: 'harness',
+				providerOptions: { thinking: { type: 'enabled', budget: 10000 } },
+				querySource: 'user',
+				tabId: 'tab-1',
+			};
+			mockInvoke.mockResolvedValue({ pid: null, success: true });
+
+			const result = await api.spawn(config);
+
+			expect(mockInvoke).toHaveBeenCalledWith('process:spawn', config);
+			expect(result.pid).toBeNull();
+			expect(result.success).toBe(true);
+		});
 	});
 
 	describe('write', () => {
@@ -165,6 +186,38 @@ describe('Process Preload API', () => {
 
 			expect(mockInvoke).toHaveBeenCalledWith('process:getActiveProcesses');
 			expect(result).toEqual(mockProcesses);
+		});
+
+		it('should handle harness-backed processes with null pid', async () => {
+			const mockProcesses = [
+				{
+					sessionId: 'session-harness',
+					toolType: 'claude-code',
+					pid: null,
+					cwd: '/home/user',
+					isTerminal: false,
+					isBatchMode: false,
+					startTime: Date.now(),
+					command: 'claude',
+					args: ['--json'],
+				},
+				{
+					sessionId: 'session-classic',
+					toolType: 'codex',
+					pid: 5678,
+					cwd: '/home/user',
+					isTerminal: false,
+					isBatchMode: false,
+					startTime: Date.now(),
+				},
+			];
+			mockInvoke.mockResolvedValue(mockProcesses);
+
+			const result = await api.getActiveProcesses();
+
+			expect(result).toHaveLength(2);
+			expect(result[0].pid).toBeNull();
+			expect(result[1].pid).toBe(5678);
 		});
 	});
 
@@ -359,6 +412,43 @@ describe('Process Preload API', () => {
 				expect.any(Function)
 			);
 		});
+
+		it('should forward tool approval with optional fields (suggestedPermissions, blockedPath, subagentId)', () => {
+			const callback = vi.fn();
+			let registeredHandler: (event: unknown, sessionId: string, request: unknown) => void;
+
+			mockOn.mockImplementation((channel: string, handler: typeof registeredHandler) => {
+				if (channel === 'process:interaction-request') {
+					registeredHandler = handler;
+				}
+			});
+
+			api.onInteractionRequest(callback);
+
+			const fullToolApproval = {
+				interactionId: 'int-full',
+				sessionId: 'session-789',
+				agentId: 'claude-code',
+				kind: 'tool-approval' as const,
+				timestamp: Date.now(),
+				timeoutMs: 60000,
+				toolUseId: 'tool-xyz',
+				toolName: 'Bash',
+				toolInput: { command: 'rm -rf /tmp/test' },
+				decisionReason: 'Shell command needs approval',
+				suggestedPermissions: [{ tool: 'Bash', scope: '/tmp' }],
+				blockedPath: '/tmp/test',
+				subagentId: 'sub-agent-1',
+			};
+			registeredHandler!({}, 'session-789', fullToolApproval);
+
+			expect(callback).toHaveBeenCalledWith('session-789', fullToolApproval);
+			const received = callback.mock.calls[0][1];
+			expect(received.timeoutMs).toBe(60000);
+			expect(received.suggestedPermissions).toHaveLength(1);
+			expect(received.blockedPath).toBe('/tmp/test');
+			expect(received.subagentId).toBe('sub-agent-1');
+		});
 	});
 
 	describe('respondToInteraction', () => {
@@ -478,6 +568,25 @@ describe('Process Preload API', () => {
 				response
 			);
 		});
+
+		it('should send approve response with updatedInput and updatedPermissions', async () => {
+			mockInvoke.mockResolvedValue(undefined);
+
+			const response = {
+				kind: 'approve' as const,
+				updatedInput: { file_path: '/src/modified.ts', new_string: 'updated' },
+				updatedPermissions: [{ tool: 'Edit', scope: '/src' }],
+				message: 'Approved with modifications',
+			};
+
+			await api.respondToInteraction('session-123', 'int-007', response);
+
+			const sentResponse = mockInvoke.mock.calls[0][3];
+			expect(sentResponse.kind).toBe('approve');
+			expect(sentResponse.updatedInput).toEqual({ file_path: '/src/modified.ts', new_string: 'updated' });
+			expect(sentResponse.updatedPermissions).toHaveLength(1);
+			expect(sentResponse.message).toBe('Approved with modifications');
+		});
 	});
 
 	describe('onRemoteCommand', () => {
@@ -578,6 +687,45 @@ describe('Process Preload API', () => {
 				'process:runtime-metadata',
 				expect.any(Function)
 			);
+		});
+
+		it('should forward metadata with full runtime capabilities (13 fields)', () => {
+			const callback = vi.fn();
+			let registeredHandler: (event: unknown, sessionId: string, metadata: unknown) => void;
+
+			mockOn.mockImplementation((channel: string, handler: typeof registeredHandler) => {
+				if (channel === 'process:runtime-metadata') {
+					registeredHandler = handler;
+				}
+			});
+
+			api.onRuntimeMetadata(callback);
+
+			const metadata = {
+				sessionId: 'session-caps',
+				source: 'claude-code',
+				replace: true,
+				capabilities: {
+					supportsMidTurnInput: true,
+					supportsInteractionRequests: true,
+					supportsPersistentStdin: false,
+					supportsRuntimePermissionUpdates: true,
+					supportsRuntimeModelChange: true,
+					supportsRuntimeEffortChange: true,
+					supportsSkillsEnumeration: true,
+					supportsRuntimeSlashCommands: true,
+					supportsFileCheckpointing: true,
+					supportsStructuredOutput: true,
+					supportsBudgetLimits: true,
+					supportsContextCompaction: true,
+					supportsSessionFork: false,
+				},
+			};
+			registeredHandler!({}, 'session-caps', metadata);
+
+			expect(callback).toHaveBeenCalledWith('session-caps', metadata);
+			const received = callback.mock.calls[0][1];
+			expect(Object.keys(received.capabilities)).toHaveLength(13);
 		});
 	});
 });
