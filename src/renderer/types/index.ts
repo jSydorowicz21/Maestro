@@ -741,7 +741,8 @@ export interface AgentConfigOption {
 // Re-export from shared — single source of truth (Layer 1: static agent capabilities)
 // For Layer 2 (harness runtime capabilities), see HarnessRuntimeCapabilities.
 // For Layer 3 (session runtime metadata), see SessionRuntimeMetadata in harnessStore.ts.
-export type { AgentCapabilities } from '../../shared/agent-capabilities-types';
+import type { AgentCapabilities } from '../../shared/agent-capabilities-types';
+export type { AgentCapabilities };
 
 export interface AgentConfig {
 	id: string;

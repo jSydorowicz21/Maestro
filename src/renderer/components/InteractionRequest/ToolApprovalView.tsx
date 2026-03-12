@@ -8,7 +8,7 @@
  * ToolApprovalRequest shape and never references Claude-specific payloads.
  */
 
-import React, { useRef, useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import { Shield, ShieldCheck, ShieldX, ChevronDown, ChevronRight, Code2 } from 'lucide-react';
 import type { Theme, ToolApprovalRequest, InteractionResponse } from '../../types';
 import { CollapsibleJsonViewer } from '../CollapsibleJsonViewer';

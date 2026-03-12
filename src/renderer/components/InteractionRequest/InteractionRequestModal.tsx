@@ -43,7 +43,7 @@ function getInteractionTitle(request: InteractionRequest): string {
 		case 'clarification':
 			return 'Agent Needs Input';
 		default: {
-			const _exhaustive: never = request;
+			void (request as never);
 			return 'Agent Interaction';
 		}
 	}
@@ -71,7 +71,7 @@ function getInteractionIcon(request: InteractionRequest, theme: Theme): React.Re
 				/>
 			);
 		default: {
-			const _exhaustive: never = request;
+			void (request as never);
 			return (
 				<MessageSquare
 					className="w-4 h-4"
@@ -198,7 +198,7 @@ const InteractionContent = memo(function InteractionContent({
 			);
 		default: {
 			// Defensive: unknown kind — show a generic fallback
-			const _exhaustive: never = request;
+			void (request as never);
 			return (
 				<div
 					className="text-sm py-4 text-center"

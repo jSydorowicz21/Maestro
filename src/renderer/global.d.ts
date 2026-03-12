@@ -87,6 +87,8 @@ interface AgentCapabilities {
 	supportsGroupChatModeration: boolean;
 	usesJsonLineOutput: boolean;
 	usesCombinedContextWindow: boolean;
+	supportsHarnessExecution: boolean;
+	imageResumeMode?: 'prompt-embed';
 }
 
 interface AgentConfig {
@@ -103,31 +105,6 @@ interface AgentConfig {
 	yoloModeArgs?: string[];
 	readOnlyCliEnforced?: boolean;
 	capabilities?: AgentCapabilities;
-}
-
-interface AgentCapabilities {
-	supportsResume: boolean;
-	supportsReadOnlyMode: boolean;
-	supportsJsonOutput: boolean;
-	supportsSessionId: boolean;
-	supportsImageInput: boolean;
-	supportsImageInputOnResume: boolean;
-	supportsSlashCommands: boolean;
-	supportsSessionStorage: boolean;
-	supportsCostTracking: boolean;
-	supportsUsageStats: boolean;
-	supportsBatchMode: boolean;
-	requiresPromptToStart: boolean;
-	supportsStreaming: boolean;
-	supportsResultMessages: boolean;
-	supportsModelSelection: boolean;
-	supportsStreamJsonInput: boolean;
-	supportsContextMerge: boolean;
-	supportsContextExport: boolean;
-	supportsWizard: boolean;
-	supportsGroupChatModeration: boolean;
-	usesJsonLineOutput: boolean;
-	usesCombinedContextWindow: boolean;
 }
 
 interface DirectoryEntry {

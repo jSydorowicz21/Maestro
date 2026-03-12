@@ -8,7 +8,7 @@
  * ClarificationRequest shape and never references provider-specific payloads.
  */
 
-import React, { useRef, useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import { HelpCircle, Check, Send, X } from 'lucide-react';
 import type {
 	Theme,

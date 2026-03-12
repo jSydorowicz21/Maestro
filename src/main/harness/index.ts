@@ -100,10 +100,6 @@ export function initializeHarnesses(): void {
 		);
 	}
 
-	// Future harness registrations:
-	// registerHarness('codex', () => new CodexHarness());
-	// registerHarness('opencode', () => new OpenCodeHarness());
-
 	const registeredIds = getRegisteredHarnessIds();
 	if (registeredIds.length > 0) {
 		logger.info(

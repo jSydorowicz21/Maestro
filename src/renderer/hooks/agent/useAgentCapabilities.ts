@@ -114,7 +114,7 @@ export function useAgentCapabilities(
 	// Helper to check a specific capability
 	const hasCapability = useCallback(
 		(capability: keyof AgentCapabilities): boolean => {
-			return capabilities[capability];
+			return !!capabilities[capability];
 		},
 		[capabilities]
 	);
