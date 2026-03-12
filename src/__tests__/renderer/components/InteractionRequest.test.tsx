@@ -945,3 +945,325 @@ describe('InteractionRequestModal — kind-neutral behavior', () => {
 		});
 	});
 });
+
+// ============================================================================
+// Provider-neutral boundary tests
+// ============================================================================
+
+describe('InteractionRequestModal — provider-neutral boundary', () => {
+	it('renders tool-approval from a non-Claude agent identically', () => {
+		const request = createToolApproval({
+			interactionId: 'int-codex-1',
+			sessionId: 'session-1',
+			agentId: 'codex',
+			toolName: 'shell',
+			toolInput: { cmd: 'npm test', timeout: 30000 },
+			decisionReason: 'Command requires approval',
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		// Renders the same tool-approval UI regardless of agentId
+		expect(screen.getByTestId('tool-approval-view')).toBeInTheDocument();
+		expect(screen.getByText('shell')).toBeInTheDocument();
+		expect(screen.getByText('Command requires approval')).toBeInTheDocument();
+		expect(screen.getByTestId('approve-button')).toBeInTheDocument();
+		expect(screen.getByTestId('deny-button')).toBeInTheDocument();
+	});
+
+	it('renders clarification from a non-Claude agent identically', () => {
+		const request = createClarification({
+			interactionId: 'int-opencode-1',
+			sessionId: 'session-1',
+			agentId: 'opencode',
+			questions: [
+				{
+					question: 'Which model to use?',
+					header: 'Model',
+					options: [
+						{ label: 'gpt-4o', description: 'OpenAI GPT-4o' },
+						{ label: 'o3-mini', description: 'OpenAI o3-mini' },
+					],
+					multiSelect: false,
+				},
+			],
+			allowFreeText: false,
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		expect(screen.getByTestId('clarification-view')).toBeInTheDocument();
+		expect(screen.getByText('Which model to use?')).toBeInTheDocument();
+		expect(screen.getByTestId('option-gpt-4o')).toBeInTheDocument();
+		expect(screen.getByTestId('option-o3-mini')).toBeInTheDocument();
+	});
+
+	it('renders tool-approval with opaque toolInput as generic JSON', () => {
+		// Use a completely unfamiliar tool input shape — the UI must not
+		// assume Claude-specific keys like file_path, command, etc.
+		const request = createToolApproval({
+			interactionId: 'int-opaque-1',
+			sessionId: 'session-1',
+			agentId: 'factory-droid',
+			toolName: 'deploy_artifact',
+			toolInput: {
+				artifact_uri: 's3://bucket/artifact.tar.gz',
+				target_env: 'staging',
+				rollback_enabled: true,
+				metadata: { version: '2.1.0', build: 1234 },
+			},
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		// The UI should render the tool name and offer the input toggle
+		expect(screen.getByText('deploy_artifact')).toBeInTheDocument();
+		expect(screen.getByTestId('toggle-input')).toBeInTheDocument();
+
+		// Expand to see the JSON viewer (mocked)
+		fireEvent.click(screen.getByTestId('toggle-input'));
+		const jsonViewer = screen.getByTestId('json-viewer');
+		expect(jsonViewer).toBeInTheDocument();
+
+		// The JSON viewer receives the raw input — it must NOT parse specific keys
+		const jsonContent = JSON.parse(jsonViewer.textContent ?? '{}');
+		expect(jsonContent.artifact_uri).toBe('s3://bucket/artifact.tar.gz');
+		expect(jsonContent.target_env).toBe('staging');
+	});
+
+	it('does not render suggestedPermissions in the UI', () => {
+		// suggestedPermissions is an opaque Record<string, unknown>[] that
+		// varies by provider. The UI must not attempt to render or parse it.
+		const request = createToolApproval({
+			interactionId: 'int-perms-1',
+			sessionId: 'session-1',
+			suggestedPermissions: [
+				{ tool: 'Edit', path: '/src/**', allow: true },
+				{ tool: 'Bash', command: 'npm *', allow: true },
+			],
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		// The modal should render, but none of the suggestedPermissions
+		// content should appear in the DOM
+		expect(screen.getByTestId('tool-approval-view')).toBeInTheDocument();
+		expect(screen.queryByText('npm *')).not.toBeInTheDocument();
+		expect(screen.queryByText('/src/**')).not.toBeInTheDocument();
+	});
+
+	it('renders minimal payload with only required fields', () => {
+		// A bare-minimum tool-approval: only required fields, no optional ones.
+		// This proves the UI doesn't crash or degrade on minimal payloads.
+		const request: ToolApprovalRequest = {
+			interactionId: 'int-minimal',
+			sessionId: 'session-1',
+			agentId: 'claude-code',
+			kind: 'tool-approval',
+			timestamp: Date.now(),
+			toolUseId: 'tu-1',
+			toolName: 'Read',
+			toolInput: {},
+		};
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+
+		expect(screen.getByTestId('tool-approval-view')).toBeInTheDocument();
+		expect(screen.getByText('Read')).toBeInTheDocument();
+		// No optional fields should cause missing elements, not errors
+		expect(screen.queryByTestId('decision-reason')).not.toBeInTheDocument();
+		expect(screen.queryByTestId('blocked-path')).not.toBeInTheDocument();
+		expect(screen.queryByTestId('toggle-input')).not.toBeInTheDocument(); // Empty toolInput
+	});
+
+	it('approve response does not include provider-specific fields', async () => {
+		const request = createToolApproval({
+			interactionId: 'int-resp-1',
+			sessionId: 'session-1',
+			agentId: 'codex',
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+		fireEvent.click(screen.getByTestId('approve-button'));
+
+		await waitFor(() => {
+			expect(mockRespondToInteraction).toHaveBeenCalledWith(
+				'session-1',
+				'int-resp-1',
+				{ kind: 'approve' }
+			);
+		});
+
+		// The response should be a plain { kind: 'approve' } without any
+		// provider-specific fields like updatedPermissions or updatedInput
+		const response = mockRespondToInteraction.mock.calls[0][2];
+		expect(Object.keys(response)).toEqual(['kind']);
+	});
+
+	it('deny response does not include provider-specific fields', async () => {
+		const request = createToolApproval({
+			interactionId: 'int-resp-2',
+			sessionId: 'session-1',
+			agentId: 'opencode',
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+		fireEvent.click(screen.getByTestId('deny-button'));
+
+		await waitFor(() => {
+			expect(mockRespondToInteraction).toHaveBeenCalledWith(
+				'session-1',
+				'int-resp-2',
+				{ kind: 'deny' }
+			);
+		});
+
+		// The response should be a plain { kind: 'deny' } without any
+		// provider-specific interrupt or message fields
+		const response = mockRespondToInteraction.mock.calls[0][2];
+		expect(Object.keys(response)).toEqual(['kind']);
+	});
+
+	it('clarification answer response uses shared structure, not provider wire format', async () => {
+		const request = createClarification({
+			interactionId: 'int-resp-3',
+			sessionId: 'session-1',
+			agentId: 'codex',
+			allowFreeText: false,
+		});
+		useSessionStore.setState({ activeSessionId: 'session-1' });
+		useHarnessStore.setState({
+			pendingInteractions: { 'session-1': [request] },
+		});
+
+		renderWithLayerStack(<InteractionRequestModal theme={testTheme} />);
+		fireEvent.click(screen.getByTestId('option-Option A'));
+		fireEvent.click(screen.getByTestId('submit-button'));
+
+		await waitFor(() => {
+			expect(mockRespondToInteraction).toHaveBeenCalled();
+		});
+
+		// The response must use the shared ClarificationAnswer structure
+		// (questionIndex + selectedOptionLabels), not provider-specific formats
+		const response = mockRespondToInteraction.mock.calls[0][2];
+		expect(response.kind).toBe('clarification-answer');
+		expect(response.answers).toEqual([
+			{
+				questionIndex: 0,
+				selectedOptionLabels: ['Option A'],
+				text: undefined,
+			},
+		]);
+		// Must not contain any provider-specific keys
+		expect(Object.keys(response)).toEqual(['kind', 'answers']);
+	});
+});
+
+// ============================================================================
+// Import boundary enforcement tests
+// ============================================================================
+
+describe('InteractionRequest — import boundary enforcement', () => {
+	it('InteractionRequest components do not import from provider SDKs or harness adapters', async () => {
+		// Static analysis: read the actual source files and verify no prohibited imports.
+		// This catches boundary violations that ESLint might miss if the rule is
+		// accidentally disabled or overridden.
+		const fs = await import('fs');
+		const path = await import('path');
+
+		const componentDir = path.resolve(
+			__dirname,
+			'../../../renderer/components/InteractionRequest'
+		);
+
+		const files = fs.readdirSync(componentDir).filter(
+			(f: string) => f.endsWith('.ts') || f.endsWith('.tsx')
+		);
+
+		const prohibitedPatterns = [
+			/@anthropic-ai\//,
+			/from\s+['"]openai/,
+			/from\s+['"].*\/main\/harness\//,
+			/from\s+['"].*claude-code-harness/,
+			/from\s+['"].*codex-harness/,
+			/from\s+['"].*opencode-harness/,
+		];
+
+		for (const file of files) {
+			const content = fs.readFileSync(path.join(componentDir, file), 'utf-8');
+			for (const pattern of prohibitedPatterns) {
+				expect(content).not.toMatch(pattern);
+			}
+		}
+	});
+
+	it('InteractionRequest components only import types from shared or renderer layers', async () => {
+		const fs = await import('fs');
+		const path = await import('path');
+
+		const componentDir = path.resolve(
+			__dirname,
+			'../../../renderer/components/InteractionRequest'
+		);
+
+		const files = fs.readdirSync(componentDir).filter(
+			(f: string) => f.endsWith('.ts') || f.endsWith('.tsx')
+		);
+
+		// Extract all import paths
+		const importPattern = /from\s+['"]([^'"]+)['"]/g;
+
+		for (const file of files) {
+			const content = fs.readFileSync(path.join(componentDir, file), 'utf-8');
+			let match;
+			while ((match = importPattern.exec(content)) !== null) {
+				const importPath = match[1];
+
+				// Skip external packages that are UI-only (react, lucide-react, etc.)
+				if (
+					importPath === 'react' ||
+					importPath.startsWith('lucide-react') ||
+					importPath.startsWith('zustand')
+				) {
+					continue;
+				}
+
+				// Internal imports should only reference renderer or shared code
+				if (importPath.startsWith('.') || importPath.startsWith('..')) {
+					expect(importPath).not.toMatch(/main\//);
+					expect(importPath).not.toMatch(/harness\//);
+					expect(importPath).not.toMatch(/parsers\//);
+				}
+			}
+		}
+	});
+});

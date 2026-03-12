@@ -33,6 +33,40 @@ export default tseslint.config(
 	// Prettier config - disables ESLint rules that conflict with Prettier
 	prettierConfig,
 
+	// Boundary enforcement: InteractionRequest components must stay provider-neutral.
+	// Prevents importing from provider-specific SDKs or harness adapters.
+	{
+		files: [
+			'src/renderer/components/InteractionRequest/**/*.ts',
+			'src/renderer/components/InteractionRequest/**/*.tsx',
+		],
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					patterns: [
+						{
+							group: ['@anthropic-ai/*'],
+							message: 'InteractionRequest components must not import from Claude SDK. Use shared types from interaction-types.ts.',
+						},
+						{
+							group: ['openai', 'openai/*'],
+							message: 'InteractionRequest components must not import from OpenAI SDK. Use shared types from interaction-types.ts.',
+						},
+						{
+							group: ['**/main/harness/*'],
+							message: 'InteractionRequest components must not import from harness adapters. Use shared types from interaction-types.ts.',
+						},
+						{
+							group: ['**/main/harness/**'],
+							message: 'InteractionRequest components must not import from harness internals. Use shared types from interaction-types.ts.',
+						},
+					],
+				},
+			],
+		},
+	},
+
 	// Main configuration for all TypeScript files
 	{
 		files: ['src/**/*.ts', 'src/**/*.tsx'],
