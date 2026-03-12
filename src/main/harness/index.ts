@@ -28,9 +28,11 @@ export type {
 	AgentHarness,
 	HarnessInput,
 	HarnessSpawnResult,
-	HarnessRuntimeSettings,
 	HarnessEvents,
 } from './agent-harness';
+
+// HarnessRuntimeSettings is re-exported from shared so preload/renderer can import it
+export type { HarnessRuntimeSettings } from '../../shared/harness-types';
 
 // Re-export registry functions
 export {

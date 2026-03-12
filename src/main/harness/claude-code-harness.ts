@@ -19,7 +19,8 @@
 
 import { EventEmitter } from 'events';
 import { randomUUID } from 'crypto';
-import type { AgentHarness, HarnessInput, HarnessSpawnResult, HarnessRuntimeSettings } from './agent-harness';
+import type { AgentHarness, HarnessInput, HarnessSpawnResult } from './agent-harness';
+import type { HarnessRuntimeSettings } from '../../shared/harness-types';
 import type { ToolType, AgentExecutionConfig, PermissionMode } from '../../shared/types';
 import type {
 	InteractionRequest,

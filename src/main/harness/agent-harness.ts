@@ -15,9 +15,13 @@
  */
 
 import { EventEmitter } from 'events';
-import type { ToolType, AgentExecutionConfig, PermissionMode } from '../../shared/types';
+import type { ToolType, AgentExecutionConfig } from '../../shared/types';
 import type { InteractionResponse } from '../../shared/interaction-types';
 import type { HarnessRuntimeCapabilities } from '../../shared/runtime-metadata-types';
+import type { HarnessRuntimeSettings } from '../../shared/harness-types';
+
+// Re-export HarnessRuntimeSettings from shared so existing imports continue to work
+export type { HarnessRuntimeSettings } from '../../shared/harness-types';
 
 // ============================================================================
 // Harness Input Types
@@ -50,26 +54,6 @@ export interface HarnessSpawnResult {
 	success: boolean;
 	/** OS process ID, if applicable. Null for in-process SDK harnesses. */
 	pid?: number | null;
-}
-
-// ============================================================================
-// Harness Runtime Settings
-// ============================================================================
-
-/**
- * Runtime settings that can be updated on a running harness.
- *
- * Phase 1 notes:
- * - `permissionMode: 'bypassPermissions'` is the single source of truth for "allow all"
- * - `model` maps to Claude's query.setModel() and supports model-switching UI
- * - Provider-specific runtime controls (e.g., reasoning effort) belong in
- *   `providerOptions`, not here
- */
-export interface HarnessRuntimeSettings {
-	permissionMode?: PermissionMode;
-	model?: string;
-	/** Provider-specific runtime options (adapter-owned, opaque to shared code) */
-	providerOptions?: Record<string, unknown>;
 }
 
 // ============================================================================
