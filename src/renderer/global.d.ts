@@ -152,6 +152,13 @@ type InteractionResponsePayload = import('../shared/interaction-types').Interact
  */
 type RuntimeMetadataPayload = import('../shared/runtime-metadata-types').RuntimeMetadataEvent;
 
+/**
+ * Harness runtime settings payload (provider-neutral).
+ * Aliased from the shared HarnessRuntimeSettings in harness-types.ts.
+ * Used by window.maestro.process.updateRuntimeSettings.
+ */
+type HarnessRuntimeSettingsPayload = import('../shared/harness-types').HarnessRuntimeSettings;
+
 type HistoryEntryType = 'AUTO' | 'USER';
 
 /**
@@ -358,6 +365,10 @@ interface MaestroAPI {
 			sessionId: string,
 			interactionId: string,
 			response: InteractionResponsePayload
+		) => Promise<void>;
+		updateRuntimeSettings: (
+			sessionId: string,
+			settings: HarnessRuntimeSettingsPayload
 		) => Promise<void>;
 		onRuntimeMetadata: (
 			callback: (sessionId: string, metadata: RuntimeMetadataPayload) => void
