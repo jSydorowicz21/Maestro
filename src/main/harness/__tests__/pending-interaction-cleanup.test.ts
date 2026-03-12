@@ -26,7 +26,6 @@ import type {
 	SDKQueryFunction,
 	SDKPermissionResult,
 	SDKCanUseToolOptions,
-	SDKUserMessage,
 } from '../claude-sdk-types';
 import { DEFAULT_INTERACTION_TIMEOUT_MS } from '../interaction-helpers';
 

@@ -1848,8 +1848,6 @@ describe('ClaudeCodeHarness', () => {
 			);
 			await flushMicrotasks();
 
-			// Capture the interaction ID before disposing
-			let capturedInteractionId = '';
 			harness.removeAllListeners('interaction-request');
 			// The interaction is already pending, so we need to find its ID
 			// We can't easily get the ID after it was created, so just dispose and try a fake one
@@ -2063,7 +2061,7 @@ describe('ClaudeCodeHarness', () => {
 			expect(harness.getPendingInteractionCount()).toBe(1);
 
 			// Respond to the new interaction
-			const latestId = Array.from((harness as any).pendingInteractions.keys())[0];
+			const latestId = Array.from((harness as any).pendingInteractions.keys())[0] as string;
 			await harness.respondToInteraction(latestId, { kind: 'approve' });
 			const r2 = await p2;
 			expect(r2.behavior).toBe('allow');
@@ -3932,7 +3930,7 @@ describe('ClaudeCodeHarness', () => {
 			await flushMicrotasks();
 
 			// Every event emitted should carry the Maestro session ID, not the Claude session ID
-			for (const [eventName, sids] of sessionIds) {
+			for (const [, sids] of sessionIds) {
 				for (const sid of sids) {
 					expect(sid).toBe(testSessionId);
 				}
@@ -4769,8 +4767,10 @@ describe('ClaudeCodeHarness', () => {
 			await flushMicrotasks();
 
 			// Now resolve supportedModels after kill
-			if (resolveSupportedModels) {
-				resolveSupportedModels([{ id: 'late-model', label: 'Late' }]);
+			// resolveSupportedModels is assigned inside the async mockImplementation callback
+			const resolver = resolveSupportedModels as ((value: any) => void) | null;
+			if (resolver) {
+				resolver([{ id: 'late-model', label: 'Late' }]);
 			}
 			await flushMicrotasks();
 

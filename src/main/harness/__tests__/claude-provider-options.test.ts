@@ -16,7 +16,7 @@ import {
 	CLAUDE_PROVIDER_OPTION_KEYS,
 	CLAUDE_RUNTIME_OPTION_KEYS,
 } from '../claude-provider-options';
-import type { ClaudeProviderOptions, ClaudeRuntimeOptions } from '../claude-provider-options';
+import type { ClaudeProviderOptions } from '../claude-provider-options';
 
 describe('buildClaudeProviderOptions', () => {
 	it('should return empty object for empty input', () => {

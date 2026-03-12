@@ -280,6 +280,7 @@ describe('agent-capabilities', () => {
 				'supportsContextExport',
 				'supportsWizard',
 				'supportsGroupChatModeration',
+				'supportsHarnessExecution',
 				'usesJsonLineOutput',
 				'usesCombinedContextWindow',
 			];
