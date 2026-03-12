@@ -9,18 +9,158 @@
  * - Provider-neutral: no agent-specific branching or styling
  *
  * Only renders when the session has non-empty runtime metadata to display.
+ *
+ * Category configuration is data-driven: add a new metadata category by
+ * appending one entry to the METADATA_CATEGORIES array.
  */
 
 import { useState, useRef, useEffect, memo } from 'react';
 import { Sparkles, Terminal, Cpu, Bot } from 'lucide-react';
 import type { Theme } from '../types';
-import { useSessionRuntimeMetadata } from '../hooks/agent/useSessionRuntimeMetadata';
+import {
+	useSessionRuntimeMetadata,
+	type UseSessionRuntimeMetadataReturn,
+} from '../hooks/agent/useSessionRuntimeMetadata';
 
 interface RuntimeMetadataBarProps {
 	/** Session ID to look up runtime metadata */
 	sessionId: string;
 	theme: Theme;
 }
+
+// ============================================================================
+// Config-driven category definitions
+// ============================================================================
+
+/**
+ * Metadata fields available to category extractors.
+ */
+type MetadataFields = Pick<
+	UseSessionRuntimeMetadataReturn,
+	'skills' | 'slashCommands' | 'availableModels' | 'availableAgents'
+>;
+
+/**
+ * Configuration for a single metadata category displayed in the bar and tooltip.
+ *
+ * To add a new category, append an entry to METADATA_CATEGORIES with these fields.
+ */
+interface MetadataCategoryConfig {
+	/** Unique key for React iteration */
+	key: string;
+	/** Section header label in the tooltip */
+	label: string;
+	/** Icon component for the summary pill and section header */
+	icon: React.ComponentType<{ className?: string }>;
+	/** Extract the item count for the summary pill */
+	getCount: (data: MetadataFields) => number;
+	/** Extract normalized items (each must have an `id`) for the tooltip section */
+	getItems: (data: MetadataFields) => { id: string }[];
+	/** Render a single tooltip item */
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	renderItem: (item: any, theme: Theme) => React.ReactNode;
+}
+
+/**
+ * Category configuration array. Each entry produces one summary pill and one
+ * tooltip section. Adding a new metadata category is a one-entry addition here.
+ */
+const METADATA_CATEGORIES: MetadataCategoryConfig[] = [
+	{
+		key: 'skills',
+		label: 'Skills',
+		icon: Sparkles,
+		getCount: (data) => data.skills.length,
+		getItems: (data) => data.skills,
+		renderItem: (skill: { id: string; name: string; description?: string }, theme) => (
+			<div
+				key={skill.id}
+				className="px-3 py-1.5 text-xs"
+				style={{ color: theme.colors.textMain }}
+			>
+				<span className="font-medium">{skill.name}</span>
+				{skill.description && (
+					<span
+						className="ml-1.5"
+						style={{ color: theme.colors.textDim }}
+					>
+						{skill.description}
+					</span>
+				)}
+			</div>
+		),
+	},
+	{
+		key: 'slashCommands',
+		label: 'Slash Commands',
+		icon: Terminal,
+		getCount: (data) => data.slashCommands.length,
+		getItems: (data) => data.slashCommands.map((cmd) => ({ id: cmd, name: cmd })),
+		renderItem: (item: { id: string; name: string }, theme) => (
+			<div
+				key={item.id}
+				className="px-3 py-1 text-xs font-mono"
+				style={{ color: theme.colors.textMain }}
+			>
+				{item.name.startsWith('/') ? item.name : `/${item.name}`}
+			</div>
+		),
+	},
+	{
+		key: 'availableModels',
+		label: 'Available Models',
+		icon: Cpu,
+		getCount: (data) => data.availableModels.length,
+		getItems: (data) => data.availableModels,
+		renderItem: (model: { id: string; label?: string }, theme) => (
+			<div
+				key={model.id}
+				className="px-3 py-1 text-xs"
+				style={{ color: theme.colors.textMain }}
+			>
+				<span className="font-mono">{model.id}</span>
+				{model.label && model.label !== model.id && (
+					<span
+						className="ml-1.5"
+						style={{ color: theme.colors.textDim }}
+					>
+						({model.label})
+					</span>
+				)}
+			</div>
+		),
+	},
+	{
+		key: 'availableAgents',
+		label: 'Sub-Agents',
+		icon: Bot,
+		getCount: (data) => data.availableAgents.length,
+		getItems: (data) => data.availableAgents,
+		renderItem: (agent: { id: string; label?: string }, theme) => (
+			<div
+				key={agent.id}
+				className="px-3 py-1 text-xs"
+				style={{ color: theme.colors.textMain }}
+			>
+				<span className="font-medium">
+					{agent.label || agent.id}
+				</span>
+				{agent.label && (
+					<span
+						className="ml-1.5 font-mono"
+						style={{ color: theme.colors.textDim }}
+					>
+						{agent.id}
+					</span>
+				)}
+			</div>
+		),
+	},
+];
+
+// ============================================================================
+// Component
+// ============================================================================
 
 /**
  * RuntimeMetadataBar - Compact header widget for harness runtime metadata.
@@ -34,6 +174,8 @@ export const RuntimeMetadataBar = memo(function RuntimeMetadataBar({
 }: RuntimeMetadataBarProps) {
 	const { skills, slashCommands, availableModels, availableAgents, hasMetadata } =
 		useSessionRuntimeMetadata(sessionId);
+
+	const metadataFields: MetadataFields = { skills, slashCommands, availableModels, availableAgents };
 
 	// Tooltip hover state with timeout for smooth UX
 	const [tooltipOpen, setTooltipOpen] = useState(false);
@@ -49,7 +191,10 @@ export const RuntimeMetadataBar = memo(function RuntimeMetadataBar({
 	}, []);
 
 	// Don't render if no metadata or nothing to show
-	const totalItems = skills.length + slashCommands.length + availableModels.length + availableAgents.length;
+	const totalItems = METADATA_CATEGORIES.reduce(
+		(sum, cat) => sum + cat.getCount(metadataFields),
+		0
+	);
 	if (!hasMetadata || totalItems === 0) {
 		return null;
 	}
@@ -75,30 +220,17 @@ export const RuntimeMetadataBar = memo(function RuntimeMetadataBar({
 				style={{ color: theme.colors.textMain }}
 				title="Agent runtime metadata"
 			>
-				{skills.length > 0 && (
-					<span className="flex items-center gap-1" style={{ color: theme.colors.textDim }}>
-						<Sparkles className="w-3 h-3" />
-						<span>{skills.length}</span>
-					</span>
-				)}
-				{slashCommands.length > 0 && (
-					<span className="flex items-center gap-1" style={{ color: theme.colors.textDim }}>
-						<Terminal className="w-3 h-3" />
-						<span>{slashCommands.length}</span>
-					</span>
-				)}
-				{availableModels.length > 0 && (
-					<span className="flex items-center gap-1" style={{ color: theme.colors.textDim }}>
-						<Cpu className="w-3 h-3" />
-						<span>{availableModels.length}</span>
-					</span>
-				)}
-				{availableAgents.length > 0 && (
-					<span className="flex items-center gap-1" style={{ color: theme.colors.textDim }}>
-						<Bot className="w-3 h-3" />
-						<span>{availableAgents.length}</span>
-					</span>
-				)}
+				{METADATA_CATEGORIES.map((cat) => {
+					const count = cat.getCount(metadataFields);
+					if (count === 0) return null;
+					const Icon = cat.icon;
+					return (
+						<span key={cat.key} className="flex items-center gap-1" style={{ color: theme.colors.textDim }}>
+							<Icon className="w-3 h-3" />
+							<span>{count}</span>
+						</span>
+					);
+				})}
 			</div>
 
 			{/* Hover tooltip showing full metadata details */}
@@ -145,107 +277,21 @@ export const RuntimeMetadataBar = memo(function RuntimeMetadataBar({
 							Runtime Metadata
 						</div>
 						<div className="max-h-80 overflow-y-auto scrollbar-thin">
-							{/* Skills section */}
-							{skills.length > 0 && (
-								<MetadataSection
-									icon={<Sparkles className="w-3 h-3" />}
-									label="Skills"
-									theme={theme}
-								>
-									{skills.map((skill) => (
-										<div
-											key={skill.id}
-											className="px-3 py-1.5 text-xs"
-											style={{ color: theme.colors.textMain }}
-										>
-											<span className="font-medium">{skill.name}</span>
-											{skill.description && (
-												<span
-													className="ml-1.5"
-													style={{ color: theme.colors.textDim }}
-												>
-													{skill.description}
-												</span>
-											)}
-										</div>
-									))}
-								</MetadataSection>
-							)}
-
-							{/* Slash commands section */}
-							{slashCommands.length > 0 && (
-								<MetadataSection
-									icon={<Terminal className="w-3 h-3" />}
-									label="Slash Commands"
-									theme={theme}
-								>
-									{slashCommands.map((cmd) => (
-										<div
-											key={cmd}
-											className="px-3 py-1 text-xs font-mono"
-											style={{ color: theme.colors.textMain }}
-										>
-											{cmd.startsWith('/') ? cmd : `/${cmd}`}
-										</div>
-									))}
-								</MetadataSection>
-							)}
-
-							{/* Available models section */}
-							{availableModels.length > 0 && (
-								<MetadataSection
-									icon={<Cpu className="w-3 h-3" />}
-									label="Available Models"
-									theme={theme}
-								>
-									{availableModels.map((model) => (
-										<div
-											key={model.id}
-											className="px-3 py-1 text-xs"
-											style={{ color: theme.colors.textMain }}
-										>
-											<span className="font-mono">{model.id}</span>
-											{model.label && model.label !== model.id && (
-												<span
-													className="ml-1.5"
-													style={{ color: theme.colors.textDim }}
-												>
-													({model.label})
-												</span>
-											)}
-										</div>
-									))}
-								</MetadataSection>
-							)}
-
-							{/* Available agents section */}
-							{availableAgents.length > 0 && (
-								<MetadataSection
-									icon={<Bot className="w-3 h-3" />}
-									label="Sub-Agents"
-									theme={theme}
-								>
-									{availableAgents.map((agent) => (
-										<div
-											key={agent.id}
-											className="px-3 py-1 text-xs"
-											style={{ color: theme.colors.textMain }}
-										>
-											<span className="font-medium">
-												{agent.label || agent.id}
-											</span>
-											{agent.label && (
-												<span
-													className="ml-1.5 font-mono"
-													style={{ color: theme.colors.textDim }}
-												>
-													{agent.id}
-												</span>
-											)}
-										</div>
-									))}
-								</MetadataSection>
-							)}
+							{METADATA_CATEGORIES.map((cat) => {
+								const items = cat.getItems(metadataFields);
+								if (items.length === 0) return null;
+								const Icon = cat.icon;
+								return (
+									<MetadataSection
+										key={cat.key}
+										icon={<Icon className="w-3 h-3" />}
+										label={cat.label}
+										theme={theme}
+									>
+										{items.map((item) => cat.renderItem(item, theme))}
+									</MetadataSection>
+								);
+							})}
 						</div>
 					</div>
 				</>
