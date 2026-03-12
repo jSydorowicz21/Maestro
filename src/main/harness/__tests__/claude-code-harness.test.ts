@@ -613,6 +613,143 @@ describe('ClaudeCodeHarness', () => {
 			expect(result.behavior).toBe('deny');
 			expect((result as any).message).toBe('Timed out waiting for user response');
 		});
+
+		it('should use DEFAULT_INTERACTION_TIMEOUT_MS when no custom timeout specified', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			mockFn.canUseTool!(
+				'Bash',
+				{ command: 'test' },
+				{ signal: new AbortController().signal, toolUseID: 'default-timeout-1' }
+			);
+			await flushMicrotasks();
+
+			// The emitted request should carry the default timeout
+			expect(capturedRequest).not.toBeNull();
+			expect(capturedRequest!.timeoutMs).toBe(DEFAULT_INTERACTION_TIMEOUT_MS);
+
+			// Interaction should still be pending before the default timeout
+			vi.advanceTimersByTime(DEFAULT_INTERACTION_TIMEOUT_MS - 1000);
+			await flushMicrotasks();
+			expect(harness.getPendingInteractionCount()).toBe(1);
+
+			// Should timeout after the default period
+			vi.advanceTimersByTime(1100);
+			await flushMicrotasks();
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+
+		it('should not fire timeout if response arrives first', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			let capturedRequest: InteractionRequest | null = null;
+			harness.on('interaction-request', (_sid: string, req: InteractionRequest) => {
+				capturedRequest = req;
+			});
+
+			const resultPromise = mockFn.canUseTool!(
+				'Bash',
+				{ command: 'test' },
+				{ signal: new AbortController().signal, toolUseID: 'early-response-1' }
+			);
+			await flushMicrotasks();
+
+			// Respond well before timeout
+			await harness.respondToInteraction(capturedRequest!.interactionId, { kind: 'approve' });
+			const result = await resultPromise;
+			expect(result.behavior).toBe('allow');
+			expect(harness.getPendingInteractionCount()).toBe(0);
+
+			// Advance past the timeout — should NOT affect anything
+			vi.advanceTimersByTime(DEFAULT_INTERACTION_TIMEOUT_MS + 1000);
+			await flushMicrotasks();
+
+			// No crash, no extra resolutions — count stays at 0
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
+
+		it('should handle multiple concurrent interactions timing out independently', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.on('interaction-request', () => {});
+
+			// Create first interaction
+			const p1 = mockFn.canUseTool!(
+				'Bash',
+				{ command: 'first' },
+				{ signal: new AbortController().signal, toolUseID: 'multi-timeout-1' }
+			);
+			await flushMicrotasks();
+
+			// Small delay then create second interaction
+			vi.advanceTimersByTime(1000);
+
+			const p2 = mockFn.canUseTool!(
+				'Write',
+				{ path: '/test.ts' },
+				{ signal: new AbortController().signal, toolUseID: 'multi-timeout-2' }
+			);
+			await flushMicrotasks();
+
+			expect(harness.getPendingInteractionCount()).toBe(2);
+
+			// Advance to when first interaction should timeout (but not second)
+			vi.advanceTimersByTime(DEFAULT_INTERACTION_TIMEOUT_MS - 500);
+			await flushMicrotasks();
+
+			// First should have timed out, second still pending
+			expect(harness.getPendingInteractionCount()).toBe(1);
+
+			const r1 = await p1;
+			expect(r1.behavior).toBe('deny');
+			expect((r1 as any).message).toBe('Timed out waiting for user response');
+
+			// Advance to when second interaction should timeout
+			vi.advanceTimersByTime(1500);
+			await flushMicrotasks();
+
+			expect(harness.getPendingInteractionCount()).toBe(0);
+
+			const r2 = await p2;
+			expect(r2.behavior).toBe('deny');
+			expect((r2 as any).message).toBe('Timed out waiting for user response');
+		});
+
+		it('should not double-resolve if timeout fires after kill', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.on('interaction-request', () => {});
+
+			const resultPromise = mockFn.canUseTool!(
+				'Bash',
+				{ command: 'test' },
+				{ signal: new AbortController().signal, toolUseID: 'kill-then-timeout-1' }
+			);
+			await flushMicrotasks();
+
+			// Kill resolves with termination response
+			harness.kill();
+
+			const result = await resultPromise;
+			expect(result.behavior).toBe('deny');
+			expect((result as any).message).toBe('Session terminated');
+
+			// Advance past timeout — should not throw or re-resolve
+			vi.advanceTimersByTime(DEFAULT_INTERACTION_TIMEOUT_MS + 1000);
+			await flushMicrotasks();
+
+			// No crash — interaction was already cleaned up
+			expect(harness.getPendingInteractionCount()).toBe(0);
+		});
 	});
 
 	// ====================================================================
