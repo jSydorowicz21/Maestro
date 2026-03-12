@@ -6,6 +6,7 @@
 import { createIpcMethod } from './ipcWrapper';
 import type { ProcessConfig } from '../types';
 import type { InteractionRequest, InteractionResponse } from '../../shared/interaction-types';
+import type { RuntimeMetadataEvent } from '../../shared/runtime-metadata-types';
 
 export type { ProcessConfig } from '../types';
 
@@ -146,4 +147,16 @@ export const processService = {
 			errorContext: 'Respond to interaction',
 			rethrow: true,
 		}),
+
+	/**
+	 * Register handler for runtime metadata events from harness-backed agents.
+	 * Called when an agent reports skills, models, agents, or capability changes.
+	 */
+	onRuntimeMetadata(
+		handler: (sessionId: string, metadata: RuntimeMetadataEvent) => void
+	): () => void {
+		return window.maestro.process.onRuntimeMetadata(
+			handler as unknown as (sessionId: string, metadata: unknown) => void
+		);
+	},
 };

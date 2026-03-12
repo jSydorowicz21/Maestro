@@ -33,6 +33,12 @@ export type {
 	ClarificationOption,
 	ClarificationAnswer,
 	PermissionUpdate,
+	// Runtime metadata types (harness runtime discovery)
+	HarnessRuntimeCapabilities,
+	SkillSummary,
+	RuntimeModelSummary,
+	RuntimeAgentSummary,
+	RuntimeMetadataEvent,
 } from '../../shared/types';
 
 // Re-export Symphony types for session metadata

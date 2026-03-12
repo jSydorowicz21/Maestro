@@ -11,6 +11,7 @@
 
 import { ipcRenderer } from 'electron';
 import type { InteractionRequest, InteractionResponse } from '../../shared/interaction-types';
+import type { RuntimeMetadataEvent } from '../../shared/runtime-metadata-types';
 
 /**
  * Helper to log via the main process logger.
@@ -485,11 +486,29 @@ export function createProcessApi() {
 			response: InteractionResponse
 		): Promise<void> =>
 			ipcRenderer.invoke('process:respond-interaction', sessionId, interactionId, response),
+
+		/**
+		 * Subscribe to runtime metadata events from harness-backed agents.
+		 * Emitted when an agent reports skills, slash commands, available models,
+		 * available agents, or runtime capability changes.
+		 * Renderer should merge updates by field unless `replace: true` is set.
+		 */
+		onRuntimeMetadata: (
+			callback: (sessionId: string, metadata: RuntimeMetadataEvent) => void
+		): (() => void) => {
+			const handler = (_: unknown, sessionId: string, metadata: RuntimeMetadataEvent) =>
+				callback(sessionId, metadata);
+			ipcRenderer.on('process:runtime-metadata', handler);
+			return () => ipcRenderer.removeListener('process:runtime-metadata', handler);
+		},
 	};
 }
 
 // Re-export interaction types for consumers of the preload API
 export type { InteractionRequest, InteractionResponse } from '../../shared/interaction-types';
+
+// Re-export runtime metadata types for consumers of the preload API
+export type { RuntimeMetadataEvent } from '../../shared/runtime-metadata-types';
 
 /**
  * TypeScript type for the process API

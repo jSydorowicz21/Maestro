@@ -478,4 +478,82 @@ describe('Process Preload API', () => {
 			expect(callback).toHaveBeenCalledWith('session-123', 'test command', 'ai');
 		});
 	});
+
+	describe('onRuntimeMetadata', () => {
+		it('should register event listener for process:runtime-metadata', () => {
+			const callback = vi.fn();
+
+			const cleanup = api.onRuntimeMetadata(callback);
+
+			expect(mockOn).toHaveBeenCalledWith('process:runtime-metadata', expect.any(Function));
+			expect(typeof cleanup).toBe('function');
+		});
+
+		it('should call callback with sessionId and full metadata snapshot', () => {
+			const callback = vi.fn();
+			let registeredHandler: (event: unknown, sessionId: string, metadata: unknown) => void;
+
+			mockOn.mockImplementation((channel: string, handler: typeof registeredHandler) => {
+				if (channel === 'process:runtime-metadata') {
+					registeredHandler = handler;
+				}
+			});
+
+			api.onRuntimeMetadata(callback);
+
+			const metadata = {
+				sessionId: 'session-123',
+				source: 'claude-code',
+				replace: true,
+				skills: [
+					{ id: 'commit', name: 'Commit', description: 'Create git commits' },
+				],
+				slashCommands: ['/help', '/clear'],
+				availableModels: [
+					{ id: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
+				],
+				capabilities: {
+					supportsRuntimeModelChange: true,
+					supportsInteractionRequests: true,
+				},
+			};
+			registeredHandler!({}, 'session-123', metadata);
+
+			expect(callback).toHaveBeenCalledWith('session-123', metadata);
+		});
+
+		it('should call callback with partial metadata update', () => {
+			const callback = vi.fn();
+			let registeredHandler: (event: unknown, sessionId: string, metadata: unknown) => void;
+
+			mockOn.mockImplementation((channel: string, handler: typeof registeredHandler) => {
+				if (channel === 'process:runtime-metadata') {
+					registeredHandler = handler;
+				}
+			});
+
+			api.onRuntimeMetadata(callback);
+
+			const partialUpdate = {
+				sessionId: 'session-456',
+				source: 'codex',
+				slashCommands: ['/test', '/run'],
+			};
+			registeredHandler!({}, 'session-456', partialUpdate);
+
+			expect(callback).toHaveBeenCalledWith('session-456', partialUpdate);
+		});
+
+		it('should return cleanup function that removes listener', () => {
+			const callback = vi.fn();
+
+			const cleanup = api.onRuntimeMetadata(callback);
+			cleanup();
+
+			expect(mockRemoveListener).toHaveBeenCalledWith(
+				'process:runtime-metadata',
+				expect.any(Function)
+			);
+		});
+	});
 });

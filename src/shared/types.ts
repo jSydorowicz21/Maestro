@@ -19,6 +19,15 @@ export type {
 	PermissionUpdate,
 } from './interaction-types';
 
+// Re-export runtime metadata types for cross-layer consumption
+export type {
+	HarnessRuntimeCapabilities,
+	SkillSummary,
+	RuntimeModelSummary,
+	RuntimeAgentSummary,
+	RuntimeMetadataEvent,
+} from './runtime-metadata-types';
+
 /**
  * Union type of all valid agent IDs.
  * Derived from AGENT_IDS — the single source of truth in agentIds.ts.

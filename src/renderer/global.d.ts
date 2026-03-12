@@ -200,6 +200,36 @@ interface InteractionResponsePayload {
 	}>;
 }
 
+/**
+ * Runtime metadata event from harness-backed agents (provider-neutral).
+ * Mirrors the shared RuntimeMetadataEvent in runtime-metadata-types.ts.
+ * Used by window.maestro.process.onRuntimeMetadata.
+ */
+interface RuntimeMetadataPayload {
+	sessionId: string;
+	source: string;
+	replace?: boolean;
+	skills?: Array<{
+		id: string;
+		name: string;
+		description?: string;
+	}>;
+	slashCommands?: string[];
+	availableModels?: Array<{
+		id: string;
+		label?: string;
+	}>;
+	availableAgents?: Array<{
+		id: string;
+		label?: string;
+	}>;
+	capabilities?: {
+		supportsRuntimeModelChange?: boolean;
+		supportsSkillsEnumeration?: boolean;
+		supportsInteractionRequests?: boolean;
+	};
+}
+
 type HistoryEntryType = 'AUTO' | 'USER';
 
 /**
@@ -404,6 +434,9 @@ interface MaestroAPI {
 			interactionId: string,
 			response: InteractionResponsePayload
 		) => Promise<void>;
+		onRuntimeMetadata: (
+			callback: (sessionId: string, metadata: RuntimeMetadataPayload) => void
+		) => () => void;
 	};
 	agentError: {
 		clearError: (sessionId: string) => Promise<{ success: boolean }>;
