@@ -882,6 +882,149 @@ describe('harnessStore', () => {
 		});
 	});
 
+	// === Lifecycle Clearing ===
+
+	describe('lifecycle clearing', () => {
+		it('clearSessionInteractions preserves runtime metadata (interrupt scenario)', () => {
+			const actions = useHarnessStore.getState();
+
+			// Session has both interactions and metadata
+			actions.addInteraction('session-1', createToolApproval({ interactionId: 'int-1' }));
+			actions.applyRuntimeMetadata('session-1', {
+				sessionId: 'session-1',
+				source: 'claude-code',
+				skills: [{ id: 's1', name: 'Skill' }],
+				capabilities: { supportsInteractionRequests: true },
+			});
+
+			// Interrupt clears interactions only
+			useHarnessStore.getState().clearSessionInteractions('session-1');
+
+			const state = useHarnessStore.getState();
+			expect(state.pendingInteractions['session-1']).toBeUndefined();
+			// Runtime metadata survives interrupt
+			expect(state.runtimeMetadata['session-1']).toBeDefined();
+			expect(state.runtimeMetadata['session-1'].skills).toHaveLength(1);
+			expect(state.runtimeMetadata['session-1'].capabilities.supportsInteractionRequests).toBe(true);
+		});
+
+		it('clearSession removes metadata even when no interactions exist (deletion scenario)', () => {
+			const actions = useHarnessStore.getState();
+
+			// Session has only metadata (no pending interactions)
+			actions.applyRuntimeMetadata('session-1', {
+				sessionId: 'session-1',
+				source: 'claude-code',
+				skills: [{ id: 's1', name: 'Skill' }],
+				availableModels: [{ id: 'opus', label: 'Opus' }],
+			});
+
+			useHarnessStore.getState().clearSession('session-1');
+
+			const state = useHarnessStore.getState();
+			expect(state.pendingInteractions['session-1']).toBeUndefined();
+			expect(state.runtimeMetadata['session-1']).toBeUndefined();
+		});
+
+		it('clearSession removes interactions even when no metadata exists', () => {
+			const actions = useHarnessStore.getState();
+
+			// Session has only interactions (no metadata)
+			actions.addInteraction('session-1', createToolApproval({ interactionId: 'int-1' }));
+			actions.addInteraction('session-1', createClarification({ interactionId: 'int-2' }));
+
+			useHarnessStore.getState().clearSession('session-1');
+
+			const state = useHarnessStore.getState();
+			expect(state.pendingInteractions['session-1']).toBeUndefined();
+			expect(state.runtimeMetadata['session-1']).toBeUndefined();
+		});
+
+		it('supports sequential execution cycles (clear → repopulate → clear)', () => {
+			const actions = useHarnessStore.getState();
+
+			// First execution populates state
+			actions.addInteraction('session-1', createToolApproval({ interactionId: 'int-1' }));
+			actions.applyRuntimeMetadata('session-1', {
+				sessionId: 'session-1',
+				source: 'claude-code',
+				skills: [{ id: 's1', name: 'First Skill' }],
+			});
+
+			// Execution ends (exit)
+			useHarnessStore.getState().clearSession('session-1');
+			expect(useHarnessStore.getState().runtimeMetadata['session-1']).toBeUndefined();
+			expect(useHarnessStore.getState().pendingInteractions['session-1']).toBeUndefined();
+
+			// Second execution starts with fresh state
+			actions.applyRuntimeMetadata('session-1', {
+				sessionId: 'session-1',
+				source: 'claude-code',
+				skills: [{ id: 's2', name: 'Second Skill' }],
+				slashCommands: ['/new-cmd'],
+			});
+			actions.addInteraction('session-1', createToolApproval({ interactionId: 'int-2' }));
+
+			const midState = useHarnessStore.getState();
+			expect(midState.runtimeMetadata['session-1'].skills).toHaveLength(1);
+			expect(midState.runtimeMetadata['session-1'].skills[0].id).toBe('s2');
+			expect(midState.pendingInteractions['session-1']).toHaveLength(1);
+
+			// Second execution ends
+			useHarnessStore.getState().clearSession('session-1');
+			expect(useHarnessStore.getState().runtimeMetadata['session-1']).toBeUndefined();
+			expect(useHarnessStore.getState().pendingInteractions['session-1']).toBeUndefined();
+		});
+
+		it('clearSessionMetadata preserves pending interactions (provider reset scenario)', () => {
+			const actions = useHarnessStore.getState();
+
+			actions.addInteraction('session-1', createToolApproval({ interactionId: 'int-1' }));
+			actions.applyRuntimeMetadata('session-1', {
+				sessionId: 'session-1',
+				source: 'claude-code',
+				skills: [{ id: 's1', name: 'Skill' }],
+			});
+
+			// Clear only metadata
+			useHarnessStore.getState().clearSessionMetadata('session-1');
+
+			const state = useHarnessStore.getState();
+			expect(state.runtimeMetadata['session-1']).toBeUndefined();
+			// Interactions survive
+			expect(state.pendingInteractions['session-1']).toHaveLength(1);
+		});
+
+		it('concurrent session clearing does not interfere', () => {
+			const actions = useHarnessStore.getState();
+
+			// Two sessions with state
+			actions.addInteraction('session-1', createToolApproval({ interactionId: 'int-1' }));
+			actions.applyRuntimeMetadata('session-1', {
+				sessionId: 'session-1',
+				source: 'claude-code',
+				skills: [{ id: 's1', name: 'Skill 1' }],
+			});
+			actions.addInteraction('session-2', createToolApproval({ interactionId: 'int-2' }));
+			actions.applyRuntimeMetadata('session-2', {
+				sessionId: 'session-2',
+				source: 'codex',
+				skills: [{ id: 's2', name: 'Skill 2' }],
+			});
+
+			// Clear session-1
+			useHarnessStore.getState().clearSession('session-1');
+
+			const state = useHarnessStore.getState();
+			// session-1 fully cleared
+			expect(state.pendingInteractions['session-1']).toBeUndefined();
+			expect(state.runtimeMetadata['session-1']).toBeUndefined();
+			// session-2 untouched
+			expect(state.pendingInteractions['session-2']).toHaveLength(1);
+			expect(state.runtimeMetadata['session-2'].skills[0].id).toBe('s2');
+		});
+	});
+
 	// === Selectors ===
 
 	describe('selectors', () => {

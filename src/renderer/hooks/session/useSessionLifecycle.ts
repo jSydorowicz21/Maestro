@@ -21,6 +21,7 @@ import type { ToolType } from '../../../shared/types';
 import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
 import { generateId } from '../../utils/ids';
 import { useGroupChatStore } from '../../stores/groupChatStore';
+import { useHarnessStore } from '../../stores/harnessStore';
 import { useModalStore } from '../../stores/modalStore';
 import { useUIStore } from '../../stores/uiStore';
 import { notifyToast } from '../../stores/notificationStore';
@@ -176,10 +177,13 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 							executionQueue: [],
 						});
 
-						// Kill the existing AI process for this session
-						window.maestro.process.kill(`${sessionId}-ai`).catch(() => {
-							// Process may not exist — that's fine
-						});
+						// Clear harness state — old provider's metadata/interactions are invalid
+					useHarnessStore.getState().clearSession(sessionId);
+
+					// Kill the existing AI process for this session
+					window.maestro.process.kill(`${sessionId}-ai`).catch(() => {
+						// Process may not exist — that's fine
+					});
 					}
 
 					return { ...s, ...updatedFields };
@@ -299,6 +303,11 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 					extra: { sessionId: id, operation: 'kill-terminal' },
 				});
 			}
+
+			// Clear harness state (pending interactions + runtime metadata) for this session.
+			// The onExit handler also clears on process exit, but we clear proactively here
+			// since the session is being deleted and the exit event may arrive after removal.
+			useHarnessStore.getState().clearSession(id);
 
 			// Delete associated playbooks
 			try {

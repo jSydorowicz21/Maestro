@@ -14,6 +14,7 @@
 import { useCallback } from 'react';
 import type { Session, LogEntry, QueuedItem, SessionState } from '../../types';
 import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
+import { useHarnessStore } from '../../stores/harnessStore';
 import { generateId } from '../../utils/ids';
 import { getActiveTab } from '../../utils/tabHelpers';
 
@@ -75,6 +76,10 @@ export function useInterruptHandler(deps: UseInterruptHandlerDeps): UseInterrupt
 		try {
 			// Send interrupt signal (Ctrl+C)
 			await (window as any).maestro.process.interrupt(targetSessionId);
+
+			// Clear pending interactions — they become stale when execution is interrupted.
+			// Runtime metadata is preserved since the process is still alive.
+			useHarnessStore.getState().clearSessionInteractions(activeSession.id);
 
 			// Check if there are queued items to process after interrupt
 			const currentSession = sessionsRef.current?.find((s) => s.id === activeSession.id);

@@ -27,6 +27,7 @@ import type {
 } from '../types';
 import { createTab, getActiveTab } from '../utils/tabHelpers';
 import { generateId } from '../utils/ids';
+import { useHarnessStore } from './harnessStore';
 import { useSessionStore } from './sessionStore';
 import { DEFAULT_IMAGE_ONLY_PROMPT } from '../hooks/input/useInputProcessing';
 import { maestroSystemPrompt } from '../../prompts';
@@ -521,6 +522,9 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 	interruptAgent: async (sessionId) => {
 		try {
 			await window.maestro.process.interrupt(sessionId);
+			// Clear pending interactions — they become stale after interrupt.
+			// Runtime metadata is preserved since the process stays alive.
+			useHarnessStore.getState().clearSessionInteractions(sessionId);
 		} catch {
 			// Process may not exist
 		}
