@@ -186,7 +186,7 @@ export const AppAgentModals = memo(function AppAgentModals({
 					}
 					recoveryActions={groupChatRecoveryActions}
 					onDismiss={onClearGroupChatError}
-					dismissible={groupChatError.error.recoverable}
+					dismissible={groupChatError.error.recoverable !== false}
 				/>
 			)}
 

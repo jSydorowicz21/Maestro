@@ -154,6 +154,21 @@ describe('AppWorktreeModals', () => {
 		expect(screen.queryByTestId('delete-worktree-modal')).not.toBeInTheDocument();
 	});
 
+	it('renders CreatePRModal falling back to activeSession when createPRSession is null', () => {
+		render(
+			<AppWorktreeModals
+				{...defaultProps}
+				createPRModalOpen={true}
+				createPRSession={null}
+				activeSession={createMockSession({ id: 'active-session' })}
+			/>
+		);
+		expect(screen.getByTestId('create-pr-modal')).toBeInTheDocument();
+		expect(screen.queryByTestId('worktree-config-modal')).not.toBeInTheDocument();
+		expect(screen.queryByTestId('create-worktree-modal')).not.toBeInTheDocument();
+		expect(screen.queryByTestId('delete-worktree-modal')).not.toBeInTheDocument();
+	});
+
 	it('renders DeleteWorktreeModal when deleteWorktreeModalOpen and deleteWorktreeSession are set', () => {
 		render(
 			<AppWorktreeModals

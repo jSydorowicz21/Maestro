@@ -131,6 +131,21 @@ describe('AppGroupChatModals', () => {
 		expect(screen.queryByTestId('delete-group-chat-modal')).not.toBeInTheDocument();
 	});
 
+	it('renders edit GroupChatModal when showEditGroupChatModal matches a group chat', () => {
+		render(
+			<AppGroupChatModals
+				{...defaultProps}
+				groupChats={[mockGroupChat]}
+				showEditGroupChatModal="gc-1"
+			/>
+		);
+		expect(screen.getByTestId('group-chat-modal-edit')).toBeInTheDocument();
+		expect(screen.queryByTestId('group-chat-modal-create')).not.toBeInTheDocument();
+		expect(screen.queryByTestId('delete-group-chat-modal')).not.toBeInTheDocument();
+		expect(screen.queryByTestId('rename-group-chat-modal')).not.toBeInTheDocument();
+		expect(screen.queryByTestId('group-chat-info-overlay')).not.toBeInTheDocument();
+	});
+
 	it('renders GroupChatInfoOverlay when showGroupChatInfo and activeGroupChatId match a group chat', () => {
 		render(
 			<AppGroupChatModals
