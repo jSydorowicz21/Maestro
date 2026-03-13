@@ -3,7 +3,7 @@
 | Field       | Value                                                                                                                                    |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | **Date**    | 2026-03-12                                                                                                                               |
-| **App URL** | https://decades-police-oxide-mix.trycloudflare.com/7246cb9d-3033-4643-a7c8-cee91b7ff052                                                  |
+| **App URL** | [REDACTED_TUNNEL_URL]                                                                                                                    |
 | **Session** | Remote UX Audit 1773336790326                                                                                                            |
 | **Scope**   | Mobile-first audit of remote session start, AI/CLI switching, response visibility, text input ergonomics, and tablet responsive behavior |
 
@@ -29,7 +29,7 @@
 
 ### Retest Coverage
 
-- Phone: reproduced long-draft composer clipping; confirmed AI to CLI isolates buffers; confirmed AI draft restores after CLI to AI; confirmed session picker no longer leaks draft into another session.
+- Phone: reproduced long-draft composer clipping; confirmed AI-to-CLI isolates buffers; confirmed AI draft restores after CLI-to-AI; confirmed session picker no longer leaks draft into another session.
 - Tablet/iPad size: long draft remained readable and contained. Evidence: `screenshots/tablet-audit-long-draft-current.png`
 - Wide desktop-like size: long draft remained readable and contained. Evidence: `screenshots/wide-audit-long-draft-current-2.png`
 
@@ -45,9 +45,9 @@
 - Rebuilt the web bundle, restarted the PM2-backed Maestro app, and re-ran the LIVE overlay remote flow until `desktop-runtime.json` returned `status: "ready"` with the fresh Cloudflare tunnel.
 - Phone:
   - Long draft is now readable in a full-width stacked composer. Evidence: `screenshots/phone-verify-expanded-draft-postfix.png`
-  - AI to CLI switch presents a clean shell input. Evidence: `screenshots/phone-verify-cli-after-toggle-final.png`
+  - AI-to-CLI switch presents a clean shell input. Evidence: `screenshots/phone-verify-cli-after-toggle-final.png`
   - CLI `pwd` output is visible in the remote UI. Evidence: `screenshots/phone-verify-cli-pwd-output-final.png`
-  - CLI to AI restores the pending AI draft. Evidence: `screenshots/phone-verify-back-to-ai-restored-final.png`
+  - CLI-to-AI restores the pending AI draft. Evidence: `screenshots/phone-verify-back-to-ai-restored-final.png`
   - Real AI factoid response arrived: `What is the capital of Peru?` -> `Lima`. Evidence: `screenshots/phone-verify-ai-factoid-response-final.png`
 - Tablet/iPad size remained readable after the phone-only fix. Evidence: `screenshots/tablet-verify-long-draft-final.png`
 - Wide desktop-like size remained readable after the phone-only fix. Evidence: `screenshots/wide-verify-long-draft-final.png`
@@ -58,13 +58,13 @@
 
 ### ISSUE-001: Phone AI composer collapses into a clipped vertical strip for normal-length drafts
 
-| Field                           | Value                                                                                   |
-| ------------------------------- | --------------------------------------------------------------------------------------- |
-| **Severity**                    | high                                                                                    |
-| **Category**                    | ux                                                                                      |
-| **URL**                         | https://decades-police-oxide-mix.trycloudflare.com/7246cb9d-3033-4643-a7c8-cee91b7ff052 |
-| **Repro Video**                 | N/A                                                                                     |
-| **Retest Status On `7cfaded1`** | still reproducible                                                                      |
+| Field                           | Value                 |
+| ------------------------------- | --------------------- |
+| **Severity**                    | high                  |
+| **Category**                    | ux                    |
+| **URL**                         | [REDACTED_TUNNEL_URL] |
+| **Repro Video**                 | N/A                   |
+| **Retest Status On `7cfaded1`** | still reproducible    |
 
 **Description**
 
@@ -94,15 +94,15 @@ On iPhone-sized viewports, the fixed bottom AI composer becomes too narrow once 
 
 ---
 
-### ISSUE-002: Switching from AI to CLI reuses the unsent AI draft as a shell command
+### ISSUE-002: Switching from AI-to-CLI reuses the unsent AI draft as a shell command
 
-| Field                           | Value                                                                                   |
-| ------------------------------- | --------------------------------------------------------------------------------------- |
-| **Severity**                    | high                                                                                    |
-| **Category**                    | functional                                                                              |
-| **URL**                         | https://decades-police-oxide-mix.trycloudflare.com/7246cb9d-3033-4643-a7c8-cee91b7ff052 |
-| **Repro Video**                 | N/A                                                                                     |
-| **Retest Status On `7cfaded1`** | not reproducible                                                                        |
+| Field                           | Value                 |
+| ------------------------------- | --------------------- |
+| **Severity**                    | high                  |
+| **Category**                    | functional            |
+| **URL**                         | [REDACTED_TUNNEL_URL] |
+| **Repro Video**                 | N/A                   |
+| **Retest Status On `7cfaded1`** | not reproducible      |
 
 **Description**
 
@@ -118,8 +118,8 @@ The mobile mode toggle carries the exact unsent AI draft into terminal mode inst
 
 **Current Retest Notes**
 
-- On the current branch, switching from AI to CLI presents a clean shell input instead of reusing the unsent AI draft.
-- Switching back from CLI to AI restores the original AI draft for that session.
+- On the current branch, switching from AI-to-CLI presents a clean shell input instead of reusing the unsent AI draft.
+- Switching back from CLI-to-AI restores the original AI draft for that session.
 - Current evidence:
   - `screenshots/phone-audit-after-cli-switch-current.png`
   - `screenshots/phone-audit-back-to-ai-current.png`
@@ -128,13 +128,13 @@ The mobile mode toggle carries the exact unsent AI draft into terminal mode inst
 
 ### ISSUE-003: Switching sessions carries the unsent draft into the newly selected session
 
-| Field                           | Value                                                                                   |
-| ------------------------------- | --------------------------------------------------------------------------------------- |
-| **Severity**                    | high                                                                                    |
-| **Category**                    | functional                                                                              |
-| **URL**                         | https://decades-police-oxide-mix.trycloudflare.com/7246cb9d-3033-4643-a7c8-cee91b7ff052 |
-| **Repro Video**                 | N/A                                                                                     |
-| **Retest Status On `7cfaded1`** | not reproducible via current session picker flow                                        |
+| Field                           | Value                                            |
+| ------------------------------- | ------------------------------------------------ |
+| **Severity**                    | high                                             |
+| **Category**                    | functional                                       |
+| **URL**                         | [REDACTED_TUNNEL_URL]                            |
+| **Repro Video**                 | N/A                                              |
+| **Retest Status On `7cfaded1`** | not reproducible via current session picker flow |
 
 **Description**
 

@@ -694,9 +694,42 @@ export default function MobileApp() {
 
 	const clearCommandDraft = useCallback(
 		(mode: InputMode = currentInputMode) => {
-			updateCommandDraft('', mode);
+			if (!activeSessionId) return;
+
+			setCommandDrafts((prev) => {
+				const currentDrafts = prev[activeSessionId] || getEmptyDrafts();
+
+				if (mode === 'terminal') {
+					if (currentDrafts.terminal === '') {
+						return prev;
+					}
+
+					return {
+						...prev,
+						[activeSessionId]: {
+							...currentDrafts,
+							terminal: '',
+						},
+					};
+				}
+
+				if (!(activeAiDraftKey in currentDrafts.aiByTab)) {
+					return prev;
+				}
+
+				const nextAiByTab = { ...currentDrafts.aiByTab };
+				delete nextAiByTab[activeAiDraftKey];
+
+				return {
+					...prev,
+					[activeSessionId]: {
+						...currentDrafts,
+						aiByTab: nextAiByTab,
+					},
+				};
+			});
 		},
-		[currentInputMode, updateCommandDraft]
+		[activeAiDraftKey, activeSessionId, currentInputMode]
 	);
 
 	useEffect(() => {
