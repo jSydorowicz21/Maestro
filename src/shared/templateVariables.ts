@@ -156,6 +156,7 @@ export interface TemplateContext {
 		ghBranch?: string;
 		ghBaseBranch?: string;
 		ghAssignees?: string;
+		ghMergedAt?: string;
 	};
 }
 
@@ -185,6 +186,7 @@ export const TEMPLATE_VARIABLES = [
 	{ variable: '{{CUE_GH_BODY}}', description: 'PR/issue body (truncated)', cueOnly: true },
 	{ variable: '{{CUE_GH_BRANCH}}', description: 'PR head branch', cueOnly: true },
 	{ variable: '{{CUE_GH_LABELS}}', description: 'Labels (comma-separated)', cueOnly: true },
+	{ variable: '{{CUE_GH_MERGED_AT}}', description: 'PR merge timestamp', cueOnly: true },
 	{ variable: '{{CUE_GH_NUMBER}}', description: 'PR/issue number', cueOnly: true },
 	{ variable: '{{CUE_GH_REPO}}', description: 'GitHub repo (owner/repo)', cueOnly: true },
 	{ variable: '{{CUE_GH_STATE}}', description: 'PR/issue state', cueOnly: true },
@@ -384,6 +386,7 @@ export function substituteTemplateVariables(template: string, context: TemplateC
 		CUE_GH_BRANCH: context.cue?.ghBranch || '',
 		CUE_GH_BASE_BRANCH: context.cue?.ghBaseBranch || '',
 		CUE_GH_ASSIGNEES: context.cue?.ghAssignees || '',
+		CUE_GH_MERGED_AT: context.cue?.ghMergedAt || '',
 	};
 
 	// Perform case-insensitive replacement
