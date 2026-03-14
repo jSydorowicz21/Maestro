@@ -41,6 +41,8 @@ export interface GroomingProcessManager {
 		};
 		// Custom environment variables (resolved via applyAgentConfigOverrides)
 		customEnvVars?: Record<string, string>;
+		// Force classic execution mode (context grooming must not recurse into harness)
+		preferredExecutionMode?: 'auto' | 'classic' | 'harness';
 	}): { pid: number | null; success?: boolean } | null;
 	on(event: string, handler: (...args: unknown[]) => void): void;
 	off(event: string, handler: (...args: unknown[]) => void): void;
@@ -329,7 +331,11 @@ export async function groomContext(
 		processManager.on('exit', onExit);
 		processManager.on('agent-error', onError);
 
-		// Spawn the process in batch mode
+		// Spawn the process in batch mode.
+		// Context grooming always uses classic execution (PTY or child-process),
+		// never harness mode. This ensures the grooming process is an independent
+		// batch invocation that doesn't interfere with or reuse the agent's
+		// harness instance — even when the parent agent runs through harness.
 		const spawnResult = processManager.spawn({
 			sessionId: groomerSessionId,
 			toolType: agentType,
@@ -343,11 +349,16 @@ export async function groomContext(
 			sessionSshRemoteConfig,
 			// Pass resolved env vars (merged from agent defaults + agent config + session overrides)
 			customEnvVars: resolvedEnvVars,
+			// Force classic execution — grooming must not recurse into harness mode.
+			// The parent agent may be harness-backed (pid == null), but the grooming
+			// process is always a separate classic spawn.
+			preferredExecutionMode: 'classic',
 		});
 
-		// Note: pid == null check rejects harness-backed runs (Phase 2+ will relax this
-		// when context grooming over harness is implemented).
-		if (!spawnResult || !spawnResult.success || spawnResult.pid == null) {
+		// Only reject if spawn itself failed. pid may be null for harness-backed
+		// parent agents, but the grooming process spawns independently via classic
+		// mode — the pid of the *grooming* process will be set by the classic spawner.
+		if (!spawnResult || !spawnResult.success) {
 			cleanup();
 			reject(new Error(`Failed to spawn grooming process for ${agentType}`));
 			return;
@@ -355,7 +366,7 @@ export async function groomContext(
 
 		logger.debug('Spawned grooming batch process', LOG_CONTEXT, {
 			groomerSessionId,
-			pid: spawnResult.pid,
+			pid: spawnResult.pid ?? null,
 		});
 
 		// Set up idle check

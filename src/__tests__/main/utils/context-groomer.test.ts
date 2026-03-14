@@ -350,7 +350,7 @@ describe('groomContext', () => {
 		).rejects.toThrow('Failed to spawn grooming process');
 	});
 
-	it('throws when spawn returns null pid', async () => {
+	it('throws when spawn returns success: false (regardless of pid)', async () => {
 		const detector = createMockAgentDetector(agent);
 		mockPM.spawn = vi.fn(() => ({ pid: null, success: false }));
 
@@ -361,6 +361,43 @@ describe('groomContext', () => {
 				detector
 			)
 		).rejects.toThrow('Failed to spawn grooming process');
+	});
+
+	it('accepts harness-backed execution records where pid is null but success is true', async () => {
+		const detector = createMockAgentDetector(agent);
+
+		// Simulate a spawn result like a harness-backed parent agent would produce:
+		// pid is null but the grooming process spawns independently via classic mode.
+		mockPM.spawn = vi.fn((config: Record<string, unknown>) => {
+			(mockPM as any)._lastSpawnConfig = config;
+			const sessionId = config.sessionId as string;
+			setTimeout(() => {
+				mockPM._emitData(sessionId, 'groomed from harness-backed agent');
+				mockPM._emitExit(sessionId, 0);
+			}, 10);
+			return { pid: null, success: true };
+		});
+
+		const result = await groomContext(
+			{ projectRoot: '/project', agentType: 'claude-code', prompt: 'summarize' },
+			mockPM,
+			detector
+		);
+
+		expect(result.response).toBe('groomed from harness-backed agent');
+		expect(result.completionReason).toContain('process exited');
+	});
+
+	it('passes preferredExecutionMode classic to prevent harness recursion', async () => {
+		const detector = createMockAgentDetector(agent);
+
+		await groomContext(
+			{ projectRoot: '/project', agentType: 'claude-code', prompt: 'summarize' },
+			mockPM,
+			detector
+		);
+
+		expect(mockPM._lastSpawnConfig!.preferredExecutionMode).toBe('classic');
 	});
 
 	it('returns response text when process exits successfully', async () => {
