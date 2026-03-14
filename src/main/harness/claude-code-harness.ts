@@ -224,24 +224,19 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 			return;
 		}
 
-		// If the input is images-only (no text), skip entirely — nothing to send
-		if (input.type === 'message' && !input.text && input.images && input.images.length > 0) {
-			logger.warn(
-				`${LOG_CONTEXT} write() called with images only and no text. ` +
-				`Image input is not supported in harness mode (Phase 1). Nothing to send.`,
-				LOG_CONTEXT
-			);
-			return;
-		}
-
-		const message = this.buildUserMessage(input);
-
-		// Use streamInput for follow-up messages after the initial prompt
-		try {
-			this._query.streamInput(this.createStreamingPrompt(message));
-		} catch (error) {
-			logger.error(`${LOG_CONTEXT} write() streamInput failed: ${String(error)}`, LOG_CONTEXT);
-		}
+		// Build message async (may need to encode images) then stream it
+		this.buildUserMessage(input)
+			.then((message) => {
+				if (!this._query || !this._running) return;
+				try {
+					this._query.streamInput(this.createStreamingPrompt(message));
+				} catch (error) {
+					logger.error(`${LOG_CONTEXT} write() streamInput failed: ${String(error)}`, LOG_CONTEXT);
+				}
+			})
+			.catch((error) => {
+				logger.error(`${LOG_CONTEXT} write() failed: ${String(error)}`, LOG_CONTEXT);
+			});
 	}
 
 	async interrupt(): Promise<void> {
@@ -1122,7 +1117,7 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 	/**
 	 * Build an SDKUserMessage from a HarnessInput.
 	 */
-	private buildUserMessage(input: HarnessInput): SDKUserMessage {
+	private async buildUserMessage(input: HarnessInput): Promise<SDKUserMessage> {
 		const content: SDKUserContentBlock[] = [];
 
 		if (input.type === 'text') {
@@ -1132,11 +1127,8 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 				content.push({ type: 'text', text: input.text });
 			}
 			if (input.images && input.images.length > 0) {
-				logger.warn(
-					`${LOG_CONTEXT} Image input is not supported in harness mode (Phase 1). ` +
-					`${input.images.length} image(s) will be skipped.`,
-					LOG_CONTEXT
-				);
+				const imageBlocks = await encodeImageFiles(input.images);
+				content.push(...imageBlocks);
 			}
 		}
 

@@ -1433,6 +1433,7 @@ describe('ClaudeCodeHarness', () => {
 			await flushMicrotasks();
 
 			harness.write({ type: 'text', text: 'Follow up message' });
+			await flushMicrotasks();
 
 			expect(mockFn.query.streamInput).toHaveBeenCalledOnce();
 		});
@@ -1442,41 +1443,70 @@ describe('ClaudeCodeHarness', () => {
 			expect(mockFn.query.streamInput).not.toHaveBeenCalled();
 		});
 
-		it('should log warning and send text only when images accompany text', async () => {
-			const { logger } = await import('../../utils/logger');
+		it('should encode images and include them in follow-up message', async () => {
+			const fakeImageBlock = {
+				type: 'image' as const,
+				source: { type: 'base64' as const, media_type: 'image/png', data: 'aW1hZ2VkYXRh' },
+			};
+			vi.mocked(encodeImageFiles).mockResolvedValueOnce([fakeImageBlock]);
+
 			await harness.spawn(createTestConfig());
 			await flushMicrotasks();
 
 			harness.write({ type: 'message', text: 'Describe this', images: ['/path/to/img.png'] });
+			await flushMicrotasks();
 
-			// Warning logged about unsupported images
-			expect(logger.warn).toHaveBeenCalledWith(
-				expect.stringContaining('Image input is not supported in harness mode'),
-				expect.any(String),
-			);
+			// encodeImageFiles called with the image paths
+			expect(encodeImageFiles).toHaveBeenCalledWith(['/path/to/img.png']);
 
-			// streamInput still called because text was provided
+			// streamInput called with text + image content
 			expect(mockFn.query.streamInput).toHaveBeenCalledOnce();
 		});
 
-		it('should log warning and skip streamInput when only images are provided (no text)', async () => {
-			const { logger } = await import('../../utils/logger');
+		it('should send images-only message when no text is provided', async () => {
+			const fakeImageBlocks = [
+				{
+					type: 'image' as const,
+					source: { type: 'base64' as const, media_type: 'image/png', data: 'aW1n' },
+				},
+				{
+					type: 'image' as const,
+					source: { type: 'base64' as const, media_type: 'image/jpeg', data: 'anBn' },
+				},
+			];
+			vi.mocked(encodeImageFiles).mockResolvedValueOnce(fakeImageBlocks);
+
 			await harness.spawn(createTestConfig());
 			await flushMicrotasks();
 
 			// Reset streamInput call count from spawn
 			vi.mocked(mockFn.query.streamInput).mockClear();
 
-			harness.write({ type: 'message', images: ['/a.png', '/b.png'] });
+			harness.write({ type: 'message', images: ['/a.png', '/b.jpg'] });
+			await flushMicrotasks();
 
-			// Warning logged about images-only input
-			expect(logger.warn).toHaveBeenCalledWith(
-				expect.stringContaining('images only and no text'),
-				expect.any(String),
-			);
+			// encodeImageFiles called
+			expect(encodeImageFiles).toHaveBeenCalledWith(['/a.png', '/b.jpg']);
 
-			// streamInput NOT called — nothing to send
-			expect(mockFn.query.streamInput).not.toHaveBeenCalled();
+			// streamInput IS called — images are now supported
+			expect(mockFn.query.streamInput).toHaveBeenCalledOnce();
+		});
+
+		it('should send empty text fallback when images-only all fail to encode', async () => {
+			// All images fail — encodeImageFiles returns empty array
+			vi.mocked(encodeImageFiles).mockResolvedValueOnce([]);
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			// Reset streamInput call count from spawn
+			vi.mocked(mockFn.query.streamInput).mockClear();
+
+			harness.write({ type: 'message', images: ['/a.bmp'] });
+			await flushMicrotasks();
+
+			// streamInput still called with empty-text fallback
+			expect(mockFn.query.streamInput).toHaveBeenCalledOnce();
 		});
 	});
 
