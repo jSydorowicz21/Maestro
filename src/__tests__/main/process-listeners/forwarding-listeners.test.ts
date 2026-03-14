@@ -34,6 +34,8 @@ describe('Forwarding Listeners', () => {
 		expect(mockProcessManager.on).toHaveBeenCalledWith('tool-execution', expect.any(Function));
 		expect(mockProcessManager.on).toHaveBeenCalledWith('stderr', expect.any(Function));
 		expect(mockProcessManager.on).toHaveBeenCalledWith('command-exit', expect.any(Function));
+		expect(mockProcessManager.on).toHaveBeenCalledWith('interaction-request', expect.any(Function));
+		expect(mockProcessManager.on).toHaveBeenCalledWith('runtime-metadata', expect.any(Function));
 	});
 
 	it('should forward slash-commands events to renderer', () => {
@@ -102,5 +104,50 @@ describe('Forwarding Listeners', () => {
 		handler?.(testSessionId, testExitCode);
 
 		expect(mockSafeSend).toHaveBeenCalledWith('process:command-exit', testSessionId, testExitCode);
+	});
+
+	it('should forward interaction-request events to renderer', () => {
+		setupForwardingListeners(mockProcessManager, { safeSend: mockSafeSend });
+
+		const handler = eventHandlers.get('interaction-request');
+		const testSessionId = 'test-session-123';
+		const testRequest = {
+			id: 'interaction-001',
+			type: 'tool_approval' as const,
+			sessionId: testSessionId,
+			title: 'Approve file write',
+			description: 'Agent wants to write to config.json',
+			tool: { name: 'write_file', input: { path: 'config.json' } },
+			timestamp: Date.now(),
+		};
+
+		handler?.(testSessionId, testRequest);
+
+		expect(mockSafeSend).toHaveBeenCalledWith(
+			'process:interaction-request',
+			testSessionId,
+			testRequest
+		);
+	});
+
+	it('should forward runtime-metadata events to renderer', () => {
+		setupForwardingListeners(mockProcessManager, { safeSend: mockSafeSend });
+
+		const handler = eventHandlers.get('runtime-metadata');
+		const testSessionId = 'test-session-123';
+		const testMetadata = {
+			sessionId: testSessionId,
+			skills: ['code-review', 'testing'],
+			availableModels: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514'],
+			timestamp: Date.now(),
+		};
+
+		handler?.(testSessionId, testMetadata);
+
+		expect(mockSafeSend).toHaveBeenCalledWith(
+			'process:runtime-metadata',
+			testSessionId,
+			testMetadata
+		);
 	});
 });

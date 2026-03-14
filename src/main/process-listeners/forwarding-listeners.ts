@@ -5,6 +5,8 @@
 
 import type { ProcessManager } from '../process-manager';
 import type { ProcessListenerDependencies, ToolExecution } from './types';
+import type { InteractionRequest } from '../../shared/interaction-types';
+import type { RuntimeMetadataEvent } from '../../shared/runtime-metadata-types';
 
 /**
  * Sets up simple forwarding listeners that pass events directly to renderer.
@@ -43,18 +45,13 @@ export function setupForwardingListeners(
 		safeSend('process:command-exit', sessionId, code);
 	});
 
-	// TODO(Phase 2+): Forward harness-specific events to the renderer.
-	// When harness adapters emit through ProcessManager (see ProcessManager.spawn() TODO),
-	// add forwarding here using the same safeSend pattern:
-	//
-	//   processManager.on('interaction-request', (sessionId: string, request: InteractionRequest) => {
-	//       safeSend('process:interaction-request', sessionId, request);
-	//   });
-	//
-	//   processManager.on('runtime-metadata', (sessionId: string, metadata: RuntimeMetadataEvent) => {
-	//       safeSend('process:runtime-metadata', sessionId, metadata);
-	//   });
-	//
-	// The renderer will need corresponding preload bridge entries and store handlers
-	// (see preload.ts and renderer harnessStore) to receive these events.
+	// Handle interaction requests from harness-backed agents (tool approval, clarification)
+	processManager.on('interaction-request', (sessionId: string, request: InteractionRequest) => {
+		safeSend('process:interaction-request', sessionId, request);
+	});
+
+	// Handle runtime metadata from harness-backed agents (skills, models, capabilities)
+	processManager.on('runtime-metadata', (sessionId: string, metadata: RuntimeMetadataEvent) => {
+		safeSend('process:runtime-metadata', sessionId, metadata);
+	});
 }
