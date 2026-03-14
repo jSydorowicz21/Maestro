@@ -1476,6 +1476,63 @@ describe('ClaudeCodeHarness', () => {
 			expect(parsed.taskName).toBeUndefined();
 			expect(parsed.message).toBeUndefined();
 		});
+
+		it('should emit data with structured JSON payload from task_progress', async () => {
+			const dataEvents: string[] = [];
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'task_progress',
+				task_id: 'task-789',
+				task_name: 'Background indexing',
+				message: 'Indexed 50 of 100 files',
+				progress: 0.5,
+			} as any);
+
+			await flushMicrotasks();
+
+			const taskEvent = dataEvents.find((d) => d.includes('task_progress'));
+			expect(taskEvent).toBeDefined();
+
+			const parsed = JSON.parse(taskEvent!);
+			expect(parsed.harnessEvent).toBe('task_progress');
+			expect(parsed.taskId).toBe('task-789');
+			expect(parsed.taskName).toBe('Background indexing');
+			expect(parsed.message).toBe('Indexed 50 of 100 files');
+			expect(parsed.progress).toBe(0.5);
+		});
+
+		it('should emit data from task_progress with minimal fields', async () => {
+			const dataEvents: string[] = [];
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'task_progress',
+				task_id: 'task-minimal',
+			} as any);
+
+			await flushMicrotasks();
+
+			const taskEvent = dataEvents.find((d) => d.includes('task_progress'));
+			expect(taskEvent).toBeDefined();
+
+			const parsed = JSON.parse(taskEvent!);
+			expect(parsed.harnessEvent).toBe('task_progress');
+			expect(parsed.taskId).toBe('task-minimal');
+			expect(parsed.taskName).toBeUndefined();
+			expect(parsed.message).toBeUndefined();
+			expect(parsed.progress).toBeUndefined();
+		});
 	});
 
 	// ====================================================================

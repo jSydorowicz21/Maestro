@@ -140,6 +140,19 @@ export interface SDKTaskStartedMessage {
 }
 
 /**
+ * Background task progress event.
+ * SDK version: @anthropic-ai/claude-agent-sdk v0.2.74 (Day 2 message type)
+ */
+export interface SDKTaskProgressMessage {
+	type: 'task_progress';
+	task_id: string;
+	task_name?: string;
+	message?: string;
+	progress?: number;
+	session_id?: string;
+}
+
+/**
  * Union of all SDK message types that the harness needs to handle.
  */
 export type SDKMessage =
@@ -154,6 +167,7 @@ export type SDKMessage =
 	| SDKToolProgressMessage
 	| SDKAuthStatusMessage
 	| SDKTaskStartedMessage
+	| SDKTaskProgressMessage
 	| { type: string; [key: string]: unknown };
 
 // ============================================================================
