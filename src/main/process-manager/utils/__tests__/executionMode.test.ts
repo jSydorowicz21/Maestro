@@ -2,13 +2,14 @@
  * Tests for execution-mode selection logic.
  *
  * Verifies the precedence rules from the design doc:
- * 1. SSH remote → classic
- * 2. Agent doesn't support harness → classic
- * 3. Caller explicitly requests classic → classic
- * 4. Caller explicitly requests harness → harness
- * 5. Auto/unspecified + agent supports harness → harness
+ * 1. Agent doesn't support harness → classic
+ * 2. Caller explicitly requests classic → classic
+ * 3. Caller explicitly requests harness → harness
+ * 4. Auto/unspecified + agent supports harness → harness
  *
- * Auto Run queries follow the same precedence as user queries.
+ * SSH remote execution follows normal precedence — harness-capable agents
+ * can use harness mode over SSH. Auto Run queries follow the same
+ * precedence as user queries.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -52,31 +53,50 @@ describe('selectExecutionMode', () => {
 	});
 
 	// -----------------------------------------------------------------------
-	// Rule 1: SSH remote → classic
+	// SSH remote follows normal precedence (no longer forced classic)
 	// -----------------------------------------------------------------------
-	describe('SSH remote forces classic mode', () => {
-		it('returns classic when sshRemoteId is set', () => {
+	describe('SSH remote follows normal precedence', () => {
+		it('returns harness for capable agent when sshRemoteId is set', () => {
 			const config = makeConfig({ sshRemoteId: 'remote-1' });
 			const result = selectExecutionMode(config);
-			expect(result.mode).toBe('classic');
-			expect(result.reason).toContain('SSH');
-			expect(result.reason).toContain('User query');
+			expect(result.mode).toBe('harness');
+			expect(result.reason).toContain('auto-selected harness');
 		});
 
-		it('returns classic when sshRemoteHost is set', () => {
+		it('returns harness for capable agent when sshRemoteHost is set', () => {
 			const config = makeConfig({ sshRemoteHost: '192.168.1.1' });
 			const result = selectExecutionMode(config);
-			expect(result.mode).toBe('classic');
-			expect(result.reason).toContain('SSH');
+			expect(result.mode).toBe('harness');
 		});
 
-		it('returns classic for SSH even when preferredExecutionMode is harness', () => {
+		it('returns harness for SSH when preferredExecutionMode is harness', () => {
 			const config = makeConfig({
 				sshRemoteId: 'remote-1',
 				preferredExecutionMode: 'harness',
 			});
 			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('harness');
+			expect(result.reason).toContain('explicitly requested harness');
+		});
+
+		it('returns classic for SSH with non-harness agent', () => {
+			const config = makeConfig({
+				sshRemoteId: 'remote-1',
+				toolType: 'terminal',
+			});
+			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('does not support harness');
+		});
+
+		it('returns classic for SSH when caller explicitly requests classic', () => {
+			const config = makeConfig({
+				sshRemoteId: 'remote-1',
+				preferredExecutionMode: 'classic',
+			});
+			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('explicitly requested classic');
 		});
 	});
 
@@ -144,15 +164,15 @@ describe('selectExecutionMode', () => {
 			expect(result.reason).toContain('Auto Run query');
 		});
 
-		it('returns classic for Auto Run over SSH even with capable agent', () => {
+		it('returns harness for Auto Run over SSH with capable agent', () => {
 			const config = makeConfig({
 				querySource: 'auto',
 				sshRemoteId: 'remote-1',
 			});
 			const result = selectExecutionMode(config);
-			expect(result.mode).toBe('classic');
+			expect(result.mode).toBe('harness');
 			expect(result.reason).toContain('Auto Run query');
-			expect(result.reason).toContain('SSH');
+			expect(result.reason).toContain('auto-selected harness');
 		});
 
 		it('returns classic for Auto Run with incapable agent even when preferring harness', () => {
@@ -256,18 +276,18 @@ describe('selectExecutionMode', () => {
 	});
 
 	// -----------------------------------------------------------------------
-	// Precedence: SSH > capability > preference
+	// Precedence: capability > preference (SSH follows normal rules)
 	// -----------------------------------------------------------------------
 	describe('precedence ordering', () => {
-		it('SSH takes priority over everything', () => {
+		it('SSH with capable agent follows normal precedence to harness', () => {
 			const config = makeConfig({
 				sshRemoteId: 'remote-1',
 				querySource: 'auto',
 				preferredExecutionMode: 'harness',
 			});
 			const result = selectExecutionMode(config);
-			expect(result.mode).toBe('classic');
-			expect(result.reason).toContain('SSH');
+			expect(result.mode).toBe('harness');
+			expect(result.reason).toContain('explicitly requested harness');
 		});
 
 		it('agent capability takes priority over preference', () => {
@@ -296,24 +316,34 @@ describe('selectExecutionMode', () => {
 	// Edge case: both SSH fields set simultaneously
 	// -----------------------------------------------------------------------
 	describe('both SSH fields set simultaneously', () => {
-		it('returns classic when both sshRemoteId and sshRemoteHost are set', () => {
+		it('returns harness for capable agent when both SSH fields are set', () => {
 			const config = makeConfig({
 				sshRemoteId: 'remote-1',
 				sshRemoteHost: '192.168.1.1',
 			});
 			const result = selectExecutionMode(config);
-			expect(result.mode).toBe('classic');
-			expect(result.reason).toContain('SSH');
+			expect(result.mode).toBe('harness');
 		});
 
-		it('returns classic when both SSH fields are set even with harness preference', () => {
+		it('returns harness when both SSH fields are set with harness preference', () => {
 			const config = makeConfig({
 				sshRemoteId: 'remote-1',
 				sshRemoteHost: '192.168.1.1',
 				preferredExecutionMode: 'harness',
 			});
 			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('harness');
+		});
+
+		it('returns classic for non-harness agent when both SSH fields are set', () => {
+			const config = makeConfig({
+				sshRemoteId: 'remote-1',
+				sshRemoteHost: '192.168.1.1',
+				toolType: 'terminal',
+			});
+			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('does not support harness');
 		});
 	});
 
