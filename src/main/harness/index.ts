@@ -65,6 +65,16 @@ export {
 	CLAUDE_RUNTIME_OPTION_KEYS,
 } from './claude-provider-options';
 
+// Re-export Codex harness
+export { CodexHarness } from './codex-harness';
+
+// Re-export Codex provider option helpers (typed builders for providerOptions)
+export type { CodexProviderOptions } from './codex-provider-options';
+export {
+	buildCodexProviderOptions,
+	CODEX_PROVIDER_OPTION_KEYS,
+} from './codex-provider-options';
+
 // Import registry functions for initialization
 import {
 	registerHarness,
