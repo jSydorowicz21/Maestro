@@ -3,11 +3,12 @@
  *
  * Verifies the precedence rules from the design doc:
  * 1. SSH remote → classic
- * 2. Auto Run → classic
- * 3. Agent doesn't support harness → classic
- * 4. Caller explicitly requests classic → classic
- * 5. Caller explicitly requests harness → harness
- * 6. Auto/unspecified + agent supports harness → harness
+ * 2. Agent doesn't support harness → classic
+ * 3. Caller explicitly requests classic → classic
+ * 4. Caller explicitly requests harness → harness
+ * 5. Auto/unspecified + agent supports harness → harness
+ *
+ * Auto Run queries follow the same precedence as user queries.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -79,23 +80,42 @@ describe('selectExecutionMode', () => {
 	});
 
 	// -----------------------------------------------------------------------
-	// Rule 2: Auto Run → classic
+	// Rule 2: Auto Run follows normal precedence (no longer forced classic)
 	// -----------------------------------------------------------------------
-	describe('Auto Run forces classic mode', () => {
-		it('returns classic when querySource is auto', () => {
+	describe('Auto Run follows normal precedence', () => {
+		it('returns harness for capable agent when querySource is auto', () => {
 			const config = makeConfig({ querySource: 'auto' });
 			const result = selectExecutionMode(config);
-			expect(result.mode).toBe('classic');
-			expect(result.reason).toContain('Auto Run');
+			expect(result.mode).toBe('harness');
 		});
 
-		it('returns classic for Auto Run even when preferredExecutionMode is harness', () => {
+		it('returns harness for Auto Run when preferredExecutionMode is harness', () => {
 			const config = makeConfig({
 				querySource: 'auto',
 				preferredExecutionMode: 'harness',
 			});
 			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('harness');
+		});
+
+		it('returns classic for Auto Run with incapable agent', () => {
+			const config = makeConfig({
+				querySource: 'auto',
+				toolType: 'terminal',
+			});
+			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('does not support harness');
+		});
+
+		it('returns classic for Auto Run when caller explicitly requests classic', () => {
+			const config = makeConfig({
+				querySource: 'auto',
+				preferredExecutionMode: 'classic',
+			});
+			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('explicitly requested classic');
 		});
 	});
 
@@ -175,10 +195,10 @@ describe('selectExecutionMode', () => {
 	});
 
 	// -----------------------------------------------------------------------
-	// Precedence: SSH > Auto Run > capability > preference
+	// Precedence: SSH > capability > preference
 	// -----------------------------------------------------------------------
 	describe('precedence ordering', () => {
-		it('SSH takes priority over Auto Run', () => {
+		it('SSH takes priority over everything', () => {
 			const config = makeConfig({
 				sshRemoteId: 'remote-1',
 				querySource: 'auto',
@@ -189,16 +209,6 @@ describe('selectExecutionMode', () => {
 			expect(result.reason).toContain('SSH');
 		});
 
-		it('Auto Run takes priority over agent capability', () => {
-			const config = makeConfig({
-				querySource: 'auto',
-				preferredExecutionMode: 'harness',
-			});
-			const result = selectExecutionMode(config);
-			expect(result.mode).toBe('classic');
-			expect(result.reason).toContain('Auto Run');
-		});
-
 		it('agent capability takes priority over preference', () => {
 			const config = makeConfig({
 				toolType: 'terminal',
@@ -207,6 +217,16 @@ describe('selectExecutionMode', () => {
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('classic');
 			expect(result.reason).toContain('does not support harness');
+		});
+
+		it('Auto Run with capable agent follows normal precedence to harness', () => {
+			const config = makeConfig({
+				querySource: 'auto',
+				preferredExecutionMode: 'harness',
+			});
+			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('harness');
+			expect(result.reason).toContain('explicitly requested harness');
 		});
 	});
 
@@ -340,7 +360,7 @@ describe('selectExecutionMode', () => {
 			expect(terminalResult.mode).toBe('classic');
 		});
 
-		it('same agent can get different modes based on context', () => {
+		it('same agent gets harness mode regardless of querySource', () => {
 			const userQuery = makeConfig({
 				sessionId: 'session-1',
 				querySource: 'user',
@@ -354,7 +374,7 @@ describe('selectExecutionMode', () => {
 			const autoResult = selectExecutionMode(autoQuery);
 
 			expect(userResult.mode).toBe('harness');
-			expect(autoResult.mode).toBe('classic');
+			expect(autoResult.mode).toBe('harness');
 		});
 	});
 });
