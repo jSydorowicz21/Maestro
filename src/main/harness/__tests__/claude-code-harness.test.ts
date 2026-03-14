@@ -1421,6 +1421,61 @@ describe('ClaudeCodeHarness', () => {
 			expect(toolEvents[0].state.progress).toBe(true);
 			expect(toolEvents[0].state.content).toBe('Running npm install...');
 		});
+
+		it('should emit data with structured JSON payload from task_started', async () => {
+			const dataEvents: string[] = [];
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'task_started',
+				task_id: 'task-123',
+				task_name: 'Background indexing',
+				message: 'Indexing workspace files',
+			} as any);
+
+			await flushMicrotasks();
+
+			// Find the task_started data event (skip any earlier data events from spawn)
+			const taskEvent = dataEvents.find((d) => d.includes('task_started'));
+			expect(taskEvent).toBeDefined();
+
+			const parsed = JSON.parse(taskEvent!);
+			expect(parsed.harnessEvent).toBe('task_started');
+			expect(parsed.taskId).toBe('task-123');
+			expect(parsed.taskName).toBe('Background indexing');
+			expect(parsed.message).toBe('Indexing workspace files');
+		});
+
+		it('should emit data from task_started with minimal fields', async () => {
+			const dataEvents: string[] = [];
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'task_started',
+				task_id: 'task-456',
+			} as any);
+
+			await flushMicrotasks();
+
+			const taskEvent = dataEvents.find((d) => d.includes('task_started'));
+			expect(taskEvent).toBeDefined();
+
+			const parsed = JSON.parse(taskEvent!);
+			expect(parsed.harnessEvent).toBe('task_started');
+			expect(parsed.taskId).toBe('task-456');
+			expect(parsed.taskName).toBeUndefined();
+			expect(parsed.message).toBeUndefined();
+		});
 	});
 
 	// ====================================================================

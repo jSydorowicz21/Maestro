@@ -58,6 +58,7 @@ import type {
 	SDKStatusMessage,
 	SDKToolProgressMessage,
 	SDKAuthStatusMessage,
+	SDKTaskStartedMessage,
 } from './claude-sdk-types';
 import { encodeImageFiles } from './claude-image-encoding';
 import { logger } from '../utils/logger';
@@ -886,6 +887,22 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 						timestamp: Date.now(),
 					});
 				}
+				break;
+			}
+
+			case 'task_started': {
+				const taskMsg = message as SDKTaskStartedMessage;
+				this.emit('data', sessionId, JSON.stringify({
+					harnessEvent: 'task_started',
+					taskId: taskMsg.task_id,
+					taskName: taskMsg.task_name,
+					message: taskMsg.message,
+				}));
+				logger.debug(
+					`${LOG_CONTEXT} Background task started: ${taskMsg.task_id}`,
+					LOG_CONTEXT,
+					{ sessionId, taskId: taskMsg.task_id, taskName: taskMsg.task_name }
+				);
 				break;
 			}
 
