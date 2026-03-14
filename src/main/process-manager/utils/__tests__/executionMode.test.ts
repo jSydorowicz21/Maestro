@@ -122,6 +122,61 @@ describe('selectExecutionMode', () => {
 			expect(result.reason).toContain('Auto Run query');
 			expect(result.reason).toContain('explicitly requested classic');
 		});
+
+		it('returns harness for Auto Run when preferredExecutionMode is auto', () => {
+			const config = makeConfig({
+				querySource: 'auto',
+				preferredExecutionMode: 'auto',
+			});
+			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('harness');
+			expect(result.reason).toContain('Auto Run query');
+			expect(result.reason).toContain('auto-selected harness');
+		});
+
+		it('returns harness for Auto Run when preferredExecutionMode is undefined', () => {
+			const config = makeConfig({
+				querySource: 'auto',
+				preferredExecutionMode: undefined,
+			});
+			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('harness');
+			expect(result.reason).toContain('Auto Run query');
+		});
+
+		it('returns classic for Auto Run over SSH even with capable agent', () => {
+			const config = makeConfig({
+				querySource: 'auto',
+				sshRemoteId: 'remote-1',
+			});
+			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('Auto Run query');
+			expect(result.reason).toContain('SSH');
+		});
+
+		it('returns classic for Auto Run with incapable agent even when preferring harness', () => {
+			const config = makeConfig({
+				querySource: 'auto',
+				toolType: 'terminal',
+				preferredExecutionMode: 'harness',
+			});
+			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('Auto Run query');
+			expect(result.reason).toContain('does not support harness');
+		});
+
+		it('returns classic for Auto Run with unrecognized mode', () => {
+			const config = makeConfig({
+				querySource: 'auto',
+				preferredExecutionMode: 'future-mode' as any,
+			});
+			const result = selectExecutionMode(config);
+			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('Auto Run query');
+			expect(result.reason).toContain('fallback');
+		});
 	});
 
 	// -----------------------------------------------------------------------
