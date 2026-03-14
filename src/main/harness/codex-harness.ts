@@ -311,6 +311,13 @@ export class CodexHarness extends EventEmitter implements AgentHarness {
 				LOG_CONTEXT
 			);
 		}
+		if (settings.providerOptions && Object.keys(settings.providerOptions).length > 0) {
+			logger.debug(
+				`${LOG_CONTEXT} Runtime provider options change requested (not supported by Codex SDK)`,
+				LOG_CONTEXT,
+				{ keys: Object.keys(settings.providerOptions) }
+			);
+		}
 	}
 
 	isRunning(): boolean {
