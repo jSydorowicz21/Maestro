@@ -1533,6 +1533,63 @@ describe('ClaudeCodeHarness', () => {
 			expect(parsed.message).toBeUndefined();
 			expect(parsed.progress).toBeUndefined();
 		});
+
+		it('should emit data with structured JSON payload from task_notification', async () => {
+			const dataEvents: string[] = [];
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'task_notification',
+				task_id: 'task-notif-1',
+				task_name: 'Background indexing',
+				message: 'Indexing complete',
+				notification_type: 'completion',
+			} as any);
+
+			await flushMicrotasks();
+
+			const taskEvent = dataEvents.find((d) => d.includes('task_notification'));
+			expect(taskEvent).toBeDefined();
+
+			const parsed = JSON.parse(taskEvent!);
+			expect(parsed.harnessEvent).toBe('task_notification');
+			expect(parsed.taskId).toBe('task-notif-1');
+			expect(parsed.taskName).toBe('Background indexing');
+			expect(parsed.message).toBe('Indexing complete');
+			expect(parsed.notificationType).toBe('completion');
+		});
+
+		it('should emit data from task_notification with minimal fields', async () => {
+			const dataEvents: string[] = [];
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'task_notification',
+				task_id: 'task-notif-min',
+			} as any);
+
+			await flushMicrotasks();
+
+			const taskEvent = dataEvents.find((d) => d.includes('task_notification'));
+			expect(taskEvent).toBeDefined();
+
+			const parsed = JSON.parse(taskEvent!);
+			expect(parsed.harnessEvent).toBe('task_notification');
+			expect(parsed.taskId).toBe('task-notif-min');
+			expect(parsed.taskName).toBeUndefined();
+			expect(parsed.message).toBeUndefined();
+			expect(parsed.notificationType).toBeUndefined();
+		});
 	});
 
 	// ====================================================================
