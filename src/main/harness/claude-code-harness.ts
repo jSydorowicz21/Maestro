@@ -1003,10 +1003,16 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 			}
 
 			default:
-				// Unknown message types are logged but not surfaced
+				// Catch-all: unknown/future SDK message types are logged with
+				// enough context for production debugging but never crash the harness.
 				logger.debug(
-					`${LOG_CONTEXT} Unhandled SDK message type: ${message.type}`,
-					LOG_CONTEXT
+					`${LOG_CONTEXT} Unknown SDK message type: ${message.type}`,
+					LOG_CONTEXT,
+					{
+						sessionId,
+						messageType: message.type,
+						keys: Object.keys(message).filter((k) => k !== 'type'),
+					}
 				);
 				break;
 		}

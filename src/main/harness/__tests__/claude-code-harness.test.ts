@@ -4455,6 +4455,46 @@ describe('ClaudeCodeHarness', () => {
 			expect(allEvents).toHaveLength(0);
 		});
 
+		it('should log unknown message types with sessionId and payload keys for debugging', async () => {
+			const { logger } = await import('../../utils/logger');
+			const debugSpy = vi.mocked(logger.debug);
+			debugSpy.mockClear();
+
+			const testSessionId = 'catch-all-session';
+			await harness.spawn(createTestConfig({ sessionId: testSessionId }));
+			await flushMicrotasks();
+
+			mockFn.pushMessage({ type: 'future_sdk_event', vendor_id: 'abc', details: { nested: true } } as any);
+			await flushMicrotasks();
+
+			const unknownCall = debugSpy.mock.calls.find(
+				(call) => typeof call[0] === 'string' && call[0].includes('Unknown SDK message type')
+			);
+			expect(unknownCall).toBeDefined();
+			// Verify contextual metadata is included
+			const context = unknownCall![2] as Record<string, unknown>;
+			expect(context.sessionId).toBe(testSessionId);
+			expect(context.messageType).toBe('future_sdk_event');
+			expect(context.keys).toEqual(expect.arrayContaining(['vendor_id', 'details']));
+			expect(context.keys).not.toContain('type'); // 'type' is filtered out since it's already in messageType
+		});
+
+		it('should not crash on unknown messages with minimal or unusual payloads', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			// Minimal: only type field
+			mockFn.pushMessage({ type: 'bare_minimum' } as any);
+			await flushMicrotasks();
+
+			// Large payload with many keys
+			mockFn.pushMessage({ type: 'verbose_event', a: 1, b: 2, c: 3, d: null, e: undefined } as any);
+			await flushMicrotasks();
+
+			// Harness should still be running after processing unknown messages
+			expect(harness.isRunning()).toBe(true);
+		});
+
 		// -- Session ID propagation --
 
 		it('should propagate correct session ID to all emitted events', async () => {
