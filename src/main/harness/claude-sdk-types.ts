@@ -178,6 +178,18 @@ export interface SDKFilesPersistedEvent {
 }
 
 /**
+ * Prompt suggestion event — the SDK suggests a follow-up prompt.
+ * Surfaced to the renderer so it can display autocomplete hints.
+ * SDK version: @anthropic-ai/claude-agent-sdk v0.2.74 (Day 2 message type)
+ */
+export interface SDKPromptSuggestionMessage {
+	type: 'prompt_suggestion';
+	suggestion?: string;
+	suggestions?: string[];
+	session_id?: string;
+}
+
+/**
  * Union of all SDK message types that the harness needs to handle.
  */
 export type SDKMessage =
@@ -195,6 +207,7 @@ export type SDKMessage =
 	| SDKTaskProgressMessage
 	| SDKTaskNotificationMessage
 	| SDKFilesPersistedEvent
+	| SDKPromptSuggestionMessage
 	| { type: string; [key: string]: unknown };
 
 // ============================================================================

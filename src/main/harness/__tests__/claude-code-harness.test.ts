@@ -1628,6 +1628,55 @@ describe('ClaudeCodeHarness', () => {
 			// Harness should still be running
 			expect(harness.isRunning()).toBe(true);
 		});
+
+		it('should emit data with structured JSON payload from prompt_suggestion with suggestions array', async () => {
+			const dataEvents: string[] = [];
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'prompt_suggestion',
+				suggestions: ['Fix the bug', 'Add tests'],
+				session_id: 'sess-ps-1',
+			} as any);
+
+			await flushMicrotasks();
+
+			const psEvent = dataEvents.find((d) => d.includes('prompt_suggestion'));
+			expect(psEvent).toBeDefined();
+
+			const parsed = JSON.parse(psEvent!);
+			expect(parsed.harnessEvent).toBe('prompt_suggestion');
+			expect(parsed.suggestions).toEqual(['Fix the bug', 'Add tests']);
+		});
+
+		it('should emit data from prompt_suggestion with single suggestion field', async () => {
+			const dataEvents: string[] = [];
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'prompt_suggestion',
+				suggestion: 'Run the tests',
+			} as any);
+
+			await flushMicrotasks();
+
+			const psEvent = dataEvents.find((d) => d.includes('prompt_suggestion'));
+			expect(psEvent).toBeDefined();
+
+			const parsed = JSON.parse(psEvent!);
+			expect(parsed.harnessEvent).toBe('prompt_suggestion');
+			expect(parsed.suggestions).toEqual(['Run the tests']);
+		});
 	});
 
 	// ====================================================================

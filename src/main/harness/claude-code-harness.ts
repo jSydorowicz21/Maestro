@@ -62,6 +62,7 @@ import type {
 	SDKTaskProgressMessage,
 	SDKTaskNotificationMessage,
 	SDKFilesPersistedEvent,
+	SDKPromptSuggestionMessage,
 } from './claude-sdk-types';
 import { encodeImageFiles } from './claude-image-encoding';
 import { logger } from '../utils/logger';
@@ -949,6 +950,21 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 					`${LOG_CONTEXT} Files persisted event`,
 					LOG_CONTEXT,
 					{ sessionId, messageId: fpMsg.message_id, fileCount: fpMsg.file_paths?.length }
+				);
+				break;
+			}
+
+			case 'prompt_suggestion': {
+				const psMsg = message as SDKPromptSuggestionMessage;
+				const suggestions = psMsg.suggestions || (psMsg.suggestion ? [psMsg.suggestion] : []);
+				this.emit('data', sessionId, JSON.stringify({
+					harnessEvent: 'prompt_suggestion',
+					suggestions,
+				}));
+				logger.debug(
+					`${LOG_CONTEXT} Prompt suggestion received`,
+					LOG_CONTEXT,
+					{ sessionId, suggestionCount: suggestions.length }
 				);
 				break;
 			}
