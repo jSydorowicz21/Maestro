@@ -1075,6 +1075,23 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 
 		this.emit('runtime-metadata', sessionId, metadata);
 
+		// Emit MCP server status from init message as a structured data event.
+		// RuntimeMetadataEvent does not have an MCP-specific field, so we use
+		// the existing 'data' event with a structured JSON payload — consistent
+		// with how task_started, prompt_suggestion, etc. are emitted.
+		if (sys.mcp_servers && sys.mcp_servers.length > 0) {
+			this.emit('data', sessionId, JSON.stringify({
+				harnessEvent: 'mcp_server_status',
+				servers: sys.mcp_servers,
+				serverCount: sys.mcp_servers.length,
+			}));
+			logger.debug(
+				`${LOG_CONTEXT} MCP server status from init`,
+				LOG_CONTEXT,
+				{ sessionId, serverCount: sys.mcp_servers.length, servers: sys.mcp_servers }
+			);
+		}
+
 		// Query supported-runtime discovery APIs for supplemental data.
 		// This runs async and emits incremental updates — it does not block
 		// message consumption.
@@ -1256,6 +1273,127 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 		}
 
 		return { role: 'user', content };
+	}
+
+	// ========================================================================
+	// MCP Server Management (Claude-specific)
+	// ========================================================================
+
+	/**
+	 * Get the current status of all connected MCP servers.
+	 * Delegates to the SDK's mcpServerStatus() method.
+	 *
+	 * Claude-specific — not part of the AgentHarness interface.
+	 */
+	async getMcpServerStatus(): Promise<Array<{ name: string; status?: string }>> {
+		if (this._disposed || !this._query || !this._running) {
+			logger.warn(`${LOG_CONTEXT} getMcpServerStatus() called but harness is not running`, LOG_CONTEXT);
+			return [];
+		}
+
+		try {
+			return await this._query.mcpServerStatus();
+		} catch (error) {
+			logger.error(`${LOG_CONTEXT} mcpServerStatus() failed: ${String(error)}`, LOG_CONTEXT);
+			return [];
+		}
+	}
+
+	/**
+	 * Dynamically replace the full MCP server configuration.
+	 * Delegates to the SDK's setMcpServers() method.
+	 *
+	 * Claude-specific — not part of the AgentHarness interface.
+	 */
+	setMcpServers(servers: Record<string, unknown>): void {
+		if (this._disposed || !this._query || !this._running) {
+			logger.warn(`${LOG_CONTEXT} setMcpServers() called but harness is not running`, LOG_CONTEXT);
+			return;
+		}
+
+		try {
+			this._query.setMcpServers(servers);
+			logger.info(
+				`${LOG_CONTEXT} MCP servers updated`,
+				LOG_CONTEXT,
+				{ serverCount: Object.keys(servers).length }
+			);
+		} catch (error) {
+			logger.error(`${LOG_CONTEXT} setMcpServers() failed: ${String(error)}`, LOG_CONTEXT);
+		}
+	}
+
+	/**
+	 * Reconnect a specific MCP server by name.
+	 * Delegates to the SDK's reconnectMcpServer() method.
+	 *
+	 * Claude-specific — not part of the AgentHarness interface.
+	 */
+	async reconnectMcpServer(name: string): Promise<void> {
+		if (this._disposed || !this._query || !this._running) {
+			logger.warn(`${LOG_CONTEXT} reconnectMcpServer() called but harness is not running`, LOG_CONTEXT);
+			return;
+		}
+
+		try {
+			await this._query.reconnectMcpServer(name);
+			logger.info(`${LOG_CONTEXT} MCP server reconnected: ${name}`, LOG_CONTEXT);
+		} catch (error) {
+			logger.error(`${LOG_CONTEXT} reconnectMcpServer() failed: ${String(error)}`, LOG_CONTEXT);
+		}
+	}
+
+	/**
+	 * Enable or disable a specific MCP server by name.
+	 * Delegates to the SDK's toggleMcpServer() method.
+	 *
+	 * Claude-specific — not part of the AgentHarness interface.
+	 */
+	toggleMcpServer(name: string, enabled: boolean): void {
+		if (this._disposed || !this._query || !this._running) {
+			logger.warn(`${LOG_CONTEXT} toggleMcpServer() called but harness is not running`, LOG_CONTEXT);
+			return;
+		}
+
+		try {
+			this._query.toggleMcpServer(name, enabled);
+			logger.info(
+				`${LOG_CONTEXT} MCP server toggled: ${name} → ${enabled ? 'enabled' : 'disabled'}`,
+				LOG_CONTEXT
+			);
+		} catch (error) {
+			logger.error(`${LOG_CONTEXT} toggleMcpServer() failed: ${String(error)}`, LOG_CONTEXT);
+		}
+	}
+
+	// ========================================================================
+	// File Checkpointing (Claude-specific)
+	// ========================================================================
+
+	/**
+	 * Restore files to their state at a given message ID.
+	 * Requires `enableFileCheckpointing: true` at spawn time.
+	 * Delegates to the SDK's rewindFiles() method.
+	 *
+	 * Claude-specific — not part of the AgentHarness interface.
+	 */
+	async rewindFiles(messageId: string, opts?: { filePaths?: string[] }): Promise<void> {
+		if (this._disposed || !this._query || !this._running) {
+			logger.warn(`${LOG_CONTEXT} rewindFiles() called but harness is not running`, LOG_CONTEXT);
+			return;
+		}
+
+		try {
+			await this._query.rewindFiles(messageId, opts);
+			logger.info(
+				`${LOG_CONTEXT} Files rewound to message: ${messageId}`,
+				LOG_CONTEXT,
+				{ filePaths: opts?.filePaths }
+			);
+		} catch (error) {
+			logger.error(`${LOG_CONTEXT} rewindFiles() failed: ${String(error)}`, LOG_CONTEXT);
+			throw error; // Re-throw — caller needs to know rewind failed
+		}
 	}
 
 	// ========================================================================

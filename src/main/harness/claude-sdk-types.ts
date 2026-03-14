@@ -342,6 +342,30 @@ export interface SDKQuery extends AsyncGenerator<SDKMessage, void, undefined> {
 	supportedModels(): Promise<Array<{ id: string; label?: string }>>;
 	supportedAgents(): Promise<Array<{ id: string; label?: string }>>;
 	initializationResult(): Promise<SDKSystemMessage>;
+
+	// -- MCP Server Management (SDK v0.2.74+) --
+
+	/** Returns the current status of all connected MCP servers. */
+	mcpServerStatus(): Promise<Array<{ name: string; status?: string }>>;
+	/** Dynamically replace the full MCP server configuration. */
+	setMcpServers(servers: Record<string, unknown>): void;
+	/** Reconnect a specific MCP server by name. */
+	reconnectMcpServer(name: string): Promise<void>;
+	/** Enable or disable a specific MCP server by name. */
+	toggleMcpServer(name: string, enabled: boolean): void;
+
+	// -- File Checkpointing (SDK v0.2.74+, requires enableFileCheckpointing) --
+
+	/**
+	 * Restore files to their state at a given message ID.
+	 * Only available when `enableFileCheckpointing: true` was passed at spawn.
+	 */
+	rewindFiles(messageId: string, opts?: { filePaths?: string[] }): Promise<void>;
+
+	// -- Background Task Control (SDK v0.2.74+) --
+
+	/** Stop a running background task by ID. */
+	stopTask(taskId: string): Promise<void>;
 }
 
 /**

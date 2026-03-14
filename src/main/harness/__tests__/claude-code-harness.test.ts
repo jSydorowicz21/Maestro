@@ -116,6 +116,15 @@ function createMockQuery() {
 		supportedModels: vi.fn().mockResolvedValue([]),
 		supportedAgents: vi.fn().mockResolvedValue([]),
 		initializationResult: vi.fn().mockResolvedValue({}),
+		// MCP management methods (SDK v0.2.74+)
+		mcpServerStatus: vi.fn().mockResolvedValue([]),
+		setMcpServers: vi.fn(),
+		reconnectMcpServer: vi.fn().mockResolvedValue(undefined),
+		toggleMcpServer: vi.fn(),
+		// File checkpointing (SDK v0.2.74+)
+		rewindFiles: vi.fn().mockResolvedValue(undefined),
+		// Background task control (SDK v0.2.74+)
+		stopTask: vi.fn().mockResolvedValue(undefined),
 	};
 
 	return {
@@ -5630,6 +5639,239 @@ describe('ClaudeCodeHarness', () => {
 			// Only the initial snapshot should exist, no incremental from late-resolving models
 			const incrementals = metadataEvents.filter((m) => m.replace === false);
 			expect(incrementals).toHaveLength(0);
+		});
+	});
+
+	// ========================================================================
+	// MCP Server Management
+	// ========================================================================
+
+	describe('MCP management delegation', () => {
+		it('should delegate getMcpServerStatus() to SDK', async () => {
+			const expectedServers = [
+				{ name: 'test-server', status: 'connected' },
+				{ name: 'another-server', status: 'disconnected' },
+			];
+			(mockFn.query.mcpServerStatus as ReturnType<typeof vi.fn>).mockResolvedValue(expectedServers);
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const result = await harness.getMcpServerStatus();
+			expect(result).toEqual(expectedServers);
+			expect(mockFn.query.mcpServerStatus).toHaveBeenCalledOnce();
+		});
+
+		it('should return empty array from getMcpServerStatus() when not running', async () => {
+			const result = await harness.getMcpServerStatus();
+			expect(result).toEqual([]);
+		});
+
+		it('should return empty array from getMcpServerStatus() on SDK error', async () => {
+			(mockFn.query.mcpServerStatus as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('SDK error'));
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const result = await harness.getMcpServerStatus();
+			expect(result).toEqual([]);
+		});
+
+		it('should delegate setMcpServers() to SDK', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const servers = { 'my-server': { command: 'node', args: ['server.js'] } };
+			harness.setMcpServers(servers);
+
+			expect(mockFn.query.setMcpServers).toHaveBeenCalledWith(servers);
+		});
+
+		it('should no-op setMcpServers() when not running', () => {
+			harness.setMcpServers({ 'test': {} });
+			expect(mockFn.query.setMcpServers).not.toHaveBeenCalled();
+		});
+
+		it('should delegate reconnectMcpServer() to SDK', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			await harness.reconnectMcpServer('my-server');
+			expect(mockFn.query.reconnectMcpServer).toHaveBeenCalledWith('my-server');
+		});
+
+		it('should no-op reconnectMcpServer() when not running', async () => {
+			await harness.reconnectMcpServer('my-server');
+			expect(mockFn.query.reconnectMcpServer).not.toHaveBeenCalled();
+		});
+
+		it('should delegate toggleMcpServer() to SDK', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			harness.toggleMcpServer('my-server', false);
+			expect(mockFn.query.toggleMcpServer).toHaveBeenCalledWith('my-server', false);
+
+			harness.toggleMcpServer('my-server', true);
+			expect(mockFn.query.toggleMcpServer).toHaveBeenCalledWith('my-server', true);
+		});
+
+		it('should no-op toggleMcpServer() when not running', () => {
+			harness.toggleMcpServer('my-server', true);
+			expect(mockFn.query.toggleMcpServer).not.toHaveBeenCalled();
+		});
+
+		it('should handle SDK error in setMcpServers() gracefully', async () => {
+			(mockFn.query.setMcpServers as ReturnType<typeof vi.fn>).mockImplementation(() => {
+				throw new Error('SDK error');
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			// Should not throw
+			harness.setMcpServers({ 'test': {} });
+		});
+
+		it('should handle SDK error in toggleMcpServer() gracefully', async () => {
+			(mockFn.query.toggleMcpServer as ReturnType<typeof vi.fn>).mockImplementation(() => {
+				throw new Error('SDK error');
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			// Should not throw
+			harness.toggleMcpServer('my-server', true);
+		});
+
+		it('should emit MCP server status from init message as data event', async () => {
+			const dataEvents: string[] = [];
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-mcp',
+				mcp_servers: [
+					{ name: 'server-a', status: 'connected' },
+					{ name: 'server-b', status: 'connecting' },
+				],
+			} as any);
+			await flushMicrotasks();
+
+			const mcpEvents = dataEvents
+				.filter((d) => d.includes('mcp_server_status'))
+				.map((d) => JSON.parse(d));
+			expect(mcpEvents).toHaveLength(1);
+			expect(mcpEvents[0]).toEqual({
+				harnessEvent: 'mcp_server_status',
+				servers: [
+					{ name: 'server-a', status: 'connected' },
+					{ name: 'server-b', status: 'connecting' },
+				],
+				serverCount: 2,
+			});
+		});
+
+		it('should not emit MCP data event when init has no mcp_servers', async () => {
+			const dataEvents: string[] = [];
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'system',
+				subtype: 'init',
+				session_id: 'sess-no-mcp',
+			} as any);
+			await flushMicrotasks();
+
+			const mcpEvents = dataEvents.filter((d) => d.includes('mcp_server_status'));
+			expect(mcpEvents).toHaveLength(0);
+		});
+
+		it('should no-op MCP methods after dispose', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+			harness.dispose();
+
+			harness.setMcpServers({ test: {} });
+			harness.toggleMcpServer('test', true);
+			await harness.reconnectMcpServer('test');
+			const status = await harness.getMcpServerStatus();
+
+			expect(mockFn.query.setMcpServers).not.toHaveBeenCalled();
+			expect(mockFn.query.toggleMcpServer).not.toHaveBeenCalled();
+			expect(mockFn.query.reconnectMcpServer).not.toHaveBeenCalled();
+			expect(mockFn.query.mcpServerStatus).not.toHaveBeenCalled();
+			expect(status).toEqual([]);
+		});
+	});
+
+	// ========================================================================
+	// File Checkpointing
+	// ========================================================================
+
+	describe('file checkpointing delegation', () => {
+		it('should delegate rewindFiles() to SDK', async () => {
+			await harness.spawn(createTestConfig({
+				providerOptions: { enableFileCheckpointing: true },
+			}));
+			await flushMicrotasks();
+
+			await harness.rewindFiles('msg-123');
+			expect(mockFn.query.rewindFiles).toHaveBeenCalledWith('msg-123', undefined);
+		});
+
+		it('should delegate rewindFiles() with filePaths option', async () => {
+			await harness.spawn(createTestConfig({
+				providerOptions: { enableFileCheckpointing: true },
+			}));
+			await flushMicrotasks();
+
+			await harness.rewindFiles('msg-456', { filePaths: ['/src/index.ts', '/src/app.ts'] });
+			expect(mockFn.query.rewindFiles).toHaveBeenCalledWith('msg-456', {
+				filePaths: ['/src/index.ts', '/src/app.ts'],
+			});
+		});
+
+		it('should no-op rewindFiles() when not running', async () => {
+			await harness.rewindFiles('msg-123');
+			expect(mockFn.query.rewindFiles).not.toHaveBeenCalled();
+		});
+
+		it('should re-throw SDK error from rewindFiles()', async () => {
+			(mockFn.query.rewindFiles as ReturnType<typeof vi.fn>).mockRejectedValue(
+				new Error('Checkpointing not enabled')
+			);
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			await expect(harness.rewindFiles('msg-bad')).rejects.toThrow('Checkpointing not enabled');
+		});
+
+		it('should no-op rewindFiles() after dispose', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+			harness.dispose();
+
+			await harness.rewindFiles('msg-123');
+			expect(mockFn.query.rewindFiles).not.toHaveBeenCalled();
+		});
+
+		it('should report supportsFileCheckpointing in capabilities', () => {
+			const caps = harness.getCapabilities();
+			expect(caps.supportsFileCheckpointing).toBe(true);
 		});
 	});
 });
