@@ -121,6 +121,8 @@ export class ProcessManager extends EventEmitter {
 					tabId: config.tabId,
 					projectPath: config.projectPath,
 					contextWindow: config.contextWindow,
+					sshRemoteId: config.sshRemoteId,
+					sshRemoteHost: config.sshRemoteHost,
 				};
 
 				// Store the execution record
@@ -138,6 +140,8 @@ export class ProcessManager extends EventEmitter {
 					querySource: config.querySource,
 					tabId: config.tabId,
 					projectPath: config.projectPath,
+					sshRemoteId: config.sshRemoteId,
+					sshRemoteHost: config.sshRemoteHost,
 					preferredExecutionMode: config.preferredExecutionMode,
 					providerOptions: config.providerOptions,
 					permissionMode: config.permissionMode,

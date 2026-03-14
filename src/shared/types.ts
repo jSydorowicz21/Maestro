@@ -94,6 +94,11 @@ export interface AgentExecutionConfig {
 	tabId?: string;
 	projectPath?: string;
 
+	/** SSH remote config ID (references SshRemoteConfig.id) */
+	sshRemoteId?: string;
+	/** SSH remote host (hostname or IP) */
+	sshRemoteHost?: string;
+
 	/** Hint from callers; ProcessManager has final say on execution mode */
 	preferredExecutionMode?: 'auto' | 'classic' | 'harness';
 

@@ -196,6 +196,35 @@ describe('ProcessManager harness spawn path', () => {
 			expect(spawnArg.providerOptions).toEqual({ key: 'value' });
 		});
 
+		it('should include SSH fields in AgentExecutionConfig passed to harness.spawn()', async () => {
+			// SSH fields are mapped from ProcessConfig → AgentExecutionConfig.
+			// Currently the SSH fallback prevents harness+SSH from running together,
+			// so they'll be undefined here. This test verifies the mapping exists
+			// as a regression guard for when SSH harness support is added.
+			const config = makeConfig();
+			pm.spawn(config);
+
+			await vi.waitFor(() => {
+				expect(mockHarness.spawn).toHaveBeenCalledTimes(1);
+			});
+
+			const spawnArg = vi.mocked(mockHarness.spawn).mock.calls[0][0];
+			expect(spawnArg).toHaveProperty('sshRemoteId');
+			expect(spawnArg).toHaveProperty('sshRemoteHost');
+			expect(spawnArg.sshRemoteId).toBeUndefined();
+			expect(spawnArg.sshRemoteHost).toBeUndefined();
+		});
+
+		it('should store SSH fields on execution record', () => {
+			const config = makeConfig();
+			pm.spawn(config);
+
+			const execution = pm.get(config.sessionId);
+			expect(execution).toBeDefined();
+			expect(execution!.sshRemoteId).toBeUndefined();
+			expect(execution!.sshRemoteHost).toBeUndefined();
+		});
+
 		it('should subscribe to all standard ProcessManager events', () => {
 			pm.spawn(makeConfig());
 
