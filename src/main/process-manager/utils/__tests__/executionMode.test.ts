@@ -60,6 +60,7 @@ describe('selectExecutionMode', () => {
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('classic');
 			expect(result.reason).toContain('SSH');
+			expect(result.reason).toContain('User query');
 		});
 
 		it('returns classic when sshRemoteHost is set', () => {
@@ -87,6 +88,7 @@ describe('selectExecutionMode', () => {
 			const config = makeConfig({ querySource: 'auto' });
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('harness');
+			expect(result.reason).toContain('Auto Run query');
 		});
 
 		it('returns harness for Auto Run when preferredExecutionMode is harness', () => {
@@ -96,6 +98,7 @@ describe('selectExecutionMode', () => {
 			});
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('harness');
+			expect(result.reason).toContain('Auto Run query');
 		});
 
 		it('returns classic for Auto Run with incapable agent', () => {
@@ -105,6 +108,7 @@ describe('selectExecutionMode', () => {
 			});
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('Auto Run query');
 			expect(result.reason).toContain('does not support harness');
 		});
 
@@ -115,6 +119,7 @@ describe('selectExecutionMode', () => {
 			});
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('Auto Run query');
 			expect(result.reason).toContain('explicitly requested classic');
 		});
 	});
@@ -167,6 +172,7 @@ describe('selectExecutionMode', () => {
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('harness');
 			expect(result.reason).toContain('explicitly requested harness');
+			expect(result.reason).toContain('User query');
 		});
 	});
 
@@ -178,7 +184,7 @@ describe('selectExecutionMode', () => {
 			const config = makeConfig({ preferredExecutionMode: 'auto' });
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('harness');
-			expect(result.reason).toContain('Auto-selected harness');
+			expect(result.reason).toContain('auto-selected harness');
 		});
 
 		it('returns harness when preferredExecutionMode is undefined', () => {
@@ -226,6 +232,7 @@ describe('selectExecutionMode', () => {
 			});
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('harness');
+			expect(result.reason).toContain('Auto Run query');
 			expect(result.reason).toContain('explicitly requested harness');
 		});
 	});
@@ -265,7 +272,7 @@ describe('selectExecutionMode', () => {
 			});
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('classic');
-			expect(result.reason).toContain('Fallback');
+			expect(result.reason).toContain('fallback');
 			expect(result.reason).toContain('invalid-mode');
 		});
 
@@ -275,7 +282,7 @@ describe('selectExecutionMode', () => {
 			});
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('classic');
-			expect(result.reason).toContain('Fallback');
+			expect(result.reason).toContain('fallback');
 		});
 	});
 

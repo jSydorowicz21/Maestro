@@ -42,12 +42,13 @@ export function selectExecutionMode(config: ProcessConfig): ExecutionModeResult 
 		config;
 
 	const capabilities = getAgentCapabilities(toolType);
+	const sourceLabel = querySource === 'auto' ? 'Auto Run' : 'User';
 
 	// 1. SSH remote — always classic in Phase 1
 	if (sshRemoteId || sshRemoteHost) {
 		const result: ExecutionModeResult = {
 			mode: 'classic',
-			reason: 'SSH remote execution forced classic mode (Phase 1)',
+			reason: `${sourceLabel} query: SSH remote execution forced classic mode (Phase 1)`,
 		};
 		logModeSelection(sessionId, toolType, result);
 		return result;
@@ -57,7 +58,7 @@ export function selectExecutionMode(config: ProcessConfig): ExecutionModeResult 
 	if (!capabilities.supportsHarnessExecution) {
 		const result: ExecutionModeResult = {
 			mode: 'classic',
-			reason: `Agent '${toolType}' does not support harness execution`,
+			reason: `${sourceLabel} query: agent '${toolType}' does not support harness execution`,
 		};
 		logModeSelection(sessionId, toolType, result);
 		return result;
@@ -67,7 +68,7 @@ export function selectExecutionMode(config: ProcessConfig): ExecutionModeResult 
 	if (preferredExecutionMode === 'classic') {
 		const result: ExecutionModeResult = {
 			mode: 'classic',
-			reason: 'Caller explicitly requested classic mode',
+			reason: `${sourceLabel} query: caller explicitly requested classic mode`,
 		};
 		logModeSelection(sessionId, toolType, result);
 		return result;
@@ -77,7 +78,7 @@ export function selectExecutionMode(config: ProcessConfig): ExecutionModeResult 
 	if (preferredExecutionMode === 'harness') {
 		const result: ExecutionModeResult = {
 			mode: 'harness',
-			reason: 'Caller explicitly requested harness mode',
+			reason: `${sourceLabel} query: caller explicitly requested harness mode`,
 		};
 		logModeSelection(sessionId, toolType, result);
 		return result;
@@ -87,7 +88,7 @@ export function selectExecutionMode(config: ProcessConfig): ExecutionModeResult 
 	if (preferredExecutionMode === 'auto' || preferredExecutionMode === undefined) {
 		const result: ExecutionModeResult = {
 			mode: 'harness',
-			reason: `Auto-selected harness mode for '${toolType}' (agent supports harness)`,
+			reason: `${sourceLabel} query: auto-selected harness mode for '${toolType}' (agent supports harness)`,
 		};
 		logModeSelection(sessionId, toolType, result);
 		return result;
@@ -96,7 +97,7 @@ export function selectExecutionMode(config: ProcessConfig): ExecutionModeResult 
 	// Fallback (should not reach here, but be safe)
 	const result: ExecutionModeResult = {
 		mode: 'classic',
-		reason: `Fallback to classic mode (unrecognized preferredExecutionMode: '${preferredExecutionMode}')`,
+		reason: `${sourceLabel} query: fallback to classic mode (unrecognized preferredExecutionMode: '${preferredExecutionMode}')`,
 	};
 	logModeSelection(sessionId, toolType, result);
 	return result;
