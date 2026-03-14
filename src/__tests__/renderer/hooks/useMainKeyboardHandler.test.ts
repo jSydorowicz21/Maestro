@@ -1568,16 +1568,20 @@ describe('useMainKeyboardHandler', () => {
 		});
 
 		describe('tab shortcuts in terminal mode', () => {
-			it('Cmd+T does NOT create a new AI tab in terminal mode (AI mode only)', () => {
+			it('Cmd+T creates a new AI tab even when in terminal mode', () => {
 				const { result } = renderHook(() => useMainKeyboardHandler());
 
-				const mockCreateTab = vi.fn();
+				const mockCreateTab = vi.fn().mockReturnValue({
+					session: { id: 'session-1', aiTabs: [], activeTabId: 'new-tab' },
+				});
 				const mockSetSessions = vi.fn();
 
 				result.current.keyboardHandlerRef.current = createUnifiedTabContext({
 					isTabShortcut: (_e: KeyboardEvent, actionId: string) => actionId === 'newTab',
 					createTab: mockCreateTab,
 					setSessions: mockSetSessions,
+					setActiveFocus: vi.fn(),
+					inputRef: { current: { focus: vi.fn() } },
 					activeSession: {
 						id: 'session-1',
 						aiTabs: [{ id: 'ai-tab-1', name: 'AI Tab 1', logs: [] }],
@@ -1599,8 +1603,8 @@ describe('useMainKeyboardHandler', () => {
 					);
 				});
 
-				// Tab shortcuts (including Cmd+T) are gated to AI mode only
-				expect(mockCreateTab).not.toHaveBeenCalled();
+				// Cmd+T should work regardless of inputMode
+				expect(mockCreateTab).toHaveBeenCalled();
 			});
 		});
 
