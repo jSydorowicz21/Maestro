@@ -100,7 +100,6 @@ export function initializeHarnesses(): void {
 
 	// Register Claude Code harness if the SDK is available
 	try {
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
 		const sdk = require('@anthropic-ai/claude-agent-sdk');
 		if (sdk && typeof sdk.query === 'function') {
 			registerHarness('claude-code' as any, () => new ClaudeCodeHarness(sdk.query));
@@ -115,7 +114,6 @@ export function initializeHarnesses(): void {
 
 	// Register Codex harness if the SDK is available
 	try {
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
 		const codexSdk = require('@openai/codex-sdk');
 		if (codexSdk && typeof codexSdk.exec === 'function') {
 			registerHarness('codex' as any, () => new CodexHarness(codexSdk.exec));

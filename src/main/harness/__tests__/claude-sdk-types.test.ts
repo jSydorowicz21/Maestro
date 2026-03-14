@@ -19,7 +19,6 @@ const SDK_PACKAGE_NAME = '@anthropic-ai/claude-agent-sdk';
  */
 function tryRequireSDK(): Record<string, unknown> | null {
 	try {
-		// eslint-disable-next-line @typescript-eslint/no-require-imports
 		return require(SDK_PACKAGE_NAME) as Record<string, unknown>;
 	} catch {
 		return null;

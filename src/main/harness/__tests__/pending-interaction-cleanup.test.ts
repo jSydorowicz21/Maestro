@@ -114,6 +114,12 @@ function createMockQuery() {
 		supportedModels: vi.fn().mockResolvedValue([]),
 		supportedAgents: vi.fn().mockResolvedValue([]),
 		initializationResult: vi.fn().mockResolvedValue({}),
+		mcpServerStatus: vi.fn().mockResolvedValue([]),
+		setMcpServers: vi.fn(),
+		reconnectMcpServer: vi.fn().mockResolvedValue(undefined),
+		toggleMcpServer: vi.fn(),
+		rewindFiles: vi.fn().mockResolvedValue(undefined),
+		stopTask: vi.fn().mockResolvedValue(undefined),
 	};
 
 	return {
@@ -986,6 +992,10 @@ describe('Claude harness pending interaction cleanup and failure behavior', () =
 			});
 
 			harness.write({ type: 'text', text: 'test' });
+
+			// write() internally calls buildUserMessage() which is async —
+			// flush microtasks so the .then() callback executes streamInput
+			await flushMicrotasks();
 
 			expect(mockLogger.error).toHaveBeenCalledWith(
 				expect.stringContaining('write() streamInput failed'),
