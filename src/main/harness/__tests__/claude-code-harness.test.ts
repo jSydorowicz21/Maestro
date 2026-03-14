@@ -1677,6 +1677,118 @@ describe('ClaudeCodeHarness', () => {
 			expect(parsed.harnessEvent).toBe('prompt_suggestion');
 			expect(parsed.suggestions).toEqual(['Run the tests']);
 		});
+
+		it('should log hook_started without emitting a data event', async () => {
+			const dataEvents: string[] = [];
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const dataCountBefore = dataEvents.length;
+
+			mockFn.pushMessage({
+				type: 'hook_started',
+				hook_name: 'PreToolUse',
+				hook_type: 'pre_tool_use',
+				tool_name: 'Bash',
+				session_id: 'sess-hook-1',
+			} as any);
+
+			await flushMicrotasks();
+
+			// No new data events should be emitted — hook messages are logged only
+			expect(dataEvents.length).toBe(dataCountBefore);
+		});
+
+		it('should handle hook_started with minimal fields without crashing', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'hook_started',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(harness.isRunning()).toBe(true);
+		});
+
+		it('should log hook_progress without emitting a data event', async () => {
+			const dataEvents: string[] = [];
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const dataCountBefore = dataEvents.length;
+
+			mockFn.pushMessage({
+				type: 'hook_progress',
+				hook_name: 'PostToolUse',
+				hook_type: 'post_tool_use',
+				message: 'Validating output...',
+				session_id: 'sess-hook-2',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(dataEvents.length).toBe(dataCountBefore);
+		});
+
+		it('should handle hook_progress with minimal fields without crashing', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'hook_progress',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(harness.isRunning()).toBe(true);
+		});
+
+		it('should log hook_response without emitting a data event', async () => {
+			const dataEvents: string[] = [];
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const dataCountBefore = dataEvents.length;
+
+			mockFn.pushMessage({
+				type: 'hook_response',
+				hook_name: 'Stop',
+				hook_type: 'stop',
+				result: 'allowed',
+				session_id: 'sess-hook-3',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(dataEvents.length).toBe(dataCountBefore);
+		});
+
+		it('should handle hook_response with minimal fields without crashing', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			mockFn.pushMessage({
+				type: 'hook_response',
+			} as any);
+
+			await flushMicrotasks();
+
+			expect(harness.isRunning()).toBe(true);
+		});
 	});
 
 	// ====================================================================

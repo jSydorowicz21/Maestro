@@ -190,6 +190,45 @@ export interface SDKPromptSuggestionMessage {
 }
 
 /**
+ * Hook started event — a Claude SDK hook has begun execution.
+ * Logged only for debug observability; not surfaced to the UI.
+ * SDK version: @anthropic-ai/claude-agent-sdk v0.2.74 (Day 2 message type)
+ */
+export interface SDKHookStartedMessage {
+	type: 'hook_started';
+	hook_name?: string;
+	hook_type?: string;
+	tool_name?: string;
+	session_id?: string;
+}
+
+/**
+ * Hook progress event — a Claude SDK hook reports progress.
+ * Logged only for debug observability; not surfaced to the UI.
+ * SDK version: @anthropic-ai/claude-agent-sdk v0.2.74 (Day 2 message type)
+ */
+export interface SDKHookProgressMessage {
+	type: 'hook_progress';
+	hook_name?: string;
+	hook_type?: string;
+	message?: string;
+	session_id?: string;
+}
+
+/**
+ * Hook response event — a Claude SDK hook has completed with a result.
+ * Logged only for debug observability; not surfaced to the UI.
+ * SDK version: @anthropic-ai/claude-agent-sdk v0.2.74 (Day 2 message type)
+ */
+export interface SDKHookResponseMessage {
+	type: 'hook_response';
+	hook_name?: string;
+	hook_type?: string;
+	result?: string;
+	session_id?: string;
+}
+
+/**
  * Union of all SDK message types that the harness needs to handle.
  */
 export type SDKMessage =
@@ -208,6 +247,9 @@ export type SDKMessage =
 	| SDKTaskNotificationMessage
 	| SDKFilesPersistedEvent
 	| SDKPromptSuggestionMessage
+	| SDKHookStartedMessage
+	| SDKHookProgressMessage
+	| SDKHookResponseMessage
 	| { type: string; [key: string]: unknown };
 
 // ============================================================================

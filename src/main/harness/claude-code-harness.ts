@@ -63,6 +63,9 @@ import type {
 	SDKTaskNotificationMessage,
 	SDKFilesPersistedEvent,
 	SDKPromptSuggestionMessage,
+	SDKHookStartedMessage,
+	SDKHookProgressMessage,
+	SDKHookResponseMessage,
 } from './claude-sdk-types';
 import { encodeImageFiles } from './claude-image-encoding';
 import { logger } from '../utils/logger';
@@ -965,6 +968,36 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 					`${LOG_CONTEXT} Prompt suggestion received`,
 					LOG_CONTEXT,
 					{ sessionId, suggestionCount: suggestions.length }
+				);
+				break;
+			}
+
+			case 'hook_started': {
+				const hookMsg = message as SDKHookStartedMessage;
+				logger.debug(
+					`${LOG_CONTEXT} Hook started: ${hookMsg.hook_name || 'unknown'}`,
+					LOG_CONTEXT,
+					{ sessionId, hookName: hookMsg.hook_name, hookType: hookMsg.hook_type, toolName: hookMsg.tool_name }
+				);
+				break;
+			}
+
+			case 'hook_progress': {
+				const hookMsg = message as SDKHookProgressMessage;
+				logger.debug(
+					`${LOG_CONTEXT} Hook progress: ${hookMsg.hook_name || 'unknown'}`,
+					LOG_CONTEXT,
+					{ sessionId, hookName: hookMsg.hook_name, hookType: hookMsg.hook_type, message: hookMsg.message }
+				);
+				break;
+			}
+
+			case 'hook_response': {
+				const hookMsg = message as SDKHookResponseMessage;
+				logger.debug(
+					`${LOG_CONTEXT} Hook response: ${hookMsg.hook_name || 'unknown'}`,
+					LOG_CONTEXT,
+					{ sessionId, hookName: hookMsg.hook_name, hookType: hookMsg.hook_type, result: hookMsg.result }
 				);
 				break;
 			}
