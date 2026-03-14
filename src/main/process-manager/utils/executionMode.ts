@@ -45,7 +45,10 @@ export function selectExecutionMode(config: ProcessConfig): ExecutionModeResult 
 		config;
 
 	const capabilities = getAgentCapabilities(toolType);
-	const sourceLabel = querySource === 'auto' ? 'Auto Run' : 'User';
+	const isSsh = Boolean(config.sshRemoteId || config.sshRemoteHost);
+	const sourceLabel =
+		(querySource === 'auto' ? 'Auto Run' : 'User') +
+		(isSsh ? ' (SSH remote)' : '');
 
 	// 1. Agent does not support harness execution
 	if (!capabilities.supportsHarnessExecution) {

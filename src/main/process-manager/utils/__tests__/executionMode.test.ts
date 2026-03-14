@@ -60,6 +60,7 @@ describe('selectExecutionMode', () => {
 			const config = makeConfig({ sshRemoteId: 'remote-1' });
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('harness');
+			expect(result.reason).toContain('(SSH remote)');
 			expect(result.reason).toContain('auto-selected harness');
 		});
 
@@ -67,6 +68,7 @@ describe('selectExecutionMode', () => {
 			const config = makeConfig({ sshRemoteHost: '192.168.1.1' });
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('harness');
+			expect(result.reason).toContain('(SSH remote)');
 		});
 
 		it('returns harness for SSH when preferredExecutionMode is harness', () => {
@@ -76,6 +78,7 @@ describe('selectExecutionMode', () => {
 			});
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('harness');
+			expect(result.reason).toContain('(SSH remote)');
 			expect(result.reason).toContain('explicitly requested harness');
 		});
 
@@ -86,6 +89,7 @@ describe('selectExecutionMode', () => {
 			});
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('(SSH remote)');
 			expect(result.reason).toContain('does not support harness');
 		});
 
@@ -96,6 +100,7 @@ describe('selectExecutionMode', () => {
 			});
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('(SSH remote)');
 			expect(result.reason).toContain('explicitly requested classic');
 		});
 	});
@@ -171,7 +176,7 @@ describe('selectExecutionMode', () => {
 			});
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('harness');
-			expect(result.reason).toContain('Auto Run query');
+			expect(result.reason).toContain('Auto Run (SSH remote)');
 			expect(result.reason).toContain('auto-selected harness');
 		});
 
@@ -260,6 +265,7 @@ describe('selectExecutionMode', () => {
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('harness');
 			expect(result.reason).toContain('auto-selected harness');
+			expect(result.reason).not.toContain('SSH');
 		});
 
 		it('returns harness when preferredExecutionMode is undefined', () => {
@@ -287,6 +293,7 @@ describe('selectExecutionMode', () => {
 			});
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('harness');
+			expect(result.reason).toContain('(SSH remote)');
 			expect(result.reason).toContain('explicitly requested harness');
 		});
 
@@ -323,6 +330,7 @@ describe('selectExecutionMode', () => {
 			});
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('harness');
+			expect(result.reason).toContain('(SSH remote)');
 		});
 
 		it('returns harness when both SSH fields are set with harness preference', () => {
@@ -333,6 +341,7 @@ describe('selectExecutionMode', () => {
 			});
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('harness');
+			expect(result.reason).toContain('(SSH remote)');
 		});
 
 		it('returns classic for non-harness agent when both SSH fields are set', () => {
@@ -343,6 +352,7 @@ describe('selectExecutionMode', () => {
 			});
 			const result = selectExecutionMode(config);
 			expect(result.mode).toBe('classic');
+			expect(result.reason).toContain('(SSH remote)');
 			expect(result.reason).toContain('does not support harness');
 		});
 	});
