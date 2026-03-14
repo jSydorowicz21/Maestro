@@ -522,6 +522,78 @@ describe('useAgentExecution', () => {
 		await spawnPromise;
 	});
 
+	it('passes all necessary config fields for harness execution in Auto Run spawn', async () => {
+		const session = createMockSession({
+			state: 'busy',
+			toolType: 'claude-code',
+			cwd: '/workspace/project',
+			customPath: '/usr/local/bin/claude',
+			customArgs: '--verbose',
+			customEnvVars: { ANTHROPIC_API_KEY: 'sk-test' },
+			customModel: 'claude-sonnet-4-6-20250514',
+			customContextWindow: 128000,
+			sessionSshRemoteConfig: { enabled: false, remoteId: null },
+			aiTabs: [createMockTab({ state: 'busy' })],
+		});
+		const sessionsRef = { current: [session] };
+		const setSessions = vi.fn();
+		const processQueuedItemRef = { current: null };
+
+		const { result } = renderHook(() =>
+			useAgentExecution({
+				activeSession: session,
+				sessionsRef,
+				setSessions,
+				processQueuedItemRef,
+				setFlashNotification: vi.fn(),
+				setSuccessFlashNotification: vi.fn(),
+			})
+		);
+
+		const spawnPromise = result.current.spawnAgentForSession(session.id, 'Build the feature');
+
+		await waitFor(() => {
+			expect(mockProcess.spawn).toHaveBeenCalledTimes(1);
+		});
+
+		const spawnConfig = mockProcess.spawn.mock.calls[0][0];
+
+		// Core fields required by harness execution
+		expect(spawnConfig.sessionId).toBeDefined();
+		expect(spawnConfig.toolType).toBe('claude-code');
+		expect(spawnConfig.cwd).toBe('/workspace/project');
+		expect(spawnConfig.prompt).toBe('Build the feature');
+		expect(spawnConfig.command).toBe('claude-code');
+		expect(spawnConfig.args).toEqual(['--print']);
+
+		// Auto Run tagging (required for selectExecutionMode logging and stats)
+		expect(spawnConfig.querySource).toBe('auto');
+
+		// Auto Run should NOT use read-only mode (needs to make changes)
+		expect(spawnConfig.readOnlyMode).toBe(false);
+
+		// Per-session config overrides (passed through IPC handler to ProcessConfig)
+		expect(spawnConfig.sessionCustomPath).toBe('/usr/local/bin/claude');
+		expect(spawnConfig.sessionCustomArgs).toBe('--verbose');
+		expect(spawnConfig.sessionCustomEnvVars).toEqual({ ANTHROPIC_API_KEY: 'sk-test' });
+		expect(spawnConfig.sessionCustomModel).toBe('claude-sonnet-4-6-20250514');
+		expect(spawnConfig.sessionCustomContextWindow).toBe(128000);
+
+		// SSH config passthrough
+		expect(spawnConfig.sessionSshRemoteConfig).toEqual({ enabled: false, remoteId: null });
+
+		// Stdin flags for prompt delivery
+		expect(spawnConfig.sendPromptViaStdin).toBeDefined();
+		expect(spawnConfig.sendPromptViaStdinRaw).toBeDefined();
+
+		// Clean up
+		const targetSessionId = spawnConfig.sessionId as string;
+		act(() => {
+			onExitHandler?.(targetSessionId);
+		});
+		await spawnPromise;
+	});
+
 	it('does nothing when cancelPendingSynopsis is called with no pending synopses', async () => {
 		const mockKill = vi.fn().mockResolvedValue(true);
 		window.maestro.process.kill = mockKill;
