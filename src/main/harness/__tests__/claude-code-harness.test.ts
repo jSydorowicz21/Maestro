@@ -33,6 +33,13 @@ vi.mock('../../utils/logger', () => ({
 	},
 }));
 
+// Mock the image encoding module
+vi.mock('../claude-image-encoding', () => ({
+	encodeImageFiles: vi.fn().mockResolvedValue([]),
+}));
+
+import { encodeImageFiles } from '../claude-image-encoding';
+
 // ============================================================================
 // Test Helpers
 // ============================================================================
@@ -278,8 +285,13 @@ describe('ClaudeCodeHarness', () => {
 			h.kill();
 		});
 
-		it('should log warning and exclude images from initial message when config has images', async () => {
-			const { logger } = await import('../../utils/logger');
+		it('should encode images and include them in initial message', async () => {
+			const fakeImageBlock = {
+				type: 'image' as const,
+				source: { type: 'base64' as const, media_type: 'image/png', data: 'aW1hZ2VkYXRh' },
+			};
+			vi.mocked(encodeImageFiles).mockResolvedValueOnce([fakeImageBlock]);
+
 			const config = createTestConfig({
 				prompt: 'Analyze this image',
 				images: ['/path/to/screenshot.png'],
@@ -294,11 +306,8 @@ describe('ClaudeCodeHarness', () => {
 			const h = new ClaudeCodeHarness(queryFn);
 			await h.spawn(config);
 
-			// Warning logged about unsupported images
-			expect(logger.warn).toHaveBeenCalledWith(
-				expect.stringContaining('Image input is not supported in harness mode'),
-				expect.any(String),
-			);
+			// encodeImageFiles called with the image paths
+			expect(encodeImageFiles).toHaveBeenCalledWith(['/path/to/screenshot.png']);
 
 			// Consume the streaming prompt to verify content
 			const messages: SDKUserMessage[] = [];
@@ -307,10 +316,57 @@ describe('ClaudeCodeHarness', () => {
 			}
 			expect(messages).toHaveLength(1);
 
-			// Only text content — no image blocks
+			// Text + image content blocks
+			const contentTypes = messages[0].content.map((b: any) => b.type);
+			expect(contentTypes).toEqual(['text', 'image']);
+			expect(messages[0].content[0]).toEqual({ type: 'text', text: 'Analyze this image' });
+			expect(messages[0].content[1]).toEqual(fakeImageBlock);
+
+			h.kill();
+		});
+
+		it('should continue with text when all images fail to encode', async () => {
+			// encodeImageFiles returns empty array (all images failed)
+			vi.mocked(encodeImageFiles).mockResolvedValueOnce([]);
+
+			const config = createTestConfig({
+				prompt: 'Analyze this image',
+				images: ['/path/to/bad-image.bmp'],
+			});
+
+			let capturedPrompt: AsyncIterable<SDKUserMessage> | null = null;
+			const queryFn: SDKQueryFunction = (cfg) => {
+				capturedPrompt = cfg.prompt as AsyncIterable<SDKUserMessage>;
+				return mockFn.query;
+			};
+
+			const h = new ClaudeCodeHarness(queryFn);
+			await h.spawn(config);
+
+			// Consume the streaming prompt
+			const messages: SDKUserMessage[] = [];
+			for await (const msg of capturedPrompt!) {
+				messages.push(msg);
+			}
+			expect(messages).toHaveLength(1);
+
+			// Only text — failed images are skipped gracefully
 			const contentTypes = messages[0].content.map((b: any) => b.type);
 			expect(contentTypes).toEqual(['text']);
 			expect(messages[0].content[0]).toEqual({ type: 'text', text: 'Analyze this image' });
+
+			h.kill();
+		});
+
+		it('should not call encodeImageFiles when no images provided', async () => {
+			vi.mocked(encodeImageFiles).mockClear();
+
+			const config = createTestConfig({ prompt: 'No images here' });
+
+			const h = new ClaudeCodeHarness(mockFn.queryFn);
+			await h.spawn(config);
+
+			expect(encodeImageFiles).not.toHaveBeenCalled();
 
 			h.kill();
 		});

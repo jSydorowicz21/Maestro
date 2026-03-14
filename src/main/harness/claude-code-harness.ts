@@ -59,6 +59,7 @@ import type {
 	SDKToolProgressMessage,
 	SDKAuthStatusMessage,
 } from './claude-sdk-types';
+import { encodeImageFiles } from './claude-image-encoding';
 import { logger } from '../utils/logger';
 
 const LOG_CONTEXT = '[ClaudeCodeHarness]';
@@ -174,7 +175,7 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 			if (providerOpts.sandbox) queryOptions.sandbox = providerOpts.sandbox;
 
 			// Use streaming input mode — required for mid-turn interactivity
-			const initialMessage = this.buildInitialMessage(config);
+			const initialMessage = await this.buildInitialMessage(config);
 
 			this._query = this._queryFn({
 				prompt: this.createStreamingPrompt(initialMessage),
@@ -1098,7 +1099,7 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 	/**
 	 * Build the initial SDKUserMessage from the execution config.
 	 */
-	private buildInitialMessage(config: AgentExecutionConfig): SDKUserMessage {
+	private async buildInitialMessage(config: AgentExecutionConfig): Promise<SDKUserMessage> {
 		const content: SDKUserContentBlock[] = [];
 
 		if (config.prompt) {
@@ -1106,11 +1107,8 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 		}
 
 		if (config.images && config.images.length > 0) {
-			logger.warn(
-				`${LOG_CONTEXT} Image input is not supported in harness mode (Phase 1). ` +
-				`${config.images.length} image(s) will be skipped.`,
-				LOG_CONTEXT
-			);
+			const imageBlocks = await encodeImageFiles(config.images);
+			content.push(...imageBlocks);
 		}
 
 		// Ensure at least one content block
