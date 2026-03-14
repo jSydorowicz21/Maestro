@@ -55,9 +55,16 @@ describe('agent-capabilities', () => {
 			expect(DEFAULT_CAPABILITIES.usesCombinedContextWindow).toBe(false);
 		});
 
-		it('should be a conservative default (all false)', () => {
-			const allFalse = Object.values(DEFAULT_CAPABILITIES).every((v) => v === false);
-			expect(allFalse).toBe(true);
+		it('should be a conservative default (all false or undefined)', () => {
+			const allDisabled = Object.values(DEFAULT_CAPABILITIES).every(
+				(v) => v === false || v === undefined
+			);
+			expect(allDisabled).toBe(true);
+		});
+
+		it('should explicitly include imageResumeMode as undefined', () => {
+			expect('imageResumeMode' in DEFAULT_CAPABILITIES).toBe(true);
+			expect(DEFAULT_CAPABILITIES.imageResumeMode).toBeUndefined();
 		});
 	});
 
@@ -283,6 +290,7 @@ describe('agent-capabilities', () => {
 				'supportsHarnessExecution',
 				'usesJsonLineOutput',
 				'usesCombinedContextWindow',
+				'imageResumeMode',
 			];
 
 			const defaultKeys = Object.keys(DEFAULT_CAPABILITIES);
@@ -290,7 +298,13 @@ describe('agent-capabilities', () => {
 		});
 
 		it('should have all agent capabilities contain all required fields', () => {
-			const requiredKeys = Object.keys(DEFAULT_CAPABILITIES);
+			// Optional fields (value is undefined in DEFAULT_CAPABILITIES) are not required
+			const optionalKeys = Object.entries(DEFAULT_CAPABILITIES)
+				.filter(([, v]) => v === undefined)
+				.map(([k]) => k);
+			const requiredKeys = Object.keys(DEFAULT_CAPABILITIES).filter(
+				(k) => !optionalKeys.includes(k)
+			);
 
 			for (const [agentId, capabilities] of Object.entries(AGENT_CAPABILITIES)) {
 				const agentKeys = Object.keys(capabilities);
@@ -298,7 +312,7 @@ describe('agent-capabilities', () => {
 				for (const key of requiredKeys) {
 					expect(agentKeys).toContain(key);
 				}
-				// Agent may have optional keys (e.g., imageResumeMode) not in DEFAULT_CAPABILITIES
+				// Optional keys (e.g., imageResumeMode) may be absent in individual agents
 			}
 		});
 	});

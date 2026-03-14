@@ -131,4 +131,5 @@ export const DEFAULT_CAPABILITIES: AgentCapabilities = {
 	usesJsonLineOutput: false,
 	usesCombinedContextWindow: false,
 	supportsHarnessExecution: false,
+	imageResumeMode: undefined,
 };
