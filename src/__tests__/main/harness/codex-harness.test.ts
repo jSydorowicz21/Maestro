@@ -139,7 +139,6 @@ describe('CodexHarness', () => {
 				maxTurns: 5,
 				customEnvVars: { API_KEY: 'abc' },
 				resumeSessionId: 'thread-old',
-				images: ['/tmp/screenshot.png'],
 				cwd: '/workspace',
 			});
 
@@ -153,8 +152,53 @@ describe('CodexHarness', () => {
 			expect(opts.maxTurns).toBe(5);
 			expect(opts.env).toEqual({ API_KEY: 'abc' });
 			expect(opts.threadId).toBe('thread-old');
-			expect(opts.images).toEqual(['/tmp/screenshot.png']);
 			expect(opts.cwd).toBe('/workspace');
+		});
+
+		it('should pass images via execOptions.images on initial spawn (no resume)', async () => {
+			const config = makeConfig({
+				images: ['/tmp/screenshot.png'],
+			});
+
+			await harness.spawn(config);
+
+			const opts = (mockExecFn as any).mock.calls[0][0] as CodexExecOptions;
+			expect(opts.images).toEqual(['/tmp/screenshot.png']);
+			expect(opts.prompt).toBe('Hello, Codex');
+		});
+
+		it('should embed image paths in prompt when resuming with images (prompt-embed)', async () => {
+			const config = makeConfig({
+				prompt: 'Continue working',
+				resumeSessionId: 'thread-old',
+				images: ['/tmp/img1.png', '/tmp/img2.png'],
+			});
+
+			await harness.spawn(config);
+
+			const opts = (mockExecFn as any).mock.calls[0][0] as CodexExecOptions;
+			// Images should NOT be in execOptions.images
+			expect(opts.images).toBeUndefined();
+			// Image paths should be embedded in the prompt text
+			expect(opts.prompt).toContain('/tmp/img1.png');
+			expect(opts.prompt).toContain('/tmp/img2.png');
+			expect(opts.prompt).toContain('Continue working');
+		});
+
+		it('should embed image paths before the prompt text when resuming', async () => {
+			const config = makeConfig({
+				prompt: 'Analyze this',
+				resumeSessionId: 'thread-old',
+				images: ['/tmp/screenshot.png'],
+			});
+
+			await harness.spawn(config);
+
+			const opts = (mockExecFn as any).mock.calls[0][0] as CodexExecOptions;
+			// The image prefix should come before the user prompt
+			const imageIdx = opts.prompt!.indexOf('/tmp/screenshot.png');
+			const promptIdx = opts.prompt!.indexOf('Analyze this');
+			expect(imageIdx).toBeLessThan(promptIdx);
 		});
 
 		it('should map permissionMode=plan to sandbox=read-only', async () => {

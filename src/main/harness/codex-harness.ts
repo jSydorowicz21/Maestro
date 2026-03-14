@@ -24,6 +24,7 @@ import type { InteractionResponse } from '../../shared/interaction-types';
 import type { HarnessRuntimeCapabilities, RuntimeMetadataEvent } from '../../shared/runtime-metadata-types';
 import type { CodexProviderOptions } from './codex-provider-options';
 import { CODEX_PROVIDER_OPTION_KEYS } from './codex-provider-options';
+import { buildImagePromptPrefix } from '../process-manager/utils/imageUtils';
 import { logger } from '../utils/logger';
 
 const LOG_CONTEXT = '[CodexHarness]';
@@ -152,7 +153,19 @@ export class CodexHarness extends EventEmitter implements AgentHarness {
 			if (config.maxTurns) execOptions.maxTurns = config.maxTurns;
 			if (config.customEnvVars) execOptions.env = config.customEnvVars;
 			if (config.resumeSessionId) execOptions.threadId = config.resumeSessionId;
-			if (config.images && config.images.length > 0) execOptions.images = config.images;
+
+			// Image handling: prompt-embed on resume, SDK images on initial spawn
+			if (config.images && config.images.length > 0) {
+				if (config.resumeSessionId) {
+					// Resume mode: Codex resume doesn't support -i flag, so embed
+					// image file paths in the prompt text (imageResumeMode: 'prompt-embed')
+					const imagePrefix = buildImagePromptPrefix(config.images);
+					execOptions.prompt = imagePrefix + execOptions.prompt;
+				} else {
+					// Initial spawn: pass images via SDK images field
+					execOptions.images = config.images;
+				}
+			}
 
 			// Map permission mode to sandbox mode
 			if (config.permissionMode === 'plan') {
