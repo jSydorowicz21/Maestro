@@ -606,8 +606,8 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 					ctx.setTabSwitcherOpen(true);
 					trackShortcut('tabSwitcher');
 				}
-				// Cmd+T: New AI tab (AI mode only — terminal tabs use Ctrl+Shift+`)
-				if (ctx.isTabShortcut(e, 'newTab') && ctx.activeSession.inputMode === 'ai') {
+				// Cmd+T: New AI tab (works in any mode including terminal)
+				if (ctx.isTabShortcut(e, 'newTab')) {
 					e.preventDefault();
 					const result = ctx.createTab(ctx.activeSession, {
 						saveToHistory: ctx.defaultSaveToHistory,
