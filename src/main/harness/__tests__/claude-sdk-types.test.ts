@@ -84,6 +84,7 @@ describe('claude-sdk-types drift detection', () => {
 
 		// Known message type discriminants our stubs cover
 		const knownMessageTypes = [
+			// Day 1 message types
 			'system',
 			'assistant',
 			'result',
@@ -93,6 +94,15 @@ describe('claude-sdk-types drift detection', () => {
 			'compact_boundary',
 			'tool_progress',
 			'auth_status',
+			// Day 2 message types (SDK v0.2.74)
+			'task_started',
+			'task_progress',
+			'task_notification',
+			'files_persisted',
+			'prompt_suggestion',
+			'hook_started',
+			'hook_progress',
+			'hook_response',
 		];
 
 		console.log(
