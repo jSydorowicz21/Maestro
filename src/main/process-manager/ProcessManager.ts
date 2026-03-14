@@ -15,8 +15,9 @@ import { DataBufferManager } from './handlers/DataBufferManager';
 import { LocalCommandRunner } from './runners/LocalCommandRunner';
 import { SshCommandRunner } from './runners/SshCommandRunner';
 import { selectExecutionMode } from './utils/executionMode';
+import { createHarness } from '../harness/harness-registry';
 import { logger } from '../utils/logger';
-import type { SshRemoteConfig } from '../../shared/types';
+import type { SshRemoteConfig, ToolType, AgentExecutionConfig } from '../../shared/types';
 import type { InteractionResponse } from '../../shared/interaction-types';
 import type { HarnessRuntimeSettings } from '../../shared/harness-types';
 
@@ -51,29 +52,133 @@ export class ProcessManager extends EventEmitter {
 	 *
 	 * Selects execution mode (classic vs harness) based on agent capabilities,
 	 * query context, and caller preferences. Classic mode uses PTY or child-process
-	 * spawners. Harness mode will delegate to an AgentHarness adapter once
-	 * implementations are registered (Phase 2+).
+	 * spawners. Harness mode delegates to an AgentHarness adapter when a factory
+	 * is registered for the agent type; falls back to classic otherwise.
 	 */
 	spawn(config: ProcessConfig): SpawnResult {
 		const { mode } = selectExecutionMode(config);
 
 		if (mode === 'harness') {
-			// Harness execution path — harness implementations are not yet registered.
-			// Log and fall back to classic for now. When harness adapters are added
-			// (Phase 2+), this branch will call createHarness() and spawnHarnessExecution().
-			//
-			// TODO(Phase 2+): Event forwarding wiring
-			// 1. Create the harness via createHarness(config) and store in the execution record
-			// 2. Subscribe to harness EventEmitter events and re-emit through ProcessManager:
-			//    - harness.on('interaction-request', (sessionId, request) => this.emit('interaction-request', sessionId, request))
-			//    - harness.on('runtime-metadata', (sessionId, metadata) => this.emit('runtime-metadata', sessionId, metadata))
-			//    - harness.on('data', ...), harness.on('exit', ...), etc. for all standard events
-			// 3. Call harness.spawn(executionConfig) and return the HarnessSpawnResult
-			logger.warn(
-				'[ProcessManager] Harness mode selected but no harness implementations registered; falling back to classic',
-				'ProcessManager',
-				{ sessionId: config.sessionId, toolType: config.toolType }
-			);
+			const harness = createHarness(config.toolType);
+
+			if (!harness) {
+				// No factory registered — fall back to classic with warning
+				logger.warn(
+					'[ProcessManager] Harness mode selected but no harness factory registered; falling back to classic',
+					'ProcessManager',
+					{ sessionId: config.sessionId, toolType: config.toolType }
+				);
+			} else {
+				// Subscribe to all standard ProcessManager events emitted by the harness
+				const standardEvents = [
+					'data', 'exit', 'stderr', 'session-id', 'usage',
+					'thinking-chunk', 'tool-execution', 'agent-error',
+					'query-complete', 'slash-commands',
+				] as const;
+
+				for (const eventName of standardEvents) {
+					harness.on(eventName, (...args: unknown[]) => {
+						this.emit(eventName, ...args);
+					});
+				}
+
+				// Subscribe to harness-specific events and re-emit through ProcessManager
+				harness.on('interaction-request', (sessionId: string, request: unknown) => {
+					this.emit('interaction-request', sessionId, request);
+				});
+				harness.on('runtime-metadata', (sessionId: string, metadata: unknown) => {
+					this.emit('runtime-metadata', sessionId, metadata);
+				});
+
+				// Create the AgentExecution record
+				const execution: AgentExecution = {
+					sessionId: config.sessionId,
+					toolType: config.toolType,
+					backend: 'harness',
+					harness,
+					cwd: config.cwd,
+					pid: null,
+					isTerminal: false,
+					startTime: Date.now(),
+					querySource: config.querySource,
+					tabId: config.tabId,
+					projectPath: config.projectPath,
+					contextWindow: config.contextWindow,
+				};
+
+				// Store the execution record
+				this.processes.set(config.sessionId, execution);
+
+				// Build AgentExecutionConfig from ProcessConfig
+				const executionConfig: AgentExecutionConfig = {
+					sessionId: config.sessionId,
+					toolType: config.toolType as ToolType,
+					cwd: config.cwd,
+					prompt: config.prompt,
+					images: config.images,
+					customEnvVars: config.customEnvVars,
+					contextWindow: config.contextWindow,
+					querySource: config.querySource,
+					tabId: config.tabId,
+					projectPath: config.projectPath,
+					preferredExecutionMode: config.preferredExecutionMode,
+					providerOptions: config.providerOptions,
+					permissionMode: config.permissionMode,
+				};
+
+				// Spawn async — fire-and-forget with error handling
+				harness.spawn(executionConfig).then(
+					(spawnResult) => {
+						if (spawnResult.pid != null) {
+							execution.pid = spawnResult.pid;
+						}
+						if (!spawnResult.success) {
+							logger.error(
+								'[ProcessManager] Harness spawn reported failure',
+								'ProcessManager',
+								{ sessionId: config.sessionId, toolType: config.toolType }
+							);
+							harness.dispose();
+							this.processes.delete(config.sessionId);
+							this.emit('agent-error', config.sessionId, {
+								type: 'agent_crashed',
+								message: 'Harness spawn failed',
+								recoverable: false,
+							});
+							this.emit('exit', config.sessionId, 1);
+						} else {
+							logger.info(
+								`[ProcessManager] Harness spawn succeeded — pid=${spawnResult.pid ?? null}`,
+								'ProcessManager',
+								{ sessionId: config.sessionId, toolType: config.toolType }
+							);
+						}
+					},
+					(error) => {
+						logger.error(
+							`[ProcessManager] Harness spawn threw: ${String(error)}`,
+							'ProcessManager',
+							{ sessionId: config.sessionId, toolType: config.toolType }
+						);
+						harness.dispose();
+						this.processes.delete(config.sessionId);
+						this.emit('agent-error', config.sessionId, {
+							type: 'agent_crashed',
+							message: `Harness spawn error: ${String(error)}`,
+							recoverable: false,
+						});
+						this.emit('exit', config.sessionId, 1);
+					}
+				);
+
+				logger.debug(
+					'[ProcessManager] spawn() completed — backend=harness, pid=null',
+					'ProcessManager',
+					{ sessionId: config.sessionId, toolType: config.toolType, selectedMode: mode }
+				);
+
+				return { pid: null, success: true };
+			}
 		}
 
 		// Classic execution path (also serves as fallback for unregistered harnesses)

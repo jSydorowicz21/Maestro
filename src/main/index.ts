@@ -78,6 +78,7 @@ import { updateParticipant, loadGroupChat, updateGroupChat } from './group-chat/
 import { needsSessionRecovery, initiateSessionRecovery } from './group-chat/session-recovery';
 import { initializeSessionStorages } from './storage';
 import { initializeOutputParsers } from './parsers';
+import { initializeHarnesses } from './harness';
 import { calculateContextTokens } from './parsers/usage-aggregator';
 import {
 	DEMO_MODE,
@@ -529,6 +530,9 @@ function setupIpcHandlers() {
 	// Initialize output parsers for all agents (Codex, OpenCode, Claude Code)
 	// This must be called before any agent output is processed
 	initializeOutputParsers();
+
+	// Initialize harness factories for SDK-backed agent execution
+	initializeHarnesses();
 
 	// Initialize session storages and register generic agent sessions handlers
 	// This provides the new window.maestro.agentSessions.* API

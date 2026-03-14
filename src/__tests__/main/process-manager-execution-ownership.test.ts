@@ -154,7 +154,7 @@ describe('ProcessManager: Unified Execution Ownership', () => {
 
 			// Verify the harness fallback warning was logged
 			expect(mockLogger.warn).toHaveBeenCalledWith(
-				expect.stringContaining('Harness mode selected but no harness implementations registered'),
+				expect.stringContaining('no harness factory registered; falling back to classic'),
 				'ProcessManager',
 				expect.objectContaining({
 					sessionId: 'test-harness-fallback',
