@@ -61,6 +61,7 @@ import type {
 	SDKTaskStartedMessage,
 	SDKTaskProgressMessage,
 	SDKTaskNotificationMessage,
+	SDKFilesPersistedEvent,
 } from './claude-sdk-types';
 import { encodeImageFiles } from './claude-image-encoding';
 import { logger } from '../utils/logger';
@@ -938,6 +939,16 @@ export class ClaudeCodeHarness extends EventEmitter implements AgentHarness {
 					`${LOG_CONTEXT} Background task notification: ${taskMsg.task_id}`,
 					LOG_CONTEXT,
 					{ sessionId, taskId: taskMsg.task_id, taskName: taskMsg.task_name, notificationType: taskMsg.notification_type }
+				);
+				break;
+			}
+
+			case 'files_persisted': {
+				const fpMsg = message as SDKFilesPersistedEvent;
+				logger.debug(
+					`${LOG_CONTEXT} Files persisted event`,
+					LOG_CONTEXT,
+					{ sessionId, messageId: fpMsg.message_id, fileCount: fpMsg.file_paths?.length }
 				);
 				break;
 			}

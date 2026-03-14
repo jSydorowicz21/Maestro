@@ -1590,6 +1590,44 @@ describe('ClaudeCodeHarness', () => {
 			expect(parsed.message).toBeUndefined();
 			expect(parsed.notificationType).toBeUndefined();
 		});
+		it('should log files_persisted without emitting a data event', async () => {
+			const dataEvents: string[] = [];
+			harness.on('data', (_sid: string, data: string) => {
+				dataEvents.push(data);
+			});
+
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			const dataCountBefore = dataEvents.length;
+
+			mockFn.pushMessage({
+				type: 'files_persisted',
+				message_id: 'msg-001',
+				file_paths: ['/src/foo.ts', '/src/bar.ts'],
+				session_id: 'sess-abc',
+			} as any);
+
+			await flushMicrotasks();
+
+			// No new data events should be emitted — files_persisted is logged only
+			expect(dataEvents.length).toBe(dataCountBefore);
+		});
+
+		it('should handle files_persisted with minimal fields without crashing', async () => {
+			await harness.spawn(createTestConfig());
+			await flushMicrotasks();
+
+			// Should not throw when optional fields are absent
+			mockFn.pushMessage({
+				type: 'files_persisted',
+			} as any);
+
+			await flushMicrotasks();
+
+			// Harness should still be running
+			expect(harness.isRunning()).toBe(true);
+		});
 	});
 
 	// ====================================================================

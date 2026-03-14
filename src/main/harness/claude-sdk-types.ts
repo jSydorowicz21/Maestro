@@ -166,6 +166,18 @@ export interface SDKTaskNotificationMessage {
 }
 
 /**
+ * Files persisted event — internal SDK bookkeeping for file checkpointing.
+ * Not surfaced to the UI; logged only.
+ * SDK version: @anthropic-ai/claude-agent-sdk v0.2.74 (Day 2 message type)
+ */
+export interface SDKFilesPersistedEvent {
+	type: 'files_persisted';
+	message_id?: string;
+	file_paths?: string[];
+	session_id?: string;
+}
+
+/**
  * Union of all SDK message types that the harness needs to handle.
  */
 export type SDKMessage =
@@ -182,6 +194,7 @@ export type SDKMessage =
 	| SDKTaskStartedMessage
 	| SDKTaskProgressMessage
 	| SDKTaskNotificationMessage
+	| SDKFilesPersistedEvent
 	| { type: string; [key: string]: unknown };
 
 // ============================================================================
