@@ -188,6 +188,45 @@ describe('useAgentExecution', () => {
 		expect(updatedSession.aiTabs[0].state).toBe('idle');
 	});
 
+	it('passes querySource "auto" in the spawn config for Auto Run tracking', async () => {
+		const session = createMockSession({
+			state: 'busy',
+			aiTabs: [createMockTab({ state: 'busy' })],
+		});
+		const sessionsRef = { current: [session] };
+		const setSessions = vi.fn();
+		const processQueuedItemRef = { current: null };
+
+		const { result } = renderHook(() =>
+			useAgentExecution({
+				activeSession: session,
+				sessionsRef,
+				setSessions,
+				processQueuedItemRef,
+				setFlashNotification: vi.fn(),
+				setSuccessFlashNotification: vi.fn(),
+			})
+		);
+
+		const spawnPromise = result.current.spawnAgentForSession(session.id, 'Auto Run prompt');
+
+		await waitFor(() => {
+			expect(mockProcess.spawn).toHaveBeenCalledTimes(1);
+		});
+
+		const spawnConfig = mockProcess.spawn.mock.calls[0][0];
+
+		// querySource must be 'auto' so selectExecutionMode() logs "Auto Run query:"
+		// and stats tracking correctly identifies Auto Run queries
+		expect(spawnConfig.querySource).toBe('auto');
+
+		const targetSessionId = spawnConfig.sessionId as string;
+		act(() => {
+			onExitHandler?.(targetSessionId);
+		});
+		await spawnPromise;
+	});
+
 	it('uses raw stdin prompt delivery for local Windows batch runs when stream-json input is unsupported', async () => {
 		const originalPlatform = (window as any).maestro?.platform;
 		(window as any).maestro = { ...((window as any).maestro || {}), platform: 'win32' };

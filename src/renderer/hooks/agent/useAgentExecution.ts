@@ -424,6 +424,9 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 							sessionSshRemoteConfig: session.sessionSshRemoteConfig,
 							sendPromptViaStdin,
 							sendPromptViaStdinRaw,
+							// Auto Run queries must be tagged so selectExecutionMode() logs the
+							// correct "Auto Run query:" prefix and stats tracking is accurate.
+							querySource: 'auto',
 						})
 						.catch(() => {
 							cleanup();
