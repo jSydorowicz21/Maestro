@@ -82,6 +82,7 @@ import {
 	getRegisteredHarnessIds,
 } from './harness-registry';
 import { ClaudeCodeHarness } from './claude-code-harness';
+import { CodexHarness } from './codex-harness';
 import { logger } from '../utils/logger';
 
 const LOG_CONTEXT = '[Harness]';
@@ -108,6 +109,21 @@ export function initializeHarnesses(): void {
 	} catch {
 		logger.info(
 			`${LOG_CONTEXT} Claude Agent SDK not available — ClaudeCodeHarness not registered`,
+			LOG_CONTEXT
+		);
+	}
+
+	// Register Codex harness if the SDK is available
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-var-requires
+		const codexSdk = require('@openai/codex-sdk');
+		if (codexSdk && typeof codexSdk.exec === 'function') {
+			registerHarness('codex' as any, () => new CodexHarness(codexSdk.exec));
+			logger.info(`${LOG_CONTEXT} Registered CodexHarness (SDK available)`, LOG_CONTEXT);
+		}
+	} catch {
+		logger.info(
+			`${LOG_CONTEXT} Codex SDK not available — CodexHarness not registered`,
 			LOG_CONTEXT
 		);
 	}

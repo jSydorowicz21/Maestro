@@ -110,6 +110,7 @@ describe('agent-capabilities', () => {
 			expect(capabilities.supportsStreaming).toBe(true);
 			expect(capabilities.supportsSlashCommands).toBe(false);
 			expect(capabilities.supportsResultMessages).toBe(false);
+			expect(capabilities.supportsHarnessExecution).toBe(true);
 			expect(capabilities.imageResumeMode).toBe('prompt-embed');
 		});
 
