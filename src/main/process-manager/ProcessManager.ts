@@ -207,7 +207,7 @@ export class ProcessManager extends EventEmitter {
 	 * Routes to the correct backend based on the execution record:
 	 * - 'pty': writes to the PTY process
 	 * - 'child-process': writes to the child process stdin
-	 * - 'harness': delegates to the harness write() (Phase 2+)
+	 * - 'harness': delegates to the harness write() as text input
 	 */
 	write(sessionId: string, data: string): boolean {
 		const execution = this.processes.get(sessionId);
@@ -246,15 +246,16 @@ export class ProcessManager extends EventEmitter {
 					return false;
 
 				case 'harness':
-					// Harness write delegation — Phase 2+
-					// This path should be unreachable in Phase 1: harness-backed executions
-					// use the SDK's streaming input API (streamInput), not raw write().
-					logger.error(
-						'[ProcessManager] write() called on harness-backed execution — unreachable in Phase 1',
+					if (execution.harness) {
+						execution.harness.write({ type: 'text', text: data });
+						return true;
+					}
+					logger.warn(
+						'[ProcessManager] write() - harness-backed execution has no harness instance',
 						'ProcessManager',
 						{ sessionId }
 					);
-					return true;
+					return false;
 
 				default:
 					logger.warn('[ProcessManager] write() - unknown backend type', 'ProcessManager', {
@@ -298,7 +299,7 @@ export class ProcessManager extends EventEmitter {
 	 * Routes based on backend:
 	 * - 'pty': sends Ctrl+C character
 	 * - 'child-process': sends SIGINT, escalates to SIGTERM after timeout
-	 * - 'harness': delegates to harness interrupt() (Phase 2+)
+	 * - 'harness': delegates to harness interrupt()
 	 */
 	interrupt(sessionId: string): boolean {
 		const execution = this.processes.get(sessionId);
@@ -353,15 +354,24 @@ export class ProcessManager extends EventEmitter {
 					return false;
 
 				case 'harness':
-					// Harness interrupt delegation — Phase 2+
-					// This path should be unreachable in Phase 1: harness-backed executions
-					// use the SDK's interrupt API, not raw interrupt().
-					logger.error(
-						'[ProcessManager] interrupt() called on harness-backed execution — unreachable in Phase 1',
+					if (execution.harness) {
+						// Fire-and-forget: interrupt() is async but callers expect synchronous return.
+						// Errors are logged but don't affect the return value.
+						execution.harness.interrupt().catch((error) => {
+							logger.error(
+								'[ProcessManager] harness.interrupt() threw',
+								'ProcessManager',
+								{ sessionId, error: String(error) }
+							);
+						});
+						return true;
+					}
+					logger.warn(
+						'[ProcessManager] interrupt() - harness-backed execution has no harness instance',
 						'ProcessManager',
 						{ sessionId }
 					);
-					return true;
+					return false;
 
 				default:
 					logger.warn('[ProcessManager] interrupt() - unknown backend type', 'ProcessManager', {
@@ -465,8 +475,7 @@ export class ProcessManager extends EventEmitter {
 	 *
 	 * Only valid for sessions running with the 'harness' backend. Classic
 	 * (PTY / child-process) sessions do not use the structured interaction
-	 * protocol. When harness adapters are registered (Phase 2+) this will
-	 * delegate to harness.respondToInteraction().
+	 * protocol.
 	 */
 	async respondToInteraction(
 		sessionId: string,
@@ -492,14 +501,16 @@ export class ProcessManager extends EventEmitter {
 			return;
 		}
 
-		// Harness response delegation — Phase 2+
-		// When harness adapters land, this will call:
-		//   execution.harness.respondToInteraction(interactionId, response)
-		logger.warn(
-			'[ProcessManager] respondToInteraction() - harness adapters not yet registered',
-			'ProcessManager',
-			{ sessionId, interactionId, responseKind: response.kind }
-		);
+		if (!execution.harness) {
+			logger.error(
+				'[ProcessManager] respondToInteraction() - harness-backed execution has no harness instance',
+				'ProcessManager',
+				{ sessionId, interactionId }
+			);
+			return;
+		}
+
+		await execution.harness.respondToInteraction(interactionId, response);
 	}
 
 	/**
@@ -507,8 +518,6 @@ export class ProcessManager extends EventEmitter {
 	 *
 	 * Only valid for sessions running with the 'harness' backend. Classic
 	 * (PTY / child-process) sessions do not support runtime settings updates.
-	 * When harness adapters are registered (Phase 2+) this will delegate to
-	 * harness.updateRuntimeSettings().
 	 */
 	async updateRuntimeSettings(
 		sessionId: string,
@@ -533,14 +542,16 @@ export class ProcessManager extends EventEmitter {
 			return;
 		}
 
-		// Harness settings delegation — Phase 2+
-		// When harness adapters land, this will call:
-		//   await execution.harness.updateRuntimeSettings(settings)
-		logger.warn(
-			'[ProcessManager] updateRuntimeSettings() - harness adapters not yet registered',
-			'ProcessManager',
-			{ sessionId, settingsKeys: Object.keys(settings) }
-		);
+		if (!execution.harness) {
+			logger.error(
+				'[ProcessManager] updateRuntimeSettings() - harness-backed execution has no harness instance',
+				'ProcessManager',
+				{ sessionId }
+			);
+			return;
+		}
+
+		await execution.harness.updateRuntimeSettings(settings);
 	}
 
 	/**

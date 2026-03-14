@@ -407,4 +407,166 @@ describe('ProcessManager harness spawn path', () => {
 			expect(result.success).toBe(true);
 		});
 	});
+
+	describe('harness delegation: write()', () => {
+		let mockHarness: AgentHarness;
+
+		beforeEach(() => {
+			mockHarness = createMockHarness();
+			vi.mocked(selectExecutionMode).mockReturnValue({ mode: 'harness', reason: 'test' });
+			mockCreateHarness.mockReturnValue(mockHarness);
+		});
+
+		it('should delegate write() to harness.write() with text input', () => {
+			const config = makeConfig();
+			pm.spawn(config);
+
+			const result = pm.write(config.sessionId, 'hello world');
+
+			expect(result).toBe(true);
+			expect(mockHarness.write).toHaveBeenCalledWith({ type: 'text', text: 'hello world' });
+		});
+
+		it('should return false when no execution exists', () => {
+			expect(pm.write('nonexistent', 'data')).toBe(false);
+		});
+	});
+
+	describe('harness delegation: interrupt()', () => {
+		let mockHarness: AgentHarness;
+
+		beforeEach(() => {
+			mockHarness = createMockHarness();
+			vi.mocked(selectExecutionMode).mockReturnValue({ mode: 'harness', reason: 'test' });
+			mockCreateHarness.mockReturnValue(mockHarness);
+		});
+
+		it('should delegate interrupt() to harness.interrupt()', () => {
+			const config = makeConfig();
+			pm.spawn(config);
+
+			const result = pm.interrupt(config.sessionId);
+
+			expect(result).toBe(true);
+			expect(mockHarness.interrupt).toHaveBeenCalled();
+		});
+
+		it('should return false when no execution exists', () => {
+			expect(pm.interrupt('nonexistent')).toBe(false);
+		});
+
+		it('should log error when harness.interrupt() rejects', async () => {
+			vi.mocked(mockHarness.interrupt).mockRejectedValue(new Error('interrupt failed'));
+
+			const config = makeConfig();
+			pm.spawn(config);
+
+			const result = pm.interrupt(config.sessionId);
+			expect(result).toBe(true);
+
+			// Wait for async rejection to be handled
+			await vi.waitFor(() => {
+				expect(logger.error).toHaveBeenCalledWith(
+					'[ProcessManager] harness.interrupt() threw',
+					'ProcessManager',
+					expect.objectContaining({ sessionId: config.sessionId })
+				);
+			});
+		});
+	});
+
+	describe('harness delegation: respondToInteraction()', () => {
+		let mockHarness: AgentHarness;
+
+		beforeEach(() => {
+			mockHarness = createMockHarness();
+			vi.mocked(selectExecutionMode).mockReturnValue({ mode: 'harness', reason: 'test' });
+			mockCreateHarness.mockReturnValue(mockHarness);
+		});
+
+		it('should delegate to harness.respondToInteraction()', async () => {
+			const config = makeConfig();
+			pm.spawn(config);
+
+			const response = { kind: 'tool-approval' as const, approved: true };
+			await pm.respondToInteraction(config.sessionId, 'interaction-1', response as any);
+
+			expect(mockHarness.respondToInteraction).toHaveBeenCalledWith('interaction-1', response);
+		});
+
+		it('should warn when no execution exists', async () => {
+			await pm.respondToInteraction('nonexistent', 'interaction-1', { kind: 'tool-approval' } as any);
+
+			expect(logger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('No execution found'),
+				'ProcessManager',
+				expect.any(Object)
+			);
+		});
+	});
+
+	describe('harness delegation: updateRuntimeSettings()', () => {
+		let mockHarness: AgentHarness;
+
+		beforeEach(() => {
+			mockHarness = createMockHarness();
+			vi.mocked(selectExecutionMode).mockReturnValue({ mode: 'harness', reason: 'test' });
+			mockCreateHarness.mockReturnValue(mockHarness);
+		});
+
+		it('should delegate to harness.updateRuntimeSettings()', async () => {
+			const config = makeConfig();
+			pm.spawn(config);
+
+			const settings = { permissionMode: 'bypassPermissions' as const };
+			await pm.updateRuntimeSettings(config.sessionId, settings);
+
+			expect(mockHarness.updateRuntimeSettings).toHaveBeenCalledWith(settings);
+		});
+
+		it('should warn when no execution exists', async () => {
+			await pm.updateRuntimeSettings('nonexistent', { model: 'claude-opus' });
+
+			expect(logger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('No execution found'),
+				'ProcessManager',
+				expect.any(Object)
+			);
+		});
+	});
+
+	describe('harness delegation: kill()', () => {
+		let mockHarness: AgentHarness;
+
+		beforeEach(() => {
+			mockHarness = createMockHarness();
+			vi.mocked(selectExecutionMode).mockReturnValue({ mode: 'harness', reason: 'test' });
+			mockCreateHarness.mockReturnValue(mockHarness);
+		});
+
+		it('should call harness.dispose() and remove execution record', () => {
+			const config = makeConfig();
+			pm.spawn(config);
+
+			const result = pm.kill(config.sessionId);
+
+			expect(result).toBe(true);
+			expect(mockHarness.dispose).toHaveBeenCalled();
+			expect(pm.get(config.sessionId)).toBeUndefined();
+		});
+
+		it('should continue cleanup even if dispose() throws', () => {
+			vi.mocked(mockHarness.dispose).mockImplementation(() => {
+				throw new Error('dispose failed');
+			});
+
+			const config = makeConfig();
+			pm.spawn(config);
+
+			const result = pm.kill(config.sessionId);
+
+			expect(result).toBe(true);
+			expect(pm.get(config.sessionId)).toBeUndefined();
+		});
+	});
 });
