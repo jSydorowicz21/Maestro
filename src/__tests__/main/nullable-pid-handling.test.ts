@@ -707,19 +707,40 @@ describe('Nullable PID Handling', () => {
 			expect(pm.get('harness-1')).toBeUndefined();
 		});
 
-		it('interrupt() on harness execution returns true (unreachable in Phase 1)', () => {
+		it('interrupt() on harness execution without harness instance returns false', () => {
+			// No harness instance attached — interrupt cannot delegate, returns false
 			const execution = makeHarnessExecution({ pid: null });
 			injectExecution(pm, execution);
 
 			const result = pm.interrupt('harness-1');
-			expect(result).toBe(true);
+			expect(result).toBe(false);
 
 			// Execution should still exist (interrupt doesn't remove it)
 			expect(pm.get('harness-1')).toBeDefined();
 		});
 
-		it('write() on harness execution returns true (unreachable in Phase 1)', () => {
+		it('interrupt() on harness execution with harness instance returns true', () => {
+			const mockHarness = { interrupt: vi.fn().mockResolvedValue(undefined) };
+			const execution = makeHarnessExecution({ pid: null, harness: mockHarness as any });
+			injectExecution(pm, execution);
+
+			const result = pm.interrupt('harness-1');
+			expect(result).toBe(true);
+			expect(pm.get('harness-1')).toBeDefined();
+		});
+
+		it('write() on harness execution without harness instance returns false', () => {
+			// No harness instance attached — write cannot delegate, returns false
 			const execution = makeHarnessExecution({ pid: null });
+			injectExecution(pm, execution);
+
+			const result = pm.write('harness-1', 'test data');
+			expect(result).toBe(false);
+		});
+
+		it('write() on harness execution with harness instance returns true', () => {
+			const mockHarness = { write: vi.fn() };
+			const execution = makeHarnessExecution({ pid: null, harness: mockHarness as any });
 			injectExecution(pm, execution);
 
 			const result = pm.write('harness-1', 'test data');
@@ -768,25 +789,27 @@ describe('Nullable PID Handling', () => {
 			);
 		});
 
-		it('write() harness error log does not crash with null PID', () => {
+		it('write() harness warning log does not crash with null PID', () => {
 			injectExecution(pm, makeHarnessExecution({ pid: null }));
 
 			pm.write('harness-1', 'data');
 
-			expect(mockLogger.error).toHaveBeenCalledWith(
-				expect.stringContaining('unreachable in Phase 1'),
+			// No harness instance → warns about missing harness, does not crash
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('harness-backed execution has no harness instance'),
 				'ProcessManager',
 				expect.objectContaining({ sessionId: 'harness-1' })
 			);
 		});
 
-		it('interrupt() harness error log does not crash with null PID', () => {
+		it('interrupt() harness warning log does not crash with null PID', () => {
 			injectExecution(pm, makeHarnessExecution({ pid: null }));
 
 			pm.interrupt('harness-1');
 
-			expect(mockLogger.error).toHaveBeenCalledWith(
-				expect.stringContaining('unreachable in Phase 1'),
+			// No harness instance → warns about missing harness, does not crash
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('harness-backed execution has no harness instance'),
 				'ProcessManager',
 				expect.objectContaining({ sessionId: 'harness-1' })
 			);
