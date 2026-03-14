@@ -3,13 +3,13 @@
  *
  * Verifies that ProcessManager correctly routes operations through
  * the backend discriminator (pty, child-process, harness) and that
- * the harness execution path behaves correctly during Phase 1
- * (logs warnings and returns safe defaults since harness adapters
- * are not yet wired).
+ * harness-backed methods delegate to the AgentHarness instance.
  *
  * Also covers:
  * - Spawn fallback when harness mode is selected but no adapters registered
- * - respondToInteraction() guards for backend type and missing sessions
+ * - respondToInteraction() and updateRuntimeSettings() guards for backend type and missing sessions
+ * - Delegation calls reaching mock harness methods
+ * - Null-guard error logging when harness field is missing despite backend being 'harness'
  * - Nullable PID in harness-backed AgentExecution records
  * - kill() cleanup for harness-backed executions
  */
@@ -52,9 +52,8 @@ const mockLogger = logger as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 /**
  * Helper: inject a synthetic execution record into the ProcessManager's
- * private processes map. This is necessary because Phase 1 spawn()
- * always falls back to classic, so we can't get a harness-backed
- * record through the normal spawn path.
+ * private processes map. This bypasses spawn() so we can test
+ * delegation directly with mock harness instances.
  */
 function injectExecution(pm: ProcessManager, execution: AgentExecution): void {
 	// Access the private map for test injection
@@ -188,15 +187,36 @@ describe('ProcessManager: Unified Execution Ownership', () => {
 	// write() routing by backend
 	// ===================================================================
 	describe('write() backend routing', () => {
-		it('returns true and logs error for harness backend (unreachable in Phase 1)', () => {
-			const execution = makeHarnessExecution();
+		it('delegates to harness.write() with HarnessInput for harness backend', () => {
+			const mockWrite = vi.fn();
+			const execution = makeHarnessExecution({
+				harness: {
+					write: mockWrite,
+					interrupt: vi.fn(),
+					respondToInteraction: vi.fn(),
+					updateRuntimeSettings: vi.fn(),
+					dispose: vi.fn(),
+					isDisposed: () => false,
+				} as any,
+			});
 			injectExecution(pm, execution);
 
 			const result = pm.write('harness-session-1', 'hello');
 
 			expect(result).toBe(true);
-			expect(mockLogger.error).toHaveBeenCalledWith(
-				expect.stringContaining('unreachable in Phase 1'),
+			expect(mockWrite).toHaveBeenCalledOnce();
+			expect(mockWrite).toHaveBeenCalledWith({ type: 'text', text: 'hello' });
+		});
+
+		it('returns false and logs warning when harness field is null despite backend being harness (write)', () => {
+			const execution = makeHarnessExecution(); // no harness field
+			injectExecution(pm, execution);
+
+			const result = pm.write('harness-session-1', 'hello');
+
+			expect(result).toBe(false);
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('no harness instance'),
 				'ProcessManager',
 				expect.objectContaining({ sessionId: 'harness-session-1' })
 			);
@@ -238,15 +258,63 @@ describe('ProcessManager: Unified Execution Ownership', () => {
 	// interrupt() routing by backend
 	// ===================================================================
 	describe('interrupt() backend routing', () => {
-		it('returns true and logs error for harness backend (unreachable in Phase 1)', () => {
-			const execution = makeHarnessExecution();
+		it('delegates to harness.interrupt() for harness backend (fire-and-forget)', () => {
+			const mockInterrupt = vi.fn().mockResolvedValue(undefined);
+			const execution = makeHarnessExecution({
+				harness: {
+					write: vi.fn(),
+					interrupt: mockInterrupt,
+					respondToInteraction: vi.fn(),
+					updateRuntimeSettings: vi.fn(),
+					dispose: vi.fn(),
+					isDisposed: () => false,
+				} as any,
+			});
 			injectExecution(pm, execution);
 
 			const result = pm.interrupt('harness-session-1');
 
 			expect(result).toBe(true);
-			expect(mockLogger.error).toHaveBeenCalledWith(
-				expect.stringContaining('unreachable in Phase 1'),
+			expect(mockInterrupt).toHaveBeenCalledOnce();
+		});
+
+		it('returns true even if harness.interrupt() rejects (error is caught and logged)', async () => {
+			const error = new Error('interrupt failed');
+			const mockInterrupt = vi.fn().mockRejectedValue(error);
+			const execution = makeHarnessExecution({
+				harness: {
+					write: vi.fn(),
+					interrupt: mockInterrupt,
+					respondToInteraction: vi.fn(),
+					updateRuntimeSettings: vi.fn(),
+					dispose: vi.fn(),
+					isDisposed: () => false,
+				} as any,
+			});
+			injectExecution(pm, execution);
+
+			const result = pm.interrupt('harness-session-1');
+			expect(result).toBe(true);
+
+			// Wait for the .catch() handler to run
+			await vi.waitFor(() => {
+				expect(mockLogger.error).toHaveBeenCalledWith(
+					expect.stringContaining('harness.interrupt() threw'),
+					'ProcessManager',
+					expect.objectContaining({ sessionId: 'harness-session-1' })
+				);
+			});
+		});
+
+		it('returns false and logs warning when harness field is null despite backend being harness (interrupt)', () => {
+			const execution = makeHarnessExecution(); // no harness field
+			injectExecution(pm, execution);
+
+			const result = pm.interrupt('harness-session-1');
+
+			expect(result).toBe(false);
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('no harness instance'),
 				'ProcessManager',
 				expect.objectContaining({ sessionId: 'harness-session-1' })
 			);
@@ -415,46 +483,69 @@ describe('ProcessManager: Unified Execution Ownership', () => {
 			);
 		});
 
-		it('reaches harness delegation stub for harness backend', () => {
-			const execution = makeHarnessExecution();
+		it('delegates to harness.respondToInteraction() for harness backend', async () => {
+			const mockRespondToInteraction = vi.fn().mockResolvedValue(undefined);
+			const execution = makeHarnessExecution({
+				harness: {
+					write: vi.fn(),
+					interrupt: vi.fn(),
+					respondToInteraction: mockRespondToInteraction,
+					updateRuntimeSettings: vi.fn(),
+					dispose: vi.fn(),
+					isDisposed: () => false,
+				} as any,
+			});
 			injectExecution(pm, execution);
 
-			pm.respondToInteraction('harness-session-1', 'int-1', { kind: 'approve' });
+			await pm.respondToInteraction('harness-session-1', 'int-1', { kind: 'approve' });
 
-			expect(mockLogger.warn).toHaveBeenCalledWith(
-				expect.stringContaining('harness adapters not yet registered'),
+			expect(mockRespondToInteraction).toHaveBeenCalledOnce();
+			expect(mockRespondToInteraction).toHaveBeenCalledWith('int-1', { kind: 'approve' });
+		});
+
+		it('passes all response types through to harness.respondToInteraction()', async () => {
+			const mockRespondToInteraction = vi.fn().mockResolvedValue(undefined);
+			const execution = makeHarnessExecution({
+				harness: {
+					write: vi.fn(),
+					interrupt: vi.fn(),
+					respondToInteraction: mockRespondToInteraction,
+					updateRuntimeSettings: vi.fn(),
+					dispose: vi.fn(),
+					isDisposed: () => false,
+				} as any,
+			});
+			injectExecution(pm, execution);
+
+			const responses = [
+				{ kind: 'approve' as const },
+				{ kind: 'deny' as const },
+				{ kind: 'text' as const, text: 'hello' },
+				{ kind: 'clarification-answer' as const, answers: [] },
+				{ kind: 'cancel' as const },
+			];
+
+			for (const response of responses) {
+				mockRespondToInteraction.mockClear();
+				await pm.respondToInteraction('harness-session-1', `int-${response.kind}`, response);
+				expect(mockRespondToInteraction).toHaveBeenCalledWith(`int-${response.kind}`, response);
+			}
+		});
+
+		it('logs error when harness field is null despite backend being harness (respondToInteraction)', async () => {
+			const execution = makeHarnessExecution(); // no harness field
+			injectExecution(pm, execution);
+
+			await pm.respondToInteraction('harness-session-1', 'int-1', { kind: 'approve' });
+
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				expect.stringContaining('no harness instance'),
 				'ProcessManager',
 				expect.objectContaining({
 					sessionId: 'harness-session-1',
 					interactionId: 'int-1',
-					responseKind: 'approve',
 				})
 			);
-		});
-
-		it('passes response kind through to log for all response types', () => {
-			const execution = makeHarnessExecution();
-			injectExecution(pm, execution);
-
-			const responseKinds = ['approve', 'deny', 'text', 'clarification-answer', 'cancel'] as const;
-
-			for (const kind of responseKinds) {
-				mockLogger.warn.mockClear();
-
-				const response = kind === 'text'
-					? { kind, text: 'hello' } as const
-					: kind === 'clarification-answer'
-						? { kind, answers: [] } as const
-						: { kind } as const;
-
-				pm.respondToInteraction('harness-session-1', `int-${kind}`, response);
-
-				expect(mockLogger.warn).toHaveBeenCalledWith(
-					expect.stringContaining('harness adapters not yet registered'),
-					'ProcessManager',
-					expect.objectContaining({ responseKind: kind })
-				);
-			}
 		});
 	});
 
@@ -506,43 +597,76 @@ describe('ProcessManager: Unified Execution Ownership', () => {
 			);
 		});
 
-		it('reaches harness delegation stub for harness backend', async () => {
-			const execution = makeHarnessExecution();
+		it('delegates to harness.updateRuntimeSettings() for harness backend', async () => {
+			const mockUpdateRuntimeSettings = vi.fn().mockResolvedValue(undefined);
+			const execution = makeHarnessExecution({
+				harness: {
+					write: vi.fn(),
+					interrupt: vi.fn(),
+					respondToInteraction: vi.fn(),
+					updateRuntimeSettings: mockUpdateRuntimeSettings,
+					dispose: vi.fn(),
+					isDisposed: () => false,
+				} as any,
+			});
 			injectExecution(pm, execution);
 
 			await pm.updateRuntimeSettings('harness-session-1', { model: 'claude-3-opus' });
 
-			expect(mockLogger.warn).toHaveBeenCalledWith(
-				expect.stringContaining('harness adapters not yet registered'),
-				'ProcessManager',
-				expect.objectContaining({
-					sessionId: 'harness-session-1',
-					settingsKeys: ['model'],
-				})
-			);
+			expect(mockUpdateRuntimeSettings).toHaveBeenCalledOnce();
+			expect(mockUpdateRuntimeSettings).toHaveBeenCalledWith({ model: 'claude-3-opus' });
 		});
 
-		it('logs all settings keys in the stub warning', async () => {
-			const execution = makeHarnessExecution();
+		it('passes compound settings through to harness.updateRuntimeSettings()', async () => {
+			const mockUpdateRuntimeSettings = vi.fn().mockResolvedValue(undefined);
+			const execution = makeHarnessExecution({
+				harness: {
+					write: vi.fn(),
+					interrupt: vi.fn(),
+					respondToInteraction: vi.fn(),
+					updateRuntimeSettings: mockUpdateRuntimeSettings,
+					dispose: vi.fn(),
+					isDisposed: () => false,
+				} as any,
+			});
 			injectExecution(pm, execution);
 
-			await pm.updateRuntimeSettings('harness-session-1', {
+			const settings = {
 				model: 'claude-3-opus',
 				permissionMode: 'default' as any,
 				providerOptions: { reasoningEffort: 'high' },
-			});
+			};
 
-			expect(mockLogger.warn).toHaveBeenCalledWith(
-				expect.stringContaining('harness adapters not yet registered'),
+			await pm.updateRuntimeSettings('harness-session-1', settings);
+
+			expect(mockUpdateRuntimeSettings).toHaveBeenCalledWith(settings);
+		});
+
+		it('logs error when harness field is null despite backend being harness (updateRuntimeSettings)', async () => {
+			const execution = makeHarnessExecution(); // no harness field
+			injectExecution(pm, execution);
+
+			await pm.updateRuntimeSettings('harness-session-1', { model: 'claude-3-opus' });
+
+			expect(mockLogger.error).toHaveBeenCalledWith(
+				expect.stringContaining('no harness instance'),
 				'ProcessManager',
-				expect.objectContaining({
-					settingsKeys: expect.arrayContaining(['model', 'permissionMode', 'providerOptions']),
-				})
+				expect.objectContaining({ sessionId: 'harness-session-1' })
 			);
 		});
 
 		it('returns Promise<void> (is async)', () => {
-			const execution = makeHarnessExecution();
+			const mockUpdateRuntimeSettings = vi.fn().mockResolvedValue(undefined);
+			const execution = makeHarnessExecution({
+				harness: {
+					write: vi.fn(),
+					interrupt: vi.fn(),
+					respondToInteraction: vi.fn(),
+					updateRuntimeSettings: mockUpdateRuntimeSettings,
+					dispose: vi.fn(),
+					isDisposed: () => false,
+				} as any,
+			});
 			injectExecution(pm, execution);
 
 			const result = pm.updateRuntimeSettings('harness-session-1', { model: 'test' });
@@ -621,9 +745,20 @@ describe('ProcessManager: Unified Execution Ownership', () => {
 	// ===================================================================
 	describe('concurrent backend operations', () => {
 		it('write routes correctly to each backend independently', () => {
+			const mockWrite = vi.fn();
 			const ptyExec = makePtyExecution({ sessionId: 'pty-1' });
 			const cpExec = makeChildProcessExecution({ sessionId: 'cp-1' });
-			const harnessExec = makeHarnessExecution({ sessionId: 'h-1' });
+			const harnessExec = makeHarnessExecution({
+				sessionId: 'h-1',
+				harness: {
+					write: mockWrite,
+					interrupt: vi.fn(),
+					respondToInteraction: vi.fn(),
+					updateRuntimeSettings: vi.fn(),
+					dispose: vi.fn(),
+					isDisposed: () => false,
+				} as any,
+			});
 
 			injectExecution(pm, ptyExec);
 			injectExecution(pm, cpExec);
@@ -631,10 +766,11 @@ describe('ProcessManager: Unified Execution Ownership', () => {
 
 			expect(pm.write('pty-1', 'a')).toBe(true);
 			expect(pm.write('cp-1', 'b')).toBe(true);
-			expect(pm.write('h-1', 'c')).toBe(true); // harness stub (unreachable in Phase 1)
+			expect(pm.write('h-1', 'c')).toBe(true);
 
 			expect(ptyExec.ptyProcess!.write).toHaveBeenCalledWith('a');
 			expect(cpExec.childProcess!.stdin!.write).toHaveBeenCalledWith('b');
+			expect(mockWrite).toHaveBeenCalledWith({ type: 'text', text: 'c' });
 		});
 
 		it('kill only removes the targeted session', () => {
