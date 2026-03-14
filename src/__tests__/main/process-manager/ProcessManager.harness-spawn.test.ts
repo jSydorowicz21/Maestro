@@ -535,6 +535,91 @@ describe('ProcessManager harness spawn path', () => {
 		});
 	});
 
+	// -----------------------------------------------------------------------
+	// SSH remote fallback: harness → classic when SSH is configured
+	// -----------------------------------------------------------------------
+	describe('SSH remote fallback to classic', () => {
+		let mockHarness: AgentHarness;
+
+		beforeEach(() => {
+			mockHarness = createMockHarness();
+			vi.mocked(selectExecutionMode).mockReturnValue({
+				mode: 'harness',
+				reason: 'User (SSH remote) query: auto-selected harness mode',
+			});
+			mockCreateHarness.mockReturnValue(mockHarness);
+		});
+
+		it('should fall back to classic when sshRemoteId is set', () => {
+			const config = makeConfig({ sshRemoteId: 'remote-1', prompt: undefined });
+			const result = pm.spawn(config);
+
+			// Should use classic path (not harness)
+			expect(mockCreateHarness).not.toHaveBeenCalled();
+			expect(result.success).toBe(true);
+			expect(result.pid).toBeDefined();
+		});
+
+		it('should fall back to classic when sshRemoteHost is set', () => {
+			const config = makeConfig({ sshRemoteHost: '192.168.1.1', prompt: undefined });
+			const result = pm.spawn(config);
+
+			expect(mockCreateHarness).not.toHaveBeenCalled();
+			expect(result.success).toBe(true);
+		});
+
+		it('should fall back to classic when both SSH fields are set', () => {
+			const config = makeConfig({
+				sshRemoteId: 'remote-1',
+				sshRemoteHost: '192.168.1.1',
+				prompt: undefined,
+			});
+			const result = pm.spawn(config);
+
+			expect(mockCreateHarness).not.toHaveBeenCalled();
+			expect(result.success).toBe(true);
+		});
+
+		it('should log info about SSH fallback', () => {
+			const config = makeConfig({ sshRemoteId: 'remote-1', prompt: undefined });
+			pm.spawn(config);
+
+			expect(logger.info).toHaveBeenCalledWith(
+				expect.stringContaining('SSH remote is configured; falling back to classic'),
+				'ProcessManager',
+				expect.objectContaining({
+					sessionId: config.sessionId,
+					toolType: config.toolType,
+					sshRemoteId: 'remote-1',
+				})
+			);
+		});
+
+		it('should NOT fall back when SSH fields are absent', () => {
+			const config = makeConfig();
+			pm.spawn(config);
+
+			// Should use harness path
+			expect(mockCreateHarness).toHaveBeenCalledWith('claude-code');
+		});
+
+		it('should NOT fall back when SSH fields are empty strings', () => {
+			const config = makeConfig({ sshRemoteId: '', sshRemoteHost: '' });
+			pm.spawn(config);
+
+			// Empty strings are falsy — should use harness path
+			expect(mockCreateHarness).toHaveBeenCalledWith('claude-code');
+		});
+
+		it('should NOT fall back when SSH fields are undefined', () => {
+			const config = makeConfig({ sshRemoteId: undefined, sshRemoteHost: undefined });
+			pm.spawn(config);
+
+			// undefined is falsy — should use harness path
+			expect(mockCreateHarness).toHaveBeenCalledWith('claude-code');
+		});
+	});
+
 	describe('harness delegation: kill()', () => {
 		let mockHarness: AgentHarness;
 

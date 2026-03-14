@@ -54,11 +54,28 @@ export class ProcessManager extends EventEmitter {
 	 * query context, and caller preferences. Classic mode uses PTY or child-process
 	 * spawners. Harness mode delegates to an AgentHarness adapter when a factory
 	 * is registered for the agent type; falls back to classic otherwise.
+	 *
+	 * SSH remote constraint: SDK-based harnesses run in-process and cannot
+	 * execute on a remote host. When SSH is configured, falls back to classic
+	 * mode even if selectExecutionMode() returns harness.
 	 */
 	spawn(config: ProcessConfig): SpawnResult {
 		const { mode } = selectExecutionMode(config);
 
-		if (mode === 'harness') {
+		// SSH fallback: SDK-based harnesses run in-process and cannot execute
+		// on a remote host. When SSH is configured, fall back to classic mode
+		// which already handles SSH wrapping via buildSshCommandWithStdin().
+		// selectExecutionMode() correctly identifies harness capability; this
+		// is a practical runtime constraint, not a capability issue.
+		const isSsh = Boolean(config.sshRemoteId || config.sshRemoteHost);
+		if (mode === 'harness' && isSsh) {
+			logger.info(
+				'[ProcessManager] Harness mode selected but SSH remote is configured; falling back to classic (SDK harness cannot execute remotely)',
+				'ProcessManager',
+				{ sessionId: config.sessionId, toolType: config.toolType, sshRemoteId: config.sshRemoteId, sshRemoteHost: config.sshRemoteHost }
+			);
+			// Fall through to classic execution path below
+		} else if (mode === 'harness') {
 			const harness = createHarness(config.toolType);
 
 			if (!harness) {
@@ -181,7 +198,7 @@ export class ProcessManager extends EventEmitter {
 			}
 		}
 
-		// Classic execution path (also serves as fallback for unregistered harnesses)
+		// Classic execution path (also serves as fallback for unregistered harnesses and SSH remote)
 		const usePty = this.shouldUsePty(config);
 		const result = usePty
 			? this.ptySpawner.spawn(config)

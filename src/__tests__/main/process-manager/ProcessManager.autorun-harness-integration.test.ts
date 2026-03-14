@@ -182,7 +182,7 @@ describe('Auto Run spawn integration (real selectExecutionMode)', () => {
 		expect(pm.get(config.sessionId)).toBeUndefined();
 	});
 
-	it('Auto Run with SSH remote uses harness for capable agent', async () => {
+	it('Auto Run with SSH remote falls back to classic (SDK harness cannot execute remotely)', () => {
 		const mockHarness = createMockHarness();
 		mockCreateHarness.mockReturnValue(mockHarness);
 
@@ -190,26 +190,17 @@ describe('Auto Run spawn integration (real selectExecutionMode)', () => {
 			querySource: 'auto',
 			toolType: 'claude-code',
 			sshRemoteId: 'remote-1',
+			prompt: undefined, // classic path used for SSH
 		});
 		const result = pm.spawn(config);
 
-		// Should route through harness path (SSH no longer forces classic)
-		expect(result).toEqual({ pid: null, success: true });
+		// SSH triggers fallback to classic (SDK-based harness runs in-process)
+		expect(result.success).toBe(true);
+		expect(result.pid).toBeDefined();
+		expect(result.pid).not.toBeNull();
 
-		// Harness factory should have been called
-		expect(mockCreateHarness).toHaveBeenCalledWith('claude-code');
-
-		// Execution record should be harness-backed
-		const execution = pm.get(config.sessionId);
-		expect(execution).toBeDefined();
-		expect(execution!.backend).toBe('harness');
-
-		// Harness.spawn() should be called
-		await vi.waitFor(() => {
-			expect(mockHarness.spawn).toHaveBeenCalledTimes(1);
-		});
-		const spawnArg = vi.mocked(mockHarness.spawn).mock.calls[0][0];
-		expect(spawnArg.sessionId).toBe(config.sessionId);
+		// Harness factory should NOT have been called
+		expect(mockCreateHarness).not.toHaveBeenCalled();
 	});
 
 	it('Auto Run and User query get same mode for same agent', async () => {
