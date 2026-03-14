@@ -1789,6 +1789,238 @@ describe('ClaudeCodeHarness', () => {
 
 			expect(harness.isRunning()).toBe(true);
 		});
+
+		// -- Debug logging verification for log-only handlers --
+
+		it('should log files_persisted with sessionId, messageId, and fileCount', async () => {
+			const { logger } = await import('../../utils/logger');
+			const debugSpy = vi.mocked(logger.debug);
+
+			const testSessionId = 'fp-log-session';
+			await harness.spawn(createTestConfig({ sessionId: testSessionId }));
+			await flushMicrotasks();
+			debugSpy.mockClear();
+
+			mockFn.pushMessage({
+				type: 'files_persisted',
+				message_id: 'msg-fp-1',
+				file_paths: ['/src/a.ts', '/src/b.ts', '/src/c.ts'],
+				session_id: 'sess-fp',
+			} as any);
+
+			await flushMicrotasks();
+
+			const fpCall = debugSpy.mock.calls.find(
+				(call) => typeof call[0] === 'string' && call[0].includes('Files persisted')
+			);
+			expect(fpCall).toBeDefined();
+			const context = fpCall![2] as Record<string, unknown>;
+			expect(context.sessionId).toBe(testSessionId);
+			expect(context.messageId).toBe('msg-fp-1');
+			expect(context.fileCount).toBe(3);
+		});
+
+		it('should log hook_started with sessionId, hookName, hookType, and toolName', async () => {
+			const { logger } = await import('../../utils/logger');
+			const debugSpy = vi.mocked(logger.debug);
+
+			const testSessionId = 'hook-start-log-session';
+			await harness.spawn(createTestConfig({ sessionId: testSessionId }));
+			await flushMicrotasks();
+			debugSpy.mockClear();
+
+			mockFn.pushMessage({
+				type: 'hook_started',
+				hook_name: 'PreToolUse',
+				hook_type: 'pre_tool_use',
+				tool_name: 'Bash',
+				session_id: 'sess-hs',
+			} as any);
+
+			await flushMicrotasks();
+
+			const hsCall = debugSpy.mock.calls.find(
+				(call) => typeof call[0] === 'string' && call[0].includes('Hook started')
+			);
+			expect(hsCall).toBeDefined();
+			const context = hsCall![2] as Record<string, unknown>;
+			expect(context.sessionId).toBe(testSessionId);
+			expect(context.hookName).toBe('PreToolUse');
+			expect(context.hookType).toBe('pre_tool_use');
+			expect(context.toolName).toBe('Bash');
+		});
+
+		it('should log hook_progress with sessionId, hookName, hookType, and message', async () => {
+			const { logger } = await import('../../utils/logger');
+			const debugSpy = vi.mocked(logger.debug);
+
+			const testSessionId = 'hook-prog-log-session';
+			await harness.spawn(createTestConfig({ sessionId: testSessionId }));
+			await flushMicrotasks();
+			debugSpy.mockClear();
+
+			mockFn.pushMessage({
+				type: 'hook_progress',
+				hook_name: 'PostToolUse',
+				hook_type: 'post_tool_use',
+				message: 'Validating output...',
+				session_id: 'sess-hp',
+			} as any);
+
+			await flushMicrotasks();
+
+			const hpCall = debugSpy.mock.calls.find(
+				(call) => typeof call[0] === 'string' && call[0].includes('Hook progress')
+			);
+			expect(hpCall).toBeDefined();
+			const context = hpCall![2] as Record<string, unknown>;
+			expect(context.sessionId).toBe(testSessionId);
+			expect(context.hookName).toBe('PostToolUse');
+			expect(context.hookType).toBe('post_tool_use');
+			expect(context.message).toBe('Validating output...');
+		});
+
+		it('should log hook_response with sessionId, hookName, hookType, and result', async () => {
+			const { logger } = await import('../../utils/logger');
+			const debugSpy = vi.mocked(logger.debug);
+
+			const testSessionId = 'hook-resp-log-session';
+			await harness.spawn(createTestConfig({ sessionId: testSessionId }));
+			await flushMicrotasks();
+			debugSpy.mockClear();
+
+			mockFn.pushMessage({
+				type: 'hook_response',
+				hook_name: 'Stop',
+				hook_type: 'stop',
+				result: 'allowed',
+				session_id: 'sess-hr',
+			} as any);
+
+			await flushMicrotasks();
+
+			const hrCall = debugSpy.mock.calls.find(
+				(call) => typeof call[0] === 'string' && call[0].includes('Hook response')
+			);
+			expect(hrCall).toBeDefined();
+			const context = hrCall![2] as Record<string, unknown>;
+			expect(context.sessionId).toBe(testSessionId);
+			expect(context.hookName).toBe('Stop');
+			expect(context.hookType).toBe('stop');
+			expect(context.result).toBe('allowed');
+		});
+
+		// -- Debug logging verification for event-emitting handlers --
+
+		it('should log task_started at debug level with task context', async () => {
+			const { logger } = await import('../../utils/logger');
+			const debugSpy = vi.mocked(logger.debug);
+
+			const testSessionId = 'ts-log-session';
+			await harness.spawn(createTestConfig({ sessionId: testSessionId }));
+			await flushMicrotasks();
+			debugSpy.mockClear();
+
+			mockFn.pushMessage({
+				type: 'task_started',
+				task_id: 'task-log-1',
+				task_name: 'Indexing',
+			} as any);
+
+			await flushMicrotasks();
+
+			const tsCall = debugSpy.mock.calls.find(
+				(call) => typeof call[0] === 'string' && call[0].includes('Background task started')
+			);
+			expect(tsCall).toBeDefined();
+			const context = tsCall![2] as Record<string, unknown>;
+			expect(context.sessionId).toBe(testSessionId);
+			expect(context.taskId).toBe('task-log-1');
+			expect(context.taskName).toBe('Indexing');
+		});
+
+		it('should log task_progress at debug level with progress context', async () => {
+			const { logger } = await import('../../utils/logger');
+			const debugSpy = vi.mocked(logger.debug);
+
+			const testSessionId = 'tp-log-session';
+			await harness.spawn(createTestConfig({ sessionId: testSessionId }));
+			await flushMicrotasks();
+			debugSpy.mockClear();
+
+			mockFn.pushMessage({
+				type: 'task_progress',
+				task_id: 'task-log-2',
+				task_name: 'Indexing',
+				progress: 0.75,
+			} as any);
+
+			await flushMicrotasks();
+
+			const tpCall = debugSpy.mock.calls.find(
+				(call) => typeof call[0] === 'string' && call[0].includes('Background task progress')
+			);
+			expect(tpCall).toBeDefined();
+			const context = tpCall![2] as Record<string, unknown>;
+			expect(context.sessionId).toBe(testSessionId);
+			expect(context.taskId).toBe('task-log-2');
+			expect(context.taskName).toBe('Indexing');
+			expect(context.progress).toBe(0.75);
+		});
+
+		it('should log task_notification at debug level with notification context', async () => {
+			const { logger } = await import('../../utils/logger');
+			const debugSpy = vi.mocked(logger.debug);
+
+			const testSessionId = 'tn-log-session';
+			await harness.spawn(createTestConfig({ sessionId: testSessionId }));
+			await flushMicrotasks();
+			debugSpy.mockClear();
+
+			mockFn.pushMessage({
+				type: 'task_notification',
+				task_id: 'task-log-3',
+				task_name: 'Indexing',
+				notification_type: 'completion',
+			} as any);
+
+			await flushMicrotasks();
+
+			const tnCall = debugSpy.mock.calls.find(
+				(call) => typeof call[0] === 'string' && call[0].includes('Background task notification')
+			);
+			expect(tnCall).toBeDefined();
+			const context = tnCall![2] as Record<string, unknown>;
+			expect(context.sessionId).toBe(testSessionId);
+			expect(context.taskId).toBe('task-log-3');
+			expect(context.taskName).toBe('Indexing');
+			expect(context.notificationType).toBe('completion');
+		});
+
+		it('should log prompt_suggestion at debug level with suggestion count', async () => {
+			const { logger } = await import('../../utils/logger');
+			const debugSpy = vi.mocked(logger.debug);
+
+			const testSessionId = 'ps-log-session';
+			await harness.spawn(createTestConfig({ sessionId: testSessionId }));
+			await flushMicrotasks();
+			debugSpy.mockClear();
+
+			mockFn.pushMessage({
+				type: 'prompt_suggestion',
+				suggestions: ['Fix the bug', 'Add tests', 'Refactor'],
+			} as any);
+
+			await flushMicrotasks();
+
+			const psCall = debugSpy.mock.calls.find(
+				(call) => typeof call[0] === 'string' && call[0].includes('Prompt suggestion')
+			);
+			expect(psCall).toBeDefined();
+			const context = psCall![2] as Record<string, unknown>;
+			expect(context.sessionId).toBe(testSessionId);
+			expect(context.suggestionCount).toBe(3);
+		});
 	});
 
 	// ====================================================================
