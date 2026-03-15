@@ -286,6 +286,7 @@ interface MaestroAPI {
 				workingDirOverride?: string;
 			};
 		}) => Promise<{ exitCode: number }>;
+		hasResultEmitted: (sessionId: string) => Promise<boolean>;
 		getActiveProcesses: () => Promise<
 			Array<{
 				sessionId: string;
