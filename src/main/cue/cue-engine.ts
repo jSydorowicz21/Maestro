@@ -986,7 +986,7 @@ export class CueEngine {
 			if (!times.includes(currentTime)) {
 				// Evict stale fired-keys from previous minutes
 				for (const key of this.scheduledFiredKeys) {
-					if (key.startsWith(`${sub.name}:`) && !key.endsWith(`:${currentTime}`)) {
+					if (key.startsWith(`${session.id}:${sub.name}:`) && !key.endsWith(`:${currentTime}`)) {
 						this.scheduledFiredKeys.delete(key);
 					}
 				}
@@ -994,7 +994,7 @@ export class CueEngine {
 			}
 
 			// Guard against double-fire (e.g., config refresh within the same minute)
-			const firedKey = `${sub.name}:${currentTime}`;
+			const firedKey = `${session.id}:${sub.name}:${currentTime}`;
 			if (this.scheduledFiredKeys.has(firedKey)) {
 				return;
 			}
@@ -1496,7 +1496,7 @@ export class CueEngine {
 		// Clean up scheduledFiredKeys for this session's subscriptions
 		for (const sub of state.config.subscriptions) {
 			for (const key of this.scheduledFiredKeys) {
-				if (key.startsWith(`${sub.name}:`)) {
+				if (key.startsWith(`${sessionId}:${sub.name}:`)) {
 					this.scheduledFiredKeys.delete(key);
 				}
 			}
