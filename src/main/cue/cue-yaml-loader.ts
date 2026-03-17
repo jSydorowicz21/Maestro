@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
 import * as chokidar from 'chokidar';
+import picomatch from 'picomatch';
 import {
 	type CueConfig,
 	type CueSubscription,
@@ -206,6 +207,17 @@ export function watchCueYaml(projectRoot: string, onChange: () => void): () => v
 	};
 }
 
+/** Validates a glob pattern via picomatch, pushing an error if invalid. */
+function validateGlobPattern(pattern: string, prefix: string, errors: string[]): void {
+	try {
+		picomatch(pattern);
+	} catch (e) {
+		errors.push(
+			`${prefix}: "watch" value "${pattern}" is not a valid glob pattern: ${e instanceof Error ? e.message : String(e)}`
+		);
+	}
+}
+
 /**
  * Validates a CueConfig-shaped object. Returns validation result with error messages.
  */
@@ -302,6 +314,8 @@ export function validateCueConfig(config: unknown): { valid: boolean; errors: st
 					errors.push(
 						`${prefix}: "watch" is required and must be a non-empty string for file.changed events`
 					);
+				} else {
+					validateGlobPattern(sub.watch as string, prefix, errors);
 				}
 			} else if (event === 'agent.completed') {
 				if (!sub.source_session) {
@@ -316,6 +330,8 @@ export function validateCueConfig(config: unknown): { valid: boolean; errors: st
 					errors.push(
 						`${prefix}: "watch" is required and must be a non-empty glob string for task.pending events`
 					);
+				} else {
+					validateGlobPattern(sub.watch as string, prefix, errors);
 				}
 				if (sub.poll_minutes !== undefined) {
 					if (typeof sub.poll_minutes !== 'number' || sub.poll_minutes < 1) {

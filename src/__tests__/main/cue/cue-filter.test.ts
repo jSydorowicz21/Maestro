@@ -258,7 +258,36 @@ describe('cue-filter', () => {
 		describe('empty filter', () => {
 			it('matches everything when filter is empty', () => {
 				expect(matchesFilter({ any: 'value' }, {})).toBe(true);
+				expect(matchesFilter({}, {})).toBe(true);
 			});
+		});
+	});
+
+	describe('combined filter conditions', () => {
+		it('combined numeric + glob in same filter object', () => {
+			expect(
+				matchesFilter({ size: 1500, path: 'src/app.ts' }, { size: '>1000', path: 'src/**/*.ts' })
+			).toBe(true);
+			expect(
+				matchesFilter({ size: 500, path: 'src/app.ts' }, { size: '>1000', path: 'src/**/*.ts' })
+			).toBe(false);
+		});
+	});
+
+	describe('unicode handling', () => {
+		it('matches unicode strings exactly', () => {
+			expect(matchesFilter({ name: '日本語' }, { name: '日本語' })).toBe(true);
+			expect(matchesFilter({ name: '日本語' }, { name: '中文' })).toBe(false);
+		});
+	});
+
+	describe('deep dot notation', () => {
+		it('resolves 4-level deep path', () => {
+			expect(matchesFilter({ a: { b: { c: { d: 'found' } } } }, { 'a.b.c.d': 'found' })).toBe(true);
+		});
+
+		it('returns false for partial path', () => {
+			expect(matchesFilter({ a: { b: 42 } }, { 'a.b.c': 'anything' })).toBe(false);
 		});
 	});
 
