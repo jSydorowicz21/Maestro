@@ -3,7 +3,7 @@ import {
 	walkTreePartitioned,
 } from '../../shared/treeUtils';
 import { isImageFile } from '../../shared/gitUtils';
-import { matchGlobPattern, shouldIgnore } from '../../shared/globUtils';
+import { shouldIgnore } from '../../shared/globUtils';
 
 /**
  * Check if a file should be opened in external app based on extension
