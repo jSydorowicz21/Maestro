@@ -94,10 +94,16 @@ export function createFsApi() {
 			ipcRenderer.invoke('fs:stat', filePath, sshRemoteId),
 
 		/**
-		 * Get directory size information
+		 * Get directory size information.
+		 * When ignorePatterns is provided, matching directories are skipped
+		 * during traversal, avoiding expensive du/find into ignored trees.
 		 */
-		directorySize: (dirPath: string, sshRemoteId?: string): Promise<DirectorySizeInfo> =>
-			ipcRenderer.invoke('fs:directorySize', dirPath, sshRemoteId),
+		directorySize: (
+			dirPath: string,
+			sshRemoteId?: string,
+			ignorePatterns?: string[]
+		): Promise<DirectorySizeInfo> =>
+			ipcRenderer.invoke('fs:directorySize', dirPath, sshRemoteId, ignorePatterns),
 
 		/**
 		 * Fetch an image from URL and return as base64

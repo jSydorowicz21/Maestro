@@ -44,7 +44,7 @@ describe('Filesystem Preload API', () => {
 
 			const result = await api.readDir('/home/user');
 
-			expect(mockInvoke).toHaveBeenCalledWith('fs:readDir', '/home/user', undefined);
+			expect(mockInvoke).toHaveBeenCalledWith('fs:readDir', '/home/user', undefined, undefined);
 			expect(result).toEqual(mockEntries);
 		});
 
@@ -53,7 +53,7 @@ describe('Filesystem Preload API', () => {
 
 			await api.readDir('/home/user', 'remote-1');
 
-			expect(mockInvoke).toHaveBeenCalledWith('fs:readDir', '/home/user', 'remote-1');
+			expect(mockInvoke).toHaveBeenCalledWith('fs:readDir', '/home/user', 'remote-1', undefined);
 		});
 	});
 
@@ -134,7 +134,32 @@ describe('Filesystem Preload API', () => {
 
 			const result = await api.directorySize('/home/user/project');
 
-			expect(mockInvoke).toHaveBeenCalledWith('fs:directorySize', '/home/user/project', undefined);
+			expect(mockInvoke).toHaveBeenCalledWith(
+				'fs:directorySize',
+				'/home/user/project',
+				undefined,
+				undefined
+			);
+			expect(result).toEqual(mockSize);
+		});
+
+		it('should invoke fs:directorySize with ignorePatterns', async () => {
+			const mockSize = {
+				totalSize: 5120,
+				fileCount: 5,
+				folderCount: 1,
+			};
+			mockInvoke.mockResolvedValue(mockSize);
+
+			const patterns = ['node_modules', 'dist'];
+			const result = await api.directorySize('/home/user/project', 'remote-1', patterns);
+
+			expect(mockInvoke).toHaveBeenCalledWith(
+				'fs:directorySize',
+				'/home/user/project',
+				'remote-1',
+				patterns
+			);
 			expect(result).toEqual(mockSize);
 		});
 	});

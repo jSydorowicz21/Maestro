@@ -237,74 +237,79 @@ export function registerFilesystemHandlers(): void {
 
 	// Calculate total size of a directory recursively
 	// Respects the same ignore patterns as loadFileTree (node_modules, __pycache__)
-	ipcMain.handle('fs:directorySize', async (_, dirPath: string, sshRemoteId?: string) => {
-		// SSH remote: dispatch to remote fs operations
-		if (sshRemoteId) {
-			const sshConfig = getSshRemoteById(sshRemoteId);
-			if (!sshConfig) {
-				throw new Error(`SSH remote not found: ${sshRemoteId}`);
+	// Optional ignorePatterns skips matching directories during traversal,
+	// preventing expensive du/find traversal into ignored trees like node_modules.
+	ipcMain.handle(
+		'fs:directorySize',
+		async (_, dirPath: string, sshRemoteId?: string, ignorePatterns?: string[]) => {
+			// SSH remote: dispatch to remote fs operations
+			if (sshRemoteId) {
+				const sshConfig = getSshRemoteById(sshRemoteId);
+				if (!sshConfig) {
+					throw new Error(`SSH remote not found: ${sshRemoteId}`);
+				}
+				// Fetch size and counts in parallel for SSH remotes
+				const [sizeResult, countResult] = await Promise.all([
+					directorySizeRemote(dirPath, sshConfig, undefined, ignorePatterns),
+					countItemsRemote(dirPath, sshConfig),
+				]);
+				if (!sizeResult.success) {
+					throw new Error(sizeResult.error || 'Failed to get remote directory size');
+				}
+				return {
+					totalSize: sizeResult.data!,
+					fileCount: countResult.success ? countResult.data!.fileCount : 0,
+					folderCount: countResult.success ? countResult.data!.folderCount : 0,
+				};
 			}
-			// Fetch size and counts in parallel for SSH remotes
-			const [sizeResult, countResult] = await Promise.all([
-				directorySizeRemote(dirPath, sshConfig),
-				countItemsRemote(dirPath, sshConfig),
-			]);
-			if (!sizeResult.success) {
-				throw new Error(sizeResult.error || 'Failed to get remote directory size');
-			}
-			return {
-				totalSize: sizeResult.data!,
-				fileCount: countResult.success ? countResult.data!.fileCount : 0,
-				folderCount: countResult.success ? countResult.data!.folderCount : 0,
-			};
-		}
 
-		// Local: use standard fs operations
-		let totalSize = 0;
-		let fileCount = 0;
-		let folderCount = 0;
+			// Local: use standard fs operations
+			let totalSize = 0;
+			let fileCount = 0;
+			let folderCount = 0;
 
-		const calculateSize = async (currentPath: string, depth: number = 0): Promise<void> => {
-			// Limit recursion depth to match file tree loading
-			if (depth >= 10) return;
+			const calculateSize = async (currentPath: string, depth: number = 0): Promise<void> => {
+				// Limit recursion depth to match file tree loading
+				if (depth >= 10) return;
 
-			try {
-				const entries = await fs.readdir(currentPath, { withFileTypes: true });
+				try {
+					const entries = await fs.readdir(currentPath, { withFileTypes: true });
 
-				for (const entry of entries) {
-					// Skip common ignore patterns (same as loadFileTree)
-					if (entry.name === 'node_modules' || entry.name === '__pycache__') {
-						continue;
-					}
+					for (const entry of entries) {
+						// Skip common ignore patterns (same as loadFileTree)
+						if (entry.name === 'node_modules' || entry.name === '__pycache__') {
+							continue;
+						}
 
-					const fullPath = path.join(currentPath, entry.name);
+						const fullPath = path.join(currentPath, entry.name);
 
-					if (entry.isDirectory()) {
-						folderCount++;
-						await calculateSize(fullPath, depth + 1);
-					} else if (entry.isFile()) {
-						fileCount++;
-						try {
-							const stats = await fs.stat(fullPath);
-							totalSize += stats.size;
-						} catch {
-							// Skip files we can't stat (permissions, etc.)
+						if (entry.isDirectory()) {
+							folderCount++;
+							await calculateSize(fullPath, depth + 1);
+						} else if (entry.isFile()) {
+							fileCount++;
+							try {
+								const stats = await fs.stat(fullPath);
+								totalSize += stats.size;
+							} catch {
+								// Skip files we can't stat (permissions, etc.)
+							}
 						}
 					}
+				} catch {
+					// Skip directories we can't read
 				}
-			} catch {
-				// Skip directories we can't read
-			}
-		};
+			};
 
-		await calculateSize(dirPath);
+			await calculateSize(dirPath);
 
-		return {
-			totalSize,
-			fileCount,
-			folderCount,
-		};
-	});
+			return {
+				totalSize,
+				fileCount,
+				folderCount,
+			};
+		}
+	);
 
 	// Write content to file (supports SSH remote)
 	ipcMain.handle(

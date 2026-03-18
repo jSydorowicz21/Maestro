@@ -410,31 +410,81 @@ export async function statRemote(
 }
 
 /**
+ * Build a POSIX find command that prunes directories matching ignore patterns.
+ *
+ * Converts glob-style ignore patterns (e.g., "node_modules", "dist", ".git")
+ * into `-name` clauses joined with `-o` inside a `-prune` block. The resulting
+ * command lists all regular files outside pruned directories and sums their
+ * sizes with `du` + `awk`.
+ *
+ * Works on both GNU (Linux) and BSD (macOS) hosts because it only uses
+ * POSIX-compatible find/du/awk options.
+ *
+ * @param escapedPath Shell-escaped directory path
+ * @param patterns Glob patterns to exclude (matched against directory names)
+ * @returns The full shell command string
+ */
+function buildPrunedSizeCommand(escapedPath: string, patterns: string[]): string {
+	// Build -name clauses for each pattern, e.g. -name "node_modules" -o -name "dist"
+	const nameClauses = patterns.map((p) => `-name ${shellEscape(p)}`).join(' -o ');
+
+	// find <path> -type d \( -name "x" -o -name "y" \) -prune -o -type f -print0
+	// | xargs -0 du -sb 2>/dev/null | awk '{sum+=$1} END {print sum+0}'
+	//
+	// The du -sb fallback for BSD uses -k with multiplication:
+	// | xargs -0 du -sk 2>/dev/null | awk '{sum+=$1*1024} END {print sum+0}'
+	//
+	// We try GNU du first, then BSD du.
+	// The `+0` in awk ensures we print "0" for empty directories instead of "".
+	return (
+		`find ${escapedPath} -type d \\( ${nameClauses} \\) -prune -o -type f -print0 2>/dev/null` +
+		` | xargs -0 du -sb 2>/dev/null | awk '{sum+=$1} END {print sum+0}'`
+	);
+}
+
+/**
  * Get total size of a directory from a remote host via SSH.
  *
- * Executes `du -sb` on the remote to calculate the total size
- * of all files in the directory.
+ * When ignorePatterns are provided, uses `find` with `-prune` to skip
+ * matching directories (e.g., node_modules, .git, dist), avoiding the
+ * expensive traversal that `du -sb` performs on the entire tree.
+ *
+ * Without ignorePatterns, falls back to the simple `du -sb` command.
  *
  * @param dirPath Path to the directory on the remote host
  * @param sshRemote SSH remote configuration
  * @param deps Optional dependencies for testing
+ * @param ignorePatterns Optional glob patterns for directories to skip
  * @returns Total size in bytes
  *
  * @example
  * const size = await directorySizeRemote('/home/user/project', sshConfig);
  * // => 1234567890
+ *
+ * @example
+ * // Skip node_modules and dist when calculating size
+ * const size = await directorySizeRemote('/home/user/project', sshConfig, undefined, ['node_modules', 'dist', '.git']);
  */
 export async function directorySizeRemote(
 	dirPath: string,
 	sshRemote: SshRemoteConfig,
-	deps: RemoteFsDeps = defaultDeps
+	deps: RemoteFsDeps = defaultDeps,
+	ignorePatterns?: string[]
 ): Promise<RemoteFsResult<number>> {
 	const escapedPath = shellEscape(dirPath);
-	// Use du with:
-	// -s: summarize (total only)
-	// -b: apparent size in bytes (GNU)
-	// If -b not available (BSD), use -k and multiply by 1024
-	const remoteCommand = `du -sb ${escapedPath} 2>/dev/null || du -sk ${escapedPath} 2>/dev/null | awk '{print $1 * 1024}'`;
+
+	let remoteCommand: string;
+
+	if (ignorePatterns && ignorePatterns.length > 0) {
+		// Use find with -prune to skip ignored directories
+		remoteCommand = buildPrunedSizeCommand(escapedPath, ignorePatterns);
+	} else {
+		// No ignore patterns - use simple du
+		// -s: summarize (total only)
+		// -b: apparent size in bytes (GNU)
+		// If -b not available (BSD), use -k and multiply by 1024
+		remoteCommand = `du -sb ${escapedPath} 2>/dev/null || du -sk ${escapedPath} 2>/dev/null | awk '{print $1 * 1024}'`;
+	}
 
 	const result = await execRemoteCommand(sshRemote, remoteCommand, deps);
 

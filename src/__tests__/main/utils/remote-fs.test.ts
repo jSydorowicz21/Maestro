@@ -416,6 +416,100 @@ describe('remote-fs', () => {
 			expect(result.success).toBe(false);
 			expect(result.error).toContain('Failed to parse du output');
 		});
+
+		it('uses find with -prune when ignorePatterns are provided', async () => {
+			const deps = createMockDeps({
+				stdout: '98765\n',
+				stderr: '',
+				exitCode: 0,
+			});
+
+			const result = await directorySizeRemote('/project', baseConfig, deps, [
+				'node_modules',
+				'dist',
+				'.git',
+			]);
+
+			expect(result.success).toBe(true);
+			expect(result.data).toBe(98765);
+
+			// Verify the command uses find with -prune instead of du -sb
+			const call = (deps.execSsh as any).mock.calls[0][1];
+			const remoteCommand = call[call.length - 1];
+			expect(remoteCommand).toContain('find');
+			expect(remoteCommand).toContain('-prune');
+			expect(remoteCommand).toContain('-name');
+			expect(remoteCommand).toContain('node_modules');
+			expect(remoteCommand).toContain('dist');
+			expect(remoteCommand).toContain('.git');
+		});
+
+		it('uses simple du when ignorePatterns is empty', async () => {
+			const deps = createMockDeps({
+				stdout: '123456789\t/project\n',
+				stderr: '',
+				exitCode: 0,
+			});
+
+			const result = await directorySizeRemote('/project', baseConfig, deps, []);
+
+			expect(result.success).toBe(true);
+			expect(result.data).toBe(123456789);
+
+			// Verify the command uses du, not find
+			const call = (deps.execSsh as any).mock.calls[0][1];
+			const remoteCommand = call[call.length - 1];
+			expect(remoteCommand).toContain('du -sb');
+			expect(remoteCommand).not.toContain('find');
+		});
+
+		it('uses simple du when ignorePatterns is undefined', async () => {
+			const deps = createMockDeps({
+				stdout: '123456789\t/project\n',
+				stderr: '',
+				exitCode: 0,
+			});
+
+			const result = await directorySizeRemote('/project', baseConfig, deps, undefined);
+
+			expect(result.success).toBe(true);
+
+			const call = (deps.execSsh as any).mock.calls[0][1];
+			const remoteCommand = call[call.length - 1];
+			expect(remoteCommand).toContain('du -sb');
+		});
+
+		it('handles zero-size result from find with ignorePatterns', async () => {
+			const deps = createMockDeps({
+				// awk prints "0" when no files matched (sum+0)
+				stdout: '0\n',
+				stderr: '',
+				exitCode: 0,
+			});
+
+			const result = await directorySizeRemote('/empty-project', baseConfig, deps, [
+				'node_modules',
+			]);
+
+			expect(result.success).toBe(true);
+			expect(result.data).toBe(0);
+		});
+
+		it('escapes ignore pattern names with special characters', async () => {
+			const deps = createMockDeps({
+				stdout: '5000\n',
+				stderr: '',
+				exitCode: 0,
+			});
+
+			await directorySizeRemote('/project', baseConfig, deps, ["my dir's"]);
+
+			const call = (deps.execSsh as any).mock.calls[0][1];
+			const remoteCommand = call[call.length - 1];
+			// The pattern should be shell-escaped
+			expect(remoteCommand).toContain('-name');
+			expect(remoteCommand).toContain('my dir');
+		});
 	});
 
 	describe('writeFileRemote', () => {

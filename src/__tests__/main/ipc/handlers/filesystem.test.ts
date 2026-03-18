@@ -144,7 +144,12 @@ describe('filesystem handlers', () => {
 			const result = await handler!({}, '/remote/path', 'remote-1');
 
 			expect(getSshRemoteById).toHaveBeenCalledWith('remote-1');
-			expect(readDirRemote).toHaveBeenCalledWith('/remote/path', mockSshConfig);
+			expect(readDirRemote).toHaveBeenCalledWith(
+				'/remote/path',
+				mockSshConfig,
+				undefined,
+				undefined
+			);
 			expect(result).toHaveLength(2);
 			expect(result[0].name).toBe('remote-file.txt');
 			expect(result[0].isFile).toBe(true);
