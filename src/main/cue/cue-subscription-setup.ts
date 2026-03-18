@@ -29,8 +29,8 @@ export function calculateNextScheduledTime(times: string[], days?: string[]): nu
 	const now = new Date();
 	const candidates: number[] = [];
 
-	// Check up to 7 days ahead to find the next match
-	for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+	// Check up to 8 days ahead (0..7) to cover same-day-next-week when today's slot has passed
+	for (let dayOffset = 0; dayOffset <= 7; dayOffset++) {
 		const candidate = new Date(now);
 		candidate.setDate(candidate.getDate() + dayOffset);
 		const dayName = DAY_NAMES[candidate.getDay()];
