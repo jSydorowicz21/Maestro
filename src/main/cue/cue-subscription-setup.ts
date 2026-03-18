@@ -105,6 +105,7 @@ export function setupHeartbeatSubscription(
 	// Check payload filter (even for timer events)
 	if (!sub.filter || matchesFilter(immediateEvent.payload, sub.filter)) {
 		deps.onLog('cue', `[CUE] "${sub.name}" triggered (time.heartbeat, initial)`);
+		state.lastTriggered = immediateEvent.timestamp;
 		deps.executeCueRun(
 			session.id,
 			sub.prompt_file ?? sub.prompt,
