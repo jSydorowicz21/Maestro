@@ -215,10 +215,10 @@ src/
 | Modify history components    | `src/renderer/components/History/`                                                                                                                                      |
 | Add Cue event type           | `src/main/cue/cue-types.ts`, `src/main/cue/cue-engine.ts`                                                                                                               |
 | Add Cue template variable    | `src/shared/templateVariables.ts`, `src/main/cue/cue-executor.ts`                                                                                                       |
-| Modify Cue modal             | `src/renderer/components/CueModal.tsx`                                                                                                                                   |
+| Modify Cue modal             | `src/renderer/components/CueModal.tsx`                                                                                                                                  |
 | Configure Cue engine         | `src/main/cue/cue-engine.ts`, `src/main/ipc/handlers/cue.ts`                                                                                                            |
-| Add terminal feature         | `src/renderer/components/XTerminal.tsx`, `src/renderer/components/TerminalView.tsx`                                                                                      |
-| Modify terminal tabs         | `src/renderer/utils/terminalTabHelpers.ts`, `src/renderer/stores/tabStore.ts`                                                                                            |
+| Add terminal feature         | `src/renderer/components/XTerminal.tsx`, `src/renderer/components/TerminalView.tsx`                                                                                     |
+| Modify terminal tabs         | `src/renderer/utils/terminalTabHelpers.ts`, `src/renderer/stores/tabStore.ts`                                                                                           |
 
 ---
 
