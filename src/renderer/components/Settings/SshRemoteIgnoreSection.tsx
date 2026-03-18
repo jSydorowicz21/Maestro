@@ -21,7 +21,28 @@ import type { Theme } from '../../types';
 import { IgnorePatternsSection } from './IgnorePatternsSection';
 
 /** Default SSH remote ignore patterns */
-const SSH_DEFAULT_PATTERNS = ['.git', '*cache*'];
+const SSH_DEFAULT_PATTERNS = [
+	'*.egg-info',
+	'.cache',
+	'.git',
+	'.gradle',
+	'.m2',
+	'.next',
+	'.nuxt',
+	'.nyc_output',
+	'.parcel-cache',
+	'.tox',
+	'.turbo',
+	'.venv',
+	'__pycache__',
+	'build',
+	'coverage',
+	'dist',
+	'node_modules',
+	'target',
+	'vendor',
+	'venv',
+];
 
 export interface SshRemoteIgnoreSectionProps {
 	/** Theme object for styling */

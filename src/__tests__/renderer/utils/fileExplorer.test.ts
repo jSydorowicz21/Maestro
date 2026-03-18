@@ -213,8 +213,12 @@ describe('fileExplorer utils', () => {
 
 			// Should pass undefined for sshRemoteId and default ignorePatterns when no SSH context is provided
 			expect(window.maestro.fs.readDir).toHaveBeenCalledWith('/project', undefined, [
-				'node_modules',
+				'.next',
 				'__pycache__',
+				'build',
+				'dist',
+				'node_modules',
+				'target',
 			]);
 			expect(result).toHaveLength(3);
 			expect(result[0]).toEqual({
@@ -392,8 +396,12 @@ describe('fileExplorer utils', () => {
 			await loadFileTree('/project');
 
 			expect(window.maestro.fs.readDir).toHaveBeenCalledWith('/project', undefined, [
-				'node_modules',
+				'.next',
 				'__pycache__',
+				'build',
+				'dist',
+				'node_modules',
+				'target',
 			]);
 		});
 

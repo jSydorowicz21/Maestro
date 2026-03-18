@@ -157,7 +157,14 @@ interface LoadingState {
 }
 
 /** Default local ignore patterns (used when no user-configured patterns are provided) */
-export const LOCAL_IGNORE_DEFAULTS = ['node_modules', '__pycache__'];
+export const LOCAL_IGNORE_DEFAULTS = [
+	'.next',
+	'__pycache__',
+	'build',
+	'dist',
+	'node_modules',
+	'target',
+];
 
 /** Options for local (non-SSH) file tree loading */
 export interface LocalFileTreeOptions {
