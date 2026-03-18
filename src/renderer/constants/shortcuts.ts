@@ -79,11 +79,6 @@ export const DEFAULT_SHORTCUTS: Record<string, Shortcut> = {
 		label: "Director's Notes",
 		keys: ['Meta', 'Shift', 'o'],
 	},
-	fontSizeReset: {
-		id: 'fontSizeReset',
-		label: 'Reset Font Size',
-		keys: ['Meta', 'Shift', '0'],
-	},
 	openCue: {
 		id: 'openCue',
 		label: 'Maestro Cue',
@@ -98,6 +93,11 @@ export const DEFAULT_SHORTCUTS: Record<string, Shortcut> = {
 		id: 'jumpToTerminal',
 		label: 'Jump to Terminal Tab',
 		keys: ['Alt', 'j'],
+	},
+	fontSizeReset: {
+		id: 'fontSizeReset',
+		label: 'Reset Font Size',
+		keys: ['Meta', 'Shift', '0'],
 	},
 };
 
