@@ -94,7 +94,8 @@ export function createCueFanInTracker(deps: CueFanInDeps): CueFanInTracker {
 					partial: true,
 				},
 			};
-			const maxChainDepth = Math.max(...completions.map((c) => c.chainDepth));
+			const maxChainDepth =
+				completions.length > 0 ? Math.max(...completions.map((c) => c.chainDepth)) : 0;
 			deps.onLog(
 				'cue',
 				`[CUE] Fan-in "${sub.name}" timed out (continue mode) — firing with ${completedNames.length}/${sources.length} sources`
@@ -177,7 +178,8 @@ export function createCueFanInTracker(deps: CueFanInDeps): CueFanInTracker {
 					outputTruncated: completions.some((c) => c.truncated),
 				},
 			};
-			const maxChainDepth = Math.max(...completions.map((c) => c.chainDepth));
+			const maxChainDepth =
+				completions.length > 0 ? Math.max(...completions.map((c) => c.chainDepth)) : 0;
 			deps.onLog('cue', `[CUE] "${sub.name}" triggered (agent.completed, fan-in complete)`);
 			deps.dispatchSubscription(
 				ownerSessionId,

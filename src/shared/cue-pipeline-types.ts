@@ -121,7 +121,7 @@ export interface CueGraphSession {
 	toolType: string;
 	subscriptions: Array<{
 		name: string;
-		event: string;
+		event: CueEventType;
 		enabled: boolean;
 		prompt?: string;
 		prompt_file?: string;

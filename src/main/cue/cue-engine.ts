@@ -131,13 +131,7 @@ export class CueEngine {
 				return result;
 			},
 			onDispatch: (sessionId, sub, event) => {
-				this.runManager.execute(
-					sessionId,
-					sub.prompt_file ?? sub.prompt,
-					event,
-					sub.name,
-					sub.output_prompt
-				);
+				this.dispatchSubscription(sessionId, sub, event, sessionId);
 			},
 		});
 	}
@@ -269,9 +263,7 @@ export class CueEngine {
 
 			reportedSessionIds.add(sessionId);
 
-			const activeRunCount = [...this.runManager.getActiveRunMap().values()].filter(
-				(r) => r.result.sessionId === sessionId
-			).length;
+			const activeRunCount = this.runManager.getActiveRunCount(sessionId);
 
 			let nextTrigger: string | undefined;
 			if (state.nextTriggers.size > 0) {

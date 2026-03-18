@@ -69,6 +69,7 @@ export interface CueRunManager {
 	stopRun(runId: string): boolean;
 	stopAll(): void;
 	getActiveRuns(): CueRunResult[];
+	getActiveRunCount(sessionId: string): number;
 	getActiveRunMap(): Map<string, ActiveRun>;
 	getQueueStatus(): Map<string, number>;
 	clearQueue(sessionId: string): void;
@@ -392,6 +393,10 @@ export function createCueRunManager(deps: CueRunManagerDeps): CueRunManager {
 
 		getActiveRuns(): CueRunResult[] {
 			return [...activeRuns.values()].map((r) => r.result);
+		},
+
+		getActiveRunCount(sessionId: string): number {
+			return [...activeRuns.values()].filter((r) => r.result.sessionId === sessionId).length;
 		},
 
 		getActiveRunMap(): Map<string, ActiveRun> {
