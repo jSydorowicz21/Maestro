@@ -211,8 +211,11 @@ describe('fileExplorer utils', () => {
 
 			const result = await loadFileTree('/project');
 
-			// Should pass undefined for sshRemoteId when no SSH context is provided
-			expect(window.maestro.fs.readDir).toHaveBeenCalledWith('/project', undefined);
+			// Should pass undefined for sshRemoteId and default ignorePatterns when no SSH context is provided
+			expect(window.maestro.fs.readDir).toHaveBeenCalledWith('/project', undefined, [
+				'node_modules',
+				'__pycache__',
+			]);
 			expect(result).toHaveLength(3);
 			expect(result[0]).toEqual({
 				name: 'src',
@@ -375,9 +378,9 @@ describe('fileExplorer utils', () => {
 			const sshContext = { sshRemoteId: 'remote-1', remoteCwd: '/home/user' };
 			const result = await loadFileTree('/project', 10, 0, sshContext);
 
-			// Verify SSH remote ID is passed to all readDir calls
-			expect(window.maestro.fs.readDir).toHaveBeenCalledWith('/project', 'remote-1');
-			expect(window.maestro.fs.readDir).toHaveBeenCalledWith('/project/src', 'remote-1');
+			// Verify SSH remote ID and ignore patterns are passed to all readDir calls
+			expect(window.maestro.fs.readDir).toHaveBeenCalledWith('/project', 'remote-1', undefined);
+			expect(window.maestro.fs.readDir).toHaveBeenCalledWith('/project/src', 'remote-1', undefined);
 			expect(result).toHaveLength(2);
 		});
 
@@ -388,7 +391,10 @@ describe('fileExplorer utils', () => {
 
 			await loadFileTree('/project');
 
-			expect(window.maestro.fs.readDir).toHaveBeenCalledWith('/project', undefined);
+			expect(window.maestro.fs.readDir).toHaveBeenCalledWith('/project', undefined, [
+				'node_modules',
+				'__pycache__',
+			]);
 		});
 
 		it('uses localIgnorePatterns when provided for local scans', async () => {

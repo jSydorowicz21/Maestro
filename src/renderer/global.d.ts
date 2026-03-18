@@ -622,7 +622,11 @@ interface MaestroAPI {
 	};
 	fs: {
 		homeDir: () => Promise<string>;
-		readDir: (dirPath: string, sshRemoteId?: string) => Promise<DirectoryEntry[]>;
+		readDir: (
+			dirPath: string,
+			sshRemoteId?: string,
+			ignorePatterns?: string[]
+		) => Promise<DirectoryEntry[]>;
 		readFile: (filePath: string, sshRemoteId?: string) => Promise<string | null>;
 		writeFile: (
 			filePath: string,

@@ -59,10 +59,17 @@ export function createFsApi() {
 		homeDir: (): Promise<string> => ipcRenderer.invoke('fs:homeDir'),
 
 		/**
-		 * Read directory contents
+		 * Read directory contents.
+		 * When ignorePatterns is provided, entries matching any pattern are
+		 * filtered server-side before returning, preventing unnecessary
+		 * recursive SSH round-trips for ignored directories.
 		 */
-		readDir: (dirPath: string, sshRemoteId?: string): Promise<DirectoryEntry[]> =>
-			ipcRenderer.invoke('fs:readDir', dirPath, sshRemoteId),
+		readDir: (
+			dirPath: string,
+			sshRemoteId?: string,
+			ignorePatterns?: string[]
+		): Promise<DirectoryEntry[]> =>
+			ipcRenderer.invoke('fs:readDir', dirPath, sshRemoteId, ignorePatterns),
 
 		/**
 		 * Read file contents

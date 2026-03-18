@@ -22,6 +22,7 @@ import os from 'os';
 import fs from 'fs/promises';
 
 import { logger } from '../../utils/logger';
+import { shouldIgnore } from '../../../shared/globUtils';
 import {
 	readDirRemote,
 	readFileRemote,
@@ -91,41 +92,56 @@ export function registerFilesystemHandlers(): void {
 	});
 
 	// Read directory contents (supports SSH remote)
-	ipcMain.handle('fs:readDir', async (_, dirPath: string, sshRemoteId?: string) => {
-		// SSH remote: dispatch to remote fs operations
-		if (sshRemoteId) {
-			const sshConfig = getSshRemoteById(sshRemoteId);
-			if (!sshConfig) {
-				throw new Error(`SSH remote not found: ${sshRemoteId}`);
+	// Optional ignorePatterns filters entries server-side, preventing unnecessary
+	// recursive SSH round-trips for directories that would be ignored by the renderer.
+	ipcMain.handle(
+		'fs:readDir',
+		async (_, dirPath: string, sshRemoteId?: string, ignorePatterns?: string[]) => {
+			// SSH remote: dispatch to remote fs operations
+			if (sshRemoteId) {
+				const sshConfig = getSshRemoteById(sshRemoteId);
+				if (!sshConfig) {
+					throw new Error(`SSH remote not found: ${sshRemoteId}`);
+				}
+				const result = await readDirRemote(dirPath, sshConfig, undefined, ignorePatterns);
+				if (!result.success) {
+					throw new Error(result.error || 'Failed to read remote directory');
+				}
+				// Map remote entries to match local format (isFile derived from !isDirectory && !isSymlink)
+				// Include full path for recursive directory scanning (e.g., document graph)
+				// Use POSIX path joining for remote paths (always forward slashes)
+				const mapped = result.data!.map((entry) => ({
+					name: entry.name.normalize('NFC'),
+					isDirectory: entry.isDirectory,
+					isFile: !entry.isDirectory && !entry.isSymlink,
+					// Preserve raw filesystem name in path for correct remote operations
+					path: dirPath.endsWith('/') ? `${dirPath}${entry.name}` : `${dirPath}/${entry.name}`,
+				}));
+				// Filter at IPC level (primary filter point)
+				if (ignorePatterns && ignorePatterns.length > 0) {
+					return mapped.filter((entry) => !shouldIgnore(entry.name, ignorePatterns));
+				}
+				return mapped;
 			}
-			const result = await readDirRemote(dirPath, sshConfig);
-			if (!result.success) {
-				throw new Error(result.error || 'Failed to read remote directory');
-			}
-			// Map remote entries to match local format (isFile derived from !isDirectory && !isSymlink)
-			// Include full path for recursive directory scanning (e.g., document graph)
-			// Use POSIX path joining for remote paths (always forward slashes)
-			return result.data!.map((entry) => ({
-				name: entry.name.normalize('NFC'),
-				isDirectory: entry.isDirectory,
-				isFile: !entry.isDirectory && !entry.isSymlink,
-				// Preserve raw filesystem name in path for correct remote operations
-				path: dirPath.endsWith('/') ? `${dirPath}${entry.name}` : `${dirPath}/${entry.name}`,
-			}));
-		}
 
-		// Local: use standard fs operations
-		const entries = await fs.readdir(dirPath, { withFileTypes: true });
-		// Convert Dirent objects to plain objects for IPC serialization
-		// Include full path for recursive directory scanning (e.g., document graph)
-		return entries.map((entry: any) => ({
-			name: entry.name.normalize('NFC'),
-			isDirectory: entry.isDirectory(),
-			isFile: entry.isFile(),
-			// Preserve raw filesystem name in path for correct local operations
-			path: path.join(dirPath, entry.name),
-		}));
-	});
+			// Local: use standard fs operations
+			const entries = await fs.readdir(dirPath, { withFileTypes: true });
+			// Convert Dirent objects to plain objects for IPC serialization
+			// Include full path for recursive directory scanning (e.g., document graph)
+			const mapped = entries.map((entry: any) => ({
+				name: entry.name.normalize('NFC'),
+				isDirectory: entry.isDirectory(),
+				isFile: entry.isFile(),
+				// Preserve raw filesystem name in path for correct local operations
+				path: path.join(dirPath, entry.name),
+			}));
+			// Apply ignore patterns for local reads too (consistent behavior)
+			if (ignorePatterns && ignorePatterns.length > 0) {
+				return mapped.filter((entry: any) => !shouldIgnore(entry.name, ignorePatterns));
+			}
+			return mapped;
+		}
+	);
 
 	// Read file contents (supports SSH remote, with image base64 encoding)
 	ipcMain.handle('fs:readFile', async (_, filePath: string, sshRemoteId?: string) => {

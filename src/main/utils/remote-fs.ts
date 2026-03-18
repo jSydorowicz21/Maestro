@@ -10,6 +10,7 @@
  */
 
 import { SshRemoteConfig } from '../../shared/types';
+import { shouldIgnore } from '../../shared/globUtils';
 import { execFileNoThrow, ExecResult } from './execFile';
 import { shellEscape } from './shell-escape';
 import { sshRemoteManager } from '../ssh-remote-manager';
@@ -209,7 +210,8 @@ async function execRemoteCommand(
 export async function readDirRemote(
 	dirPath: string,
 	sshRemote: SshRemoteConfig,
-	deps: RemoteFsDeps = defaultDeps
+	deps: RemoteFsDeps = defaultDeps,
+	ignorePatterns?: string[]
 ): Promise<RemoteFsResult<RemoteDirEntry[]>> {
 	// Use ls with specific options:
 	// -1: One entry per line
@@ -271,9 +273,15 @@ export async function readDirRemote(
 		entries.push({ name, isDirectory, isSymlink });
 	}
 
+	// Filter entries by ignore patterns (defense-in-depth - IPC handler also filters)
+	const filtered =
+		ignorePatterns && ignorePatterns.length > 0
+			? entries.filter((entry) => !shouldIgnore(entry.name, ignorePatterns))
+			: entries;
+
 	return {
 		success: true,
-		data: entries,
+		data: filtered,
 	};
 }
 
