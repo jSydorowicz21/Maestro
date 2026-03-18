@@ -417,28 +417,33 @@ export async function statRemote(
  * command lists all regular files outside pruned directories and sums their
  * sizes with `du` + `awk`.
  *
- * Works on both GNU (Linux) and BSD (macOS) hosts because it only uses
- * POSIX-compatible find/du/awk options.
+ * Uses POSIX-compatible find/du/awk options (du -sk) for portability across
+ * both GNU (Linux) and BSD (macOS) remote hosts.
  *
  * @param escapedPath Shell-escaped directory path
  * @param patterns Glob patterns to exclude (matched against directory names)
  * @returns The full shell command string
  */
 function buildPrunedSizeCommand(escapedPath: string, patterns: string[]): string {
+	if (patterns.length === 0) {
+		throw new Error('buildPrunedSizeCommand requires at least one pattern');
+	}
+
 	// Build -name clauses for each pattern, e.g. -name "node_modules" -o -name "dist"
 	const nameClauses = patterns.map((p) => `-name ${shellEscape(p)}`).join(' -o ');
 
 	// find <path> -type d \( -name "x" -o -name "y" \) -prune -o -type f -print0
-	// | xargs -0 du -sb 2>/dev/null | awk '{sum+=$1} END {print sum+0}'
-	//
-	// The du -sb fallback for BSD uses -k with multiplication:
 	// | xargs -0 du -sk 2>/dev/null | awk '{sum+=$1*1024} END {print sum+0}'
 	//
-	// We try GNU du first, then BSD du.
+	// Uses du -sk (POSIX-portable, works on both GNU and BSD) instead of du -sb
+	// (GNU-only). du -sk reports in 1024-byte blocks; the awk *1024 converts to
+	// bytes. Small files may be rounded up to the nearest block, making this an
+	// approximation of apparent size - acceptable for UI display purposes.
+	//
 	// The `+0` in awk ensures we print "0" for empty directories instead of "".
 	return (
 		`find ${escapedPath} -type d \\( ${nameClauses} \\) -prune -o -type f -print0 2>/dev/null` +
-		` | xargs -0 du -sb 2>/dev/null | awk '{sum+=$1} END {print sum+0}'`
+		` | xargs -0 du -sk 2>/dev/null | awk '{sum+=$1*1024} END {print sum+0}'`
 	);
 }
 
@@ -803,6 +808,10 @@ export async function incrementalScanRemote(
 	sinceTimestamp: number,
 	deps: RemoteFsDeps = defaultDeps
 ): Promise<RemoteFsResult<IncrementalScanResult>> {
+	if (!Number.isFinite(sinceTimestamp)) {
+		return { success: false, error: 'Invalid timestamp' };
+	}
+
 	const escapedPath = shellEscape(dirPath);
 	const scanTime = Math.floor(Date.now() / 1000);
 
@@ -810,7 +819,8 @@ export async function incrementalScanRemote(
 	// -newermt accepts a date string in ISO format
 	// We exclude common patterns like node_modules and __pycache__
 	const isoDate = new Date(sinceTimestamp * 1000).toISOString();
-	const remoteCommand = `find ${escapedPath} -newermt "${isoDate}" -type f \\( ! -path "*/node_modules/*" ! -path "*/__pycache__/*" \\) 2>/dev/null || true`;
+	const escapedDate = shellEscape(isoDate);
+	const remoteCommand = `find ${escapedPath} -newermt ${escapedDate} -type f \\( ! -path "*/node_modules/*" ! -path "*/__pycache__/*" \\) 2>/dev/null || true`;
 
 	const result = await execRemoteCommand(sshRemote, remoteCommand, deps);
 

@@ -110,18 +110,15 @@ export function registerFilesystemHandlers(): void {
 				// Map remote entries to match local format (isFile derived from !isDirectory && !isSymlink)
 				// Include full path for recursive directory scanning (e.g., document graph)
 				// Use POSIX path joining for remote paths (always forward slashes)
-				const mapped = result.data!.map((entry) => ({
+				// readDirRemote already filters by ignorePatterns when provided,
+				// so no additional filtering is needed here.
+				return result.data!.map((entry) => ({
 					name: entry.name.normalize('NFC'),
 					isDirectory: entry.isDirectory,
 					isFile: !entry.isDirectory && !entry.isSymlink,
 					// Preserve raw filesystem name in path for correct remote operations
 					path: dirPath.endsWith('/') ? `${dirPath}${entry.name}` : `${dirPath}/${entry.name}`,
 				}));
-				// Filter at IPC level (primary filter point)
-				if (ignorePatterns && ignorePatterns.length > 0) {
-					return mapped.filter((entry) => !shouldIgnore(entry.name, ignorePatterns));
-				}
-				return mapped;
 			}
 
 			// Local: use standard fs operations

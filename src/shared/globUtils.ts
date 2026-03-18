@@ -7,9 +7,16 @@
 
 /**
  * Simple glob pattern matcher for ignore patterns.
- * Supports basic glob patterns: *, ?, and character classes.
+ * Supports basic glob patterns: * (any chars) and ? (single char).
+ *
+ * IMPORTANT: This matcher operates on bare file/directory NAMES only,
+ * not full paths. Patterns containing path separators (e.g., "src/dist")
+ * will never match a bare name and are effectively ignored.
+ * The `**` double-glob is treated as two consecutive `*` wildcards,
+ * which is functionally equivalent to a single `*` for name matching.
+ *
  * @param pattern - The glob pattern to match against
- * @param name - The file/folder name to test
+ * @param name - The file/folder name to test (must be a bare name, not a path)
  * @returns true if the name matches the pattern
  */
 export function matchGlobPattern(pattern: string, name: string): boolean {
