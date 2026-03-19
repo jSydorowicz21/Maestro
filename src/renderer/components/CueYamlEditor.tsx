@@ -7,8 +7,7 @@ import { CUE_PATTERNS } from '../constants/cuePatterns';
 import { useSessionStore, selectSessionById } from '../stores/sessionStore';
 import { buildSpawnConfigForAgent } from '../utils/sessionHelpers';
 import type { Theme } from '../types';
-
-const CUE_TEAL = '#06b6d4';
+import { CUE_COLOR } from '../../shared/cue-pipeline-types';
 
 const YAML_TEMPLATE = `# .maestro/cue.yaml
 # Define event-driven subscriptions for your agents.
@@ -409,7 +408,7 @@ export function CueYamlEditor({
 				width={1200}
 				maxHeight="85vh"
 				closeOnBackdropClick={false}
-				headerIcon={<Zap className="w-4 h-4" style={{ color: CUE_TEAL }} />}
+				headerIcon={<Zap className="w-4 h-4" style={{ color: CUE_COLOR }} />}
 				testId="cue-yaml-editor"
 				footer={
 					<div className="flex items-center justify-between w-full">
@@ -510,7 +509,7 @@ export function CueYamlEditor({
 										className="rounded px-2.5 py-1.5 text-xs whitespace-pre-wrap"
 										style={{
 											backgroundColor:
-												msg.role === 'user' ? `${CUE_TEAL}15` : theme.colors.bgActivity,
+												msg.role === 'user' ? `${CUE_COLOR}15` : theme.colors.bgActivity,
 											color: theme.colors.textMain,
 										}}
 										data-testid={`chat-message-${msg.role}`}
@@ -553,7 +552,7 @@ export function CueYamlEditor({
 									className="self-end p-2 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
 									style={{
 										backgroundColor:
-											chatInput.trim() && !chatBusy ? CUE_TEAL : theme.colors.bgActivity,
+											chatInput.trim() && !chatBusy ? CUE_COLOR : theme.colors.bgActivity,
 										color: chatInput.trim() && !chatBusy ? '#fff' : theme.colors.textDim,
 									}}
 									data-testid="ai-chat-send"
@@ -650,7 +649,7 @@ export function CueYamlEditor({
 								onClick={handleCopyPattern}
 								className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors"
 								style={{
-									backgroundColor: copied ? theme.colors.success : CUE_TEAL,
+									backgroundColor: copied ? theme.colors.success : CUE_COLOR,
 									color: '#fff',
 								}}
 							>

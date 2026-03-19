@@ -18,12 +18,13 @@ import {
 	ChevronsUp,
 	ChevronsDown,
 } from 'lucide-react';
-import type {
-	PipelineNode,
-	TriggerNodeData,
-	AgentNodeData,
-	CueEventType,
-	CuePipeline,
+import {
+	CUE_COLOR,
+	type PipelineNode,
+	type TriggerNodeData,
+	type AgentNodeData,
+	type CueEventType,
+	type CuePipeline,
 } from '../../../../shared/cue-pipeline-types';
 import { useDebouncedCallback } from '../../../hooks/utils';
 
@@ -551,7 +552,7 @@ function AgentConfig({
 												includeUpstreamOutput: e.target.checked,
 											} as Partial<AgentNodeData>)
 										}
-										style={{ accentColor: '#06b6d4' }}
+										style={{ accentColor: CUE_COLOR }}
 									/>
 									Auto-include upstream output
 								</label>
@@ -655,9 +656,9 @@ function AgentConfig({
 							padding: '4px 10px',
 							fontSize: 11,
 							fontWeight: 500,
-							color: '#06b6d4',
+							color: CUE_COLOR,
 							backgroundColor: 'transparent',
-							border: '1px solid #06b6d440',
+							border: `1px solid ${CUE_COLOR}40`,
 							borderRadius: 4,
 							cursor: 'pointer',
 						}}

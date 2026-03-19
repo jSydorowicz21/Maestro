@@ -16,6 +16,9 @@ export type CueEventType =
 	| 'github.issue'
 	| 'task.pending';
 
+/** Cue brand color — single source of truth for all Cue UI */
+export const CUE_COLOR = '#06b6d4';
+
 /** 12 visually distinct colors suitable for dark backgrounds */
 export const PIPELINE_COLORS: string[] = [
 	'#06b6d4', // cyan
