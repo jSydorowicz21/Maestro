@@ -41,3 +41,35 @@ export function matchGlobPattern(pattern: string, name: string): boolean {
 export function shouldIgnore(name: string, patterns: string[]): boolean {
 	return patterns.some((pattern) => matchGlobPattern(pattern, name));
 }
+
+/**
+ * Default ignore patterns for SSH remote file indexing.
+ *
+ * Single source of truth used by:
+ * - `src/main/stores/defaults.ts` (settings store default)
+ * - `src/renderer/components/Settings/SshRemoteIgnoreSection.tsx` (reset-to-defaults)
+ *
+ * Sorted alphabetically for easy scanning. Add new entries in sort order.
+ */
+export const SSH_REMOTE_IGNORE_DEFAULTS: readonly string[] = [
+	'*.egg-info',
+	'.cache',
+	'.git',
+	'.gradle',
+	'.m2',
+	'.next',
+	'.nuxt',
+	'.nyc_output',
+	'.parcel-cache',
+	'.tox',
+	'.turbo',
+	'.venv',
+	'__pycache__',
+	'build',
+	'coverage',
+	'dist',
+	'node_modules',
+	'target',
+	'vendor',
+	'venv',
+];

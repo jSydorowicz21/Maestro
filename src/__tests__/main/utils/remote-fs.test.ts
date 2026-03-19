@@ -4,6 +4,7 @@ import {
 	readFileRemote,
 	statRemote,
 	directorySizeRemote,
+	countItemsRemote,
 	writeFileRemote,
 	existsRemote,
 	mkdirRemote,
@@ -166,6 +167,36 @@ describe('remote-fs', () => {
 			const remoteCommand = call[call.length - 1];
 			// Path should be properly escaped in the command
 			expect(remoteCommand).toContain("'/path/with spaces/and'\\''quotes'");
+		});
+
+		it('filters entries matching ignorePatterns', async () => {
+			const deps = createMockDeps({
+				stdout: 'file.txt\nnode_modules/\ndist/\nsrc/\n',
+				stderr: '',
+				exitCode: 0,
+			});
+
+			const result = await readDirRemote('/project', baseConfig, deps, [
+				'node_modules',
+				'dist',
+			]);
+
+			expect(result.success).toBe(true);
+			expect(result.data).toHaveLength(2);
+			expect(result.data!.map((e) => e.name)).toEqual(['file.txt', 'src']);
+		});
+
+		it('returns all entries when ignorePatterns is empty', async () => {
+			const deps = createMockDeps({
+				stdout: 'file.txt\nnode_modules/\nsrc/\n',
+				stderr: '',
+				exitCode: 0,
+			});
+
+			const result = await readDirRemote('/project', baseConfig, deps, []);
+
+			expect(result.success).toBe(true);
+			expect(result.data).toHaveLength(3);
 		});
 	});
 
@@ -615,6 +646,63 @@ describe('remote-fs', () => {
 			const expectedBase64 = Buffer.from('Hello', 'utf-8').toString('base64');
 			expect(stringCommand).toContain(expectedBase64);
 			expect(bufferCommand).toContain(expectedBase64);
+		});
+	});
+
+	describe('countItemsRemote', () => {
+		it('counts files and folders without ignorePatterns', async () => {
+			const deps = createMockDeps({
+				stdout: 'FILES:   123\nDIRS:   45\n',
+				stderr: '',
+				exitCode: 0,
+			});
+
+			const result = await countItemsRemote('/project', baseConfig, deps);
+
+			expect(result.success).toBe(true);
+			expect(result.data).toEqual({ fileCount: 123, folderCount: 45 });
+
+			const call = (deps.execSsh as any).mock.calls[0][1];
+			const remoteCommand = call[call.length - 1];
+			expect(remoteCommand).not.toContain('-prune');
+		});
+
+		it('uses find with -prune when ignorePatterns are provided', async () => {
+			const deps = createMockDeps({
+				stdout: 'FILES:   50\nDIRS:   10\n',
+				stderr: '',
+				exitCode: 0,
+			});
+
+			const result = await countItemsRemote('/project', baseConfig, deps, ['node_modules', 'dist']);
+
+			expect(result.success).toBe(true);
+			expect(result.data).toEqual({ fileCount: 50, folderCount: 10 });
+
+			const call = (deps.execSsh as any).mock.calls[0][1];
+			const remoteCommand = call[call.length - 1];
+			expect(remoteCommand).toContain('find');
+			expect(remoteCommand).toContain('-prune');
+			expect(remoteCommand).toContain('-name');
+			expect(remoteCommand).toContain('node_modules');
+			expect(remoteCommand).toContain('dist');
+		});
+
+		it('uses simple find when ignorePatterns is empty', async () => {
+			const deps = createMockDeps({
+				stdout: 'FILES:   200\nDIRS:   30\n',
+				stderr: '',
+				exitCode: 0,
+			});
+
+			const result = await countItemsRemote('/project', baseConfig, deps, []);
+
+			expect(result.success).toBe(true);
+			expect(result.data).toEqual({ fileCount: 200, folderCount: 30 });
+
+			const call = (deps.execSsh as any).mock.calls[0][1];
+			const remoteCommand = call[call.length - 1];
+			expect(remoteCommand).not.toContain('-prune');
 		});
 	});
 

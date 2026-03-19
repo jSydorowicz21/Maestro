@@ -7,6 +7,7 @@
 
 import path from 'path';
 import { isWindows } from '../../shared/platformDetection';
+import { SSH_REMOTE_IGNORE_DEFAULTS } from '../../shared/globUtils';
 
 import type {
 	MaestroSettings,
@@ -65,28 +66,7 @@ export const SETTINGS_DEFAULTS: MaestroSettings = {
 	webInterfaceCustomPort: 8080,
 	sshRemotes: [],
 	defaultSshRemoteId: null,
-	sshRemoteIgnorePatterns: [
-		'*.egg-info',
-		'.cache',
-		'.git',
-		'.gradle',
-		'.m2',
-		'.next',
-		'.nuxt',
-		'.nyc_output',
-		'.parcel-cache',
-		'.tox',
-		'.turbo',
-		'.venv',
-		'__pycache__',
-		'build',
-		'coverage',
-		'dist',
-		'node_modules',
-		'target',
-		'vendor',
-		'venv',
-	],
+	sshRemoteIgnorePatterns: [...SSH_REMOTE_IGNORE_DEFAULTS],
 	sshRemoteHonorGitignore: false,
 	installationId: null,
 	wakatimeEnabled: false,

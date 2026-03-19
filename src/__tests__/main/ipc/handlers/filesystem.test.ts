@@ -384,7 +384,7 @@ describe('filesystem handlers', () => {
 			const handler = registeredHandlers.get('fs:countItems');
 			const result = await handler!({}, '/remote/folder', 'remote-1');
 
-			expect(countItemsRemote).toHaveBeenCalledWith('/remote/folder', mockSshConfig);
+			expect(countItemsRemote).toHaveBeenCalledWith('/remote/folder', mockSshConfig, undefined, undefined);
 			expect(result).toEqual({ fileCount: 10, folderCount: 3 });
 		});
 	});
@@ -402,10 +402,48 @@ describe('filesystem handlers', () => {
 			const handler = registeredHandlers.get('fs:directorySize');
 			const result = await handler!({}, '/remote/folder', 'remote-1');
 
+			expect(countItemsRemote).toHaveBeenCalledWith(
+				'/remote/folder',
+				mockSshConfig,
+				undefined,
+				undefined
+			);
 			expect(result).toEqual({
 				totalSize: 1024000,
 				fileCount: 50,
 				folderCount: 5,
+			});
+		});
+
+		it('should pass ignorePatterns to both directorySizeRemote and countItemsRemote', async () => {
+			const mockSshConfig = { id: 'remote-1', host: 'server.com', username: 'user' };
+			vi.mocked(getSshRemoteById).mockReturnValue(mockSshConfig as any);
+			vi.mocked(directorySizeRemote).mockResolvedValue({ success: true, data: 2048 });
+			vi.mocked(countItemsRemote).mockResolvedValue({
+				success: true,
+				data: { fileCount: 10, folderCount: 2 },
+			});
+
+			const patterns = ['node_modules', 'dist'];
+			const handler = registeredHandlers.get('fs:directorySize');
+			const result = await handler!({}, '/remote/folder', 'remote-1', patterns);
+
+			expect(directorySizeRemote).toHaveBeenCalledWith(
+				'/remote/folder',
+				mockSshConfig,
+				undefined,
+				patterns
+			);
+			expect(countItemsRemote).toHaveBeenCalledWith(
+				'/remote/folder',
+				mockSshConfig,
+				undefined,
+				patterns
+			);
+			expect(result).toEqual({
+				totalSize: 2048,
+				fileCount: 10,
+				folderCount: 2,
 			});
 		});
 	});

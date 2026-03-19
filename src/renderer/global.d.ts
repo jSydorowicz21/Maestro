@@ -664,7 +664,8 @@ interface MaestroAPI {
 		) => Promise<{ success: boolean }>;
 		countItems: (
 			dirPath: string,
-			sshRemoteId?: string
+			sshRemoteId?: string,
+			ignorePatterns?: string[]
 		) => Promise<{ fileCount: number; folderCount: number }>;
 	};
 	webserver: {

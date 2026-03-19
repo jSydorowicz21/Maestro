@@ -243,7 +243,7 @@ describe('Filesystem Preload API', () => {
 
 			const result = await api.countItems('/home/user/project');
 
-			expect(mockInvoke).toHaveBeenCalledWith('fs:countItems', '/home/user/project', undefined);
+			expect(mockInvoke).toHaveBeenCalledWith('fs:countItems', '/home/user/project', undefined, undefined);
 			expect(result.fileCount).toBe(5);
 			expect(result.folderCount).toBe(2);
 		});

@@ -195,12 +195,13 @@ async function execRemoteCommand(
 /**
  * Read directory contents from a remote host via SSH.
  *
- * Executes `ls -la` on the remote and parses the output to extract
+ * Executes `ls -1AF` on the remote and parses the output to extract
  * file names, types (directory, file, symlink), and other metadata.
  *
  * @param dirPath Path to the directory on the remote host
  * @param sshRemote SSH remote configuration
  * @param deps Optional dependencies for testing
+ * @param ignorePatterns Optional glob patterns to filter out matching entries
  * @returns Array of directory entries
  *
  * @example
@@ -273,7 +274,7 @@ export async function readDirRemote(
 		entries.push({ name, isDirectory, isSymlink });
 	}
 
-	// Filter entries by ignore patterns (defense-in-depth - IPC handler also filters)
+	// Filter entries by ignore patterns (defense-in-depth - renderer also filters)
 	const filtered =
 		ignorePatterns && ignorePatterns.length > 0
 			? entries.filter((entry) => !shouldIgnore(entry.name, ignorePatterns))
@@ -410,12 +411,25 @@ export async function statRemote(
 }
 
 /**
- * Build a POSIX find command that prunes directories matching ignore patterns.
+ * Build a POSIX find prune clause from ignore patterns.
  *
  * Converts glob-style ignore patterns (e.g., "node_modules", "dist", ".git")
- * into `-name` clauses joined with `-o` inside a `-prune` block. The resulting
- * command lists all regular files outside pruned directories and sums their
- * sizes with `du` + `awk`.
+ * into `-name` clauses joined with `-o` inside a `-prune` block prefix.
+ *
+ * @param patterns Glob patterns to exclude (matched against directory names)
+ * @returns The prune clause string, e.g. `-type d \( -name "x" -o -name "y" \) -prune -o`
+ */
+function buildPruneClause(patterns: string[]): string {
+	if (patterns.length === 0) {
+		return '';
+	}
+	const nameClauses = patterns.map((p) => `-name ${shellEscape(p)}`).join(' -o ');
+	return `-type d \\( ${nameClauses} \\) -prune -o`;
+}
+
+/**
+ * Build a POSIX find command that prunes directories matching ignore patterns
+ * and sums file sizes with `du` + `awk`.
  *
  * Uses POSIX-compatible find/du/awk options (du -sk) for portability across
  * both GNU (Linux) and BSD (macOS) remote hosts.
@@ -429,11 +443,14 @@ function buildPrunedSizeCommand(escapedPath: string, patterns: string[]): string
 		throw new Error('buildPrunedSizeCommand requires at least one pattern');
 	}
 
-	// Build -name clauses for each pattern, e.g. -name "node_modules" -o -name "dist"
-	const nameClauses = patterns.map((p) => `-name ${shellEscape(p)}`).join(' -o ');
+	const pruneClause = buildPruneClause(patterns);
 
-	// find <path> -type d \( -name "x" -o -name "y" \) -prune -o -type f -print0
-	// | xargs -0 du -sk 2>/dev/null | awk '{sum+=$1*1024} END {print sum+0}'
+	// find <path> <prune> -type f -exec du -sk {} + 2>/dev/null
+	// | awk '{sum+=$1*1024} END {print sum+0}'
+	//
+	// Uses `-exec ... {} +` instead of `| xargs -0` for portability: GNU xargs
+	// requires `-r` to skip empty input, but BSD/macOS xargs does not support `-r`.
+	// `-exec {} +` is POSIX-compliant and batches arguments the same way.
 	//
 	// Uses du -sk (POSIX-portable, works on both GNU and BSD) instead of du -sb
 	// (GNU-only). du -sk reports in 1024-byte blocks; the awk *1024 converts to
@@ -442,8 +459,31 @@ function buildPrunedSizeCommand(escapedPath: string, patterns: string[]): string
 	//
 	// The `+0` in awk ensures we print "0" for empty directories instead of "".
 	return (
-		`find ${escapedPath} -type d \\( ${nameClauses} \\) -prune -o -type f -print0 2>/dev/null` +
-		` | xargs -0 du -sk 2>/dev/null | awk '{sum+=$1*1024} END {print sum+0}'`
+		`find ${escapedPath} ${pruneClause} -type f -exec du -sk {} + 2>/dev/null` +
+		` | awk '{sum+=$1*1024} END {print sum+0}'`
+	);
+}
+
+/**
+ * Build a POSIX find command that prunes directories matching ignore patterns
+ * and counts files and directories separately.
+ *
+ * @param escapedPath Shell-escaped directory path
+ * @param patterns Glob patterns to exclude (matched against directory names)
+ * @returns The full shell command string producing FILES:<n> and DIRS:<n> output
+ */
+function buildPrunedCountCommand(escapedPath: string, patterns: string[]): string {
+	if (patterns.length === 0) {
+		throw new Error('buildPrunedCountCommand requires at least one pattern');
+	}
+
+	const pruneClause = buildPruneClause(patterns);
+
+	// Count files and directories separately, excluding pruned subtrees.
+	// -mindepth 1 on the DIRS count excludes the root directory itself.
+	return (
+		`echo "FILES:$(find ${escapedPath} ${pruneClause} -type f -print 2>/dev/null | wc -l)"` +
+		` && echo "DIRS:$(find ${escapedPath} -mindepth 1 ${pruneClause} -type d -print 2>/dev/null | wc -l)"`
 	);
 }
 
@@ -726,20 +766,33 @@ export async function deleteRemote(
 /**
  * Count files and folders in a directory on a remote host via SSH.
  *
+ * When ignorePatterns are provided, uses `find` with `-prune` to skip
+ * matching directories, keeping counts consistent with directorySizeRemote.
+ *
  * @param dirPath Directory path to count items in
  * @param sshRemote SSH remote configuration
  * @param deps Optional dependencies for testing
+ * @param ignorePatterns Optional glob patterns for directories to skip
  * @returns File and folder counts
  */
 export async function countItemsRemote(
 	dirPath: string,
 	sshRemote: SshRemoteConfig,
-	deps: RemoteFsDeps = defaultDeps
+	deps: RemoteFsDeps = defaultDeps,
+	ignorePatterns?: string[]
 ): Promise<RemoteFsResult<{ fileCount: number; folderCount: number }>> {
 	const escapedPath = shellEscape(dirPath);
-	// Use find to count files and directories separately
-	// -type f for files, -type d for directories (excluding the root dir itself)
-	const remoteCommand = `echo "FILES:$(find ${escapedPath} -type f 2>/dev/null | wc -l)" && echo "DIRS:$(find ${escapedPath} -mindepth 1 -type d 2>/dev/null | wc -l)"`;
+
+	let remoteCommand: string;
+
+	if (ignorePatterns && ignorePatterns.length > 0) {
+		// Use find with -prune to skip ignored directories (consistent with directorySizeRemote)
+		remoteCommand = buildPrunedCountCommand(escapedPath, ignorePatterns);
+	} else {
+		// No ignore patterns - count everything
+		// -type f for files, -type d for directories (excluding the root dir itself)
+		remoteCommand = `echo "FILES:$(find ${escapedPath} -type f 2>/dev/null | wc -l)" && echo "DIRS:$(find ${escapedPath} -mindepth 1 -type d 2>/dev/null | wc -l)"`;
+	}
 
 	const result = await execRemoteCommand(sshRemote, remoteCommand, deps);
 

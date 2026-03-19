@@ -134,7 +134,7 @@ export function registerFilesystemHandlers(): void {
 			}));
 			// Apply ignore patterns for local reads too (consistent behavior)
 			if (ignorePatterns && ignorePatterns.length > 0) {
-				return mapped.filter((entry: any) => !shouldIgnore(entry.name, ignorePatterns));
+				return mapped.filter((entry) => !shouldIgnore(entry.name, ignorePatterns));
 			}
 			return mapped;
 		}
@@ -232,8 +232,7 @@ export function registerFilesystemHandlers(): void {
 		}
 	});
 
-	// Calculate total size of a directory recursively
-	// Respects the same ignore patterns as loadFileTree (node_modules, __pycache__)
+	// Calculate total size of a directory recursively.
 	// Optional ignorePatterns skips matching directories during traversal,
 	// preventing expensive du/find traversal into ignored trees like node_modules.
 	ipcMain.handle(
@@ -246,9 +245,10 @@ export function registerFilesystemHandlers(): void {
 					throw new Error(`SSH remote not found: ${sshRemoteId}`);
 				}
 				// Fetch size and counts in parallel for SSH remotes
+				// Both calls respect ignorePatterns so counts stay consistent with size.
 				const [sizeResult, countResult] = await Promise.all([
 					directorySizeRemote(dirPath, sshConfig, undefined, ignorePatterns),
-					countItemsRemote(dirPath, sshConfig),
+					countItemsRemote(dirPath, sshConfig, undefined, ignorePatterns),
 				]);
 				if (!sizeResult.success) {
 					throw new Error(sizeResult.error || 'Failed to get remote directory size');
@@ -261,6 +261,11 @@ export function registerFilesystemHandlers(): void {
 			}
 
 			// Local: use standard fs operations
+			// Use provided ignore patterns; fall back to basic defaults for backwards compat
+			const localIgnore =
+				ignorePatterns && ignorePatterns.length > 0
+					? ignorePatterns
+					: ['node_modules', '__pycache__'];
 			let totalSize = 0;
 			let fileCount = 0;
 			let folderCount = 0;
@@ -273,8 +278,7 @@ export function registerFilesystemHandlers(): void {
 					const entries = await fs.readdir(currentPath, { withFileTypes: true });
 
 					for (const entry of entries) {
-						// Skip common ignore patterns (same as loadFileTree)
-						if (entry.name === 'node_modules' || entry.name === '__pycache__') {
+						if (shouldIgnore(entry.name, localIgnore)) {
 							continue;
 						}
 
@@ -394,43 +398,54 @@ export function registerFilesystemHandlers(): void {
 	);
 
 	// Count items in a directory (for delete confirmation, supports SSH remote)
-	ipcMain.handle('fs:countItems', async (_, dirPath: string, sshRemoteId?: string) => {
-		try {
-			// SSH remote: dispatch to remote fs operations
-			if (sshRemoteId) {
-				const sshConfig = getSshRemoteById(sshRemoteId);
-				if (!sshConfig) {
-					throw new Error(`SSH remote not found: ${sshRemoteId}`);
-				}
-				const result = await countItemsRemote(dirPath, sshConfig);
-				if (!result.success || !result.data) {
-					throw new Error(result.error || 'Failed to count remote items');
-				}
-				return result.data;
-			}
-
-			// Local: standard fs count
-			let fileCount = 0;
-			let folderCount = 0;
-
-			const countRecursive = async (dir: string) => {
-				const entries = await fs.readdir(dir, { withFileTypes: true });
-				for (const entry of entries) {
-					if (entry.isDirectory()) {
-						folderCount++;
-						await countRecursive(path.join(dir, entry.name));
-					} else {
-						fileCount++;
+	// Optional ignorePatterns skips matching directories during traversal,
+	// keeping counts consistent with directorySize when both use the same patterns.
+	ipcMain.handle(
+		'fs:countItems',
+		async (_, dirPath: string, sshRemoteId?: string, ignorePatterns?: string[]) => {
+			try {
+				// SSH remote: dispatch to remote fs operations
+				if (sshRemoteId) {
+					const sshConfig = getSshRemoteById(sshRemoteId);
+					if (!sshConfig) {
+						throw new Error(`SSH remote not found: ${sshRemoteId}`);
 					}
+					const result = await countItemsRemote(dirPath, sshConfig, undefined, ignorePatterns);
+					if (!result.success || !result.data) {
+						throw new Error(result.error || 'Failed to count remote items');
+					}
+					return result.data;
 				}
-			};
 
-			await countRecursive(dirPath);
-			return { fileCount, folderCount };
-		} catch (error) {
-			throw new Error(`Failed to count items: ${error}`);
+				// Local: standard fs count
+				// Use provided ignore patterns for consistency with directorySize
+				const localIgnore =
+					ignorePatterns && ignorePatterns.length > 0 ? ignorePatterns : undefined;
+				let fileCount = 0;
+				let folderCount = 0;
+
+				const countRecursive = async (dir: string) => {
+					const entries = await fs.readdir(dir, { withFileTypes: true });
+					for (const entry of entries) {
+						if (localIgnore && shouldIgnore(entry.name, localIgnore)) {
+							continue;
+						}
+						if (entry.isDirectory()) {
+							folderCount++;
+							await countRecursive(path.join(dir, entry.name));
+						} else {
+							fileCount++;
+						}
+					}
+				};
+
+				await countRecursive(dirPath);
+				return { fileCount, folderCount };
+			} catch (error) {
+				throw new Error(`Failed to count items: ${error}`);
+			}
 		}
-	});
+	);
 
 	// Fetch image from URL and return as base64 data URL (avoids CORS issues)
 	// Only allows http/https and blocks requests to private/internal networks (SSRF protection)

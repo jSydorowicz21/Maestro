@@ -130,10 +130,16 @@ export function createFsApi() {
 		): Promise<{ success: boolean }> => ipcRenderer.invoke('fs:delete', targetPath, options),
 
 		/**
-		 * Count files and folders in a directory
+		 * Count files and folders in a directory.
+		 * When ignorePatterns is provided, matching directories are skipped
+		 * during traversal, keeping counts consistent with directorySize.
 		 */
-		countItems: (dirPath: string, sshRemoteId?: string): Promise<ItemCountInfo> =>
-			ipcRenderer.invoke('fs:countItems', dirPath, sshRemoteId),
+		countItems: (
+			dirPath: string,
+			sshRemoteId?: string,
+			ignorePatterns?: string[]
+		): Promise<ItemCountInfo> =>
+			ipcRenderer.invoke('fs:countItems', dirPath, sshRemoteId, ignorePatterns),
 	};
 }
 
