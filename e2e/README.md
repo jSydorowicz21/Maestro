@@ -93,12 +93,21 @@ This lets E2E tests run without network calls or API keys.
 
 1. Identify which spec group your test belongs to (e.g., `04-tab-management`)
 2. Create a new `.spec.ts` file in that directory
-3. Import fixtures you need:
+3. Import the session-factory fixture (provides a window with a session already created):
    ```typescript
-   import { test, expect } from '../../fixtures/electron-app';
+   import { test, expect } from '../../fixtures/session-factory';
+   import { SELECTORS } from '../../utils/selectors';
+
+   test.describe('My Feature', () => {
+     test('should do something', async ({ windowWithSession }) => {
+       // windowWithSession is a Playwright Page with full UI rendered
+       await expect(windowWithSession.locator(SELECTORS.INPUT_AREA)).toBeVisible();
+     });
+   });
    ```
 4. Write your test using Playwright's `test` and `expect` APIs
 5. Use selectors from `utils/selectors.ts` for UI elements
+6. Use keyboard shortcuts instead of clicking right panel tabs (header-controls can intercept clicks)
 6. If you need a new selector, add it to `selectors.ts` and the corresponding `data-testid` attribute in the source component
 
 ## Adding New Selectors
