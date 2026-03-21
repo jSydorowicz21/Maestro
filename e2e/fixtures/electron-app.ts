@@ -64,6 +64,23 @@ export const test = base.extend<{}, ElectronWorkerFixtures>({
 	}, { scope: 'worker' }],
 
 	electronApp: [async ({ appPath, testDataDir }, use) => {
+		// Pre-seed mock agent config so Maestro uses our mock instead of real Claude
+		const mockAgentPath = path.join(__dirname, '..', 'mock-agent', 'mock-claude.mjs');
+		if (fs.existsSync(mockAgentPath)) {
+			const agentConfig = {
+				configs: {
+					'claude-code': {
+						customPath: mockAgentPath,
+					},
+				},
+			};
+			fs.writeFileSync(
+				path.join(testDataDir, 'maestro-agent-configs.json'),
+				JSON.stringify(agentConfig, null, '\t'),
+				'utf-8',
+			);
+		}
+
 		const app = await electron.launch({
 			args: [appPath],
 			env: {
