@@ -1,0 +1,6 @@
+{
+	"message": "Error: Rate limit exceeded. Please wait before making another request.",
+	"code": "rate_limit_error",
+	"retry_after_seconds": 30,
+	"exit_code": 1
+}

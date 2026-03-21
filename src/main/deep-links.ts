@@ -153,11 +153,16 @@ export function setupDeepLinkHandling(getMainWindow: () => BrowserWindow | null)
 	// Single-instance lock (Windows/Linux deep link support)
 	// On macOS, open-url handles this; on Windows/Linux, the OS launches a new instance
 	// with the URL in argv, and second-instance event fires in the primary instance
-	const gotTheLock = app.requestSingleInstanceLock();
-	if (!gotTheLock) {
-		// Another instance is running — it will receive our argv via second-instance
-		logger.info('Another instance is running, quitting', 'DeepLink');
-		return false;
+	// Skip single-instance lock in E2E tests so test instances can run alongside production
+	if (process.env.MAESTRO_E2E_TEST === 'true') {
+		logger.info('E2E test mode: skipping single-instance lock', 'DeepLink');
+	} else {
+		const gotTheLock = app.requestSingleInstanceLock();
+		if (!gotTheLock) {
+			// Another instance is running - it will receive our argv via second-instance
+			logger.info('Another instance is running, quitting', 'DeepLink');
+			return false;
+		}
 	}
 
 	// Handle second-instance event (Windows/Linux: new instance launched with deep link URL)

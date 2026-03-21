@@ -1,0 +1,9 @@
+{
+	"text": "Hello from mock Claude. This is a simulated response for E2E testing.",
+	"chunks": [
+		"Hello from ",
+		"mock Claude. ",
+		"This is a simulated ",
+		"response for E2E testing."
+	]
+}

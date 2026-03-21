@@ -5,8 +5,7 @@
  * E2E tests launch the actual packaged/built application and interact with
  * the UI through Playwright's browser automation.
  */
-import { defineConfig, devices } from '@playwright/test';
-import path from 'path';
+import { defineConfig } from '@playwright/test';
 
 /**
  * See https://playwright.dev/docs/test-configuration
@@ -53,14 +52,61 @@ export default defineConfig({
 		actionTimeout: 10000,
 	},
 
-	// Configure projects for major browsers
+	// Configure projects - ordered spec directories with dependency chains
 	projects: [
 		{
-			name: 'electron',
+			name: 'infrastructure',
+			testDir: './e2e/specs/01-infrastructure',
+		},
+		{
+			name: 'session-management',
+			testDir: './e2e/specs/02-session-management',
+			dependencies: ['infrastructure'],
+		},
+		{
+			name: 'agent-interaction',
+			testDir: './e2e/specs/03-agent-interaction',
+			dependencies: ['infrastructure'],
+		},
+		{
+			name: 'ui-features',
+			testDir: './e2e/specs/04-tab-management',
+			dependencies: ['infrastructure'],
+		},
+		{
+			name: 'keyboard-navigation',
+			testDir: './e2e/specs/05-keyboard-navigation',
+			dependencies: ['infrastructure'],
+		},
+		{
+			name: 'settings',
+			testDir: './e2e/specs/06-settings',
+			dependencies: ['infrastructure'],
+		},
+		{
+			name: 'right-panel',
+			testDir: './e2e/specs/07-right-panel',
+			dependencies: ['infrastructure'],
+		},
+		{
+			name: 'modal-system',
+			testDir: './e2e/specs/08-modal-system',
+			dependencies: ['infrastructure'],
+		},
+		{
+			name: 'error-handling',
+			testDir: './e2e/specs/09-error-handling',
+			dependencies: ['infrastructure'],
+		},
+		{
+			name: 'advanced',
+			testDir: './e2e/specs/10-advanced',
+			dependencies: ['session-management'],
+		},
+		{
+			name: 'autorun',
 			testDir: './e2e',
-			use: {
-				// Electron-specific settings will be configured in test fixtures
-			},
+			testMatch: 'autorun-*.spec.ts',
 		},
 	],
 

@@ -1,0 +1,5 @@
+{
+	"message": "Error: Authentication failed. Please check your API key and try again.",
+	"code": "auth_error",
+	"exit_code": 1
+}

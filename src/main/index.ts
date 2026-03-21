@@ -136,8 +136,14 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 // Used for stores that should be shared between dev and prod (e.g., agent configs)
 const productionDataPath = app.getPath('userData');
 
+// E2E test mode: use isolated data directory to prevent test/production interference
+if (process.env.MAESTRO_DATA_DIR) {
+	app.setPath('userData', process.env.MAESTRO_DATA_DIR);
+	console.log(`[E2E TEST] Using data directory: ${process.env.MAESTRO_DATA_DIR}`);
+}
+
 // Demo mode: use a separate data directory for fresh demos
-if (DEMO_MODE) {
+if (DEMO_MODE && !process.env.MAESTRO_DATA_DIR) {
 	app.setPath('userData', DEMO_DATA_PATH);
 	console.log(`[DEMO MODE] Using data directory: ${DEMO_DATA_PATH}`);
 }
