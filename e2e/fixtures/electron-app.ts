@@ -93,6 +93,34 @@ export const test = base.extend<{}, ElectronWorkerFixtures>({
 			timeout: 30000,
 		});
 
+		// Auto-dismiss any native dialogs (quit confirmations, error alerts)
+		app.on('dialog', async (dialog) => {
+			await dialog.dismiss().catch(() => {});
+		});
+
+		// Auto-confirm quit in E2E mode (skip the quit confirmation dialog)
+		await app.evaluate(async ({ ipcMain }) => {
+			// When the renderer requests quit confirmation, auto-confirm
+			ipcMain.on('app:quitConfirmed', () => {});
+			// Disable the quit confirmation flow entirely
+			(global as any).__e2eSkipQuitConfirmation = true;
+		}).catch(() => {});
+
+		// Suppress beforeunload in the renderer
+		const win = await app.firstWindow();
+		await win.evaluate(() => {
+			window.onbeforeunload = null;
+			// Auto-confirm quit via IPC if the app asks
+			if ((window as any).maestro?.app?.confirmQuit) {
+				const origOnQuit = (window as any).maestro.app.onQuitConfirmationRequest;
+				if (origOnQuit) {
+					origOnQuit(() => {
+						(window as any).maestro.app.confirmQuit();
+					});
+				}
+			}
+		}).catch(() => {});
+
 		await use(app);
 
 		// Force-close after ALL tests complete

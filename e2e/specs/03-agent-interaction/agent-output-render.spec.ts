@@ -15,7 +15,7 @@ test.describe('Agent Output Rendering', () => {
 
 		// Send a simple message
 		await textarea.fill('Say hello world');
-		await windowWithSession.keyboard.press('Enter');
+		await windowWithSession.keyboard.press('Control+Enter');
 
 		// Wait for mock agent to respond (mock agent responds in <1s)
 		await windowWithSession.waitForTimeout(5000);
@@ -57,7 +57,7 @@ test.describe('Agent Output Rendering', () => {
 
 		// Send message
 		await textarea.fill('Quick test');
-		await windowWithSession.keyboard.press('Enter');
+		await windowWithSession.keyboard.press('Control+Enter');
 		await windowWithSession.waitForTimeout(3000);
 
 		// After response, all UI elements should still be interactive

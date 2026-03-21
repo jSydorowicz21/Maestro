@@ -17,7 +17,7 @@ test.describe('Mock Agent Response', () => {
 
 		// Send a message
 		await textarea.fill('Hello from E2E test');
-		await windowWithSession.keyboard.press('Enter');
+		await windowWithSession.keyboard.press('Control+Enter');
 
 		// Wait for agent to respond
 		await windowWithSession.waitForTimeout(5000);
@@ -32,7 +32,7 @@ test.describe('Mock Agent Response', () => {
 		const textarea = windowWithSession.locator(`${SELECTORS.INPUT_AREA} textarea`);
 
 		await textarea.fill('__THINKING__ analyze this problem');
-		await windowWithSession.keyboard.press('Enter');
+		await windowWithSession.keyboard.press('Control+Enter');
 
 		// Wait for agent to respond (thinking blocks take slightly longer)
 		await windowWithSession.waitForTimeout(5000);

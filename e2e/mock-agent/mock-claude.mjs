@@ -10,6 +10,11 @@
  *   __CRASH__       - exit with code 137 (simulated crash / OOM)
  *   __SLOW__        - add a 5-second delay before responding
  *   __THINKING__    - include thinking blocks in the response
+ *   __TOOLCALL__    - emit a tool_use event (Read file) before response
+ *   __MARKDOWN__    - respond with rich markdown (headers, code blocks, lists)
+ *   __JSON__        - respond with a JSON code block
+ *   __HIGHCONTEXT__ - report high context usage in the result
+ *   __LONG__        - respond with a long multi-paragraph response
  *
  * Default behavior: emit init -> assistant chunks -> result
  */
@@ -101,12 +106,43 @@ function emitThinkingChunks(thinkingText) {
 	});
 }
 
-function emitResult(fullText) {
+function emitToolUse(name, input) {
+	writeLine({
+		type: 'assistant',
+		message: {
+			role: 'assistant',
+			content: [{
+				type: 'tool_use',
+				id: 'tool_' + Date.now(),
+				name: name,
+				input: input,
+			}],
+		},
+		session_id: SESSION_ID,
+	});
+}
+
+function emitToolResult(toolUseId, content) {
+	writeLine({
+		type: 'assistant',
+		message: {
+			role: 'user',
+			content: [{
+				type: 'tool_result',
+				tool_use_id: toolUseId,
+				content: content,
+			}],
+		},
+		session_id: SESSION_ID,
+	});
+}
+
+function emitResult(fullText, usageOverride) {
 	writeLine({
 		type: 'result',
 		result: fullText,
 		session_id: SESSION_ID,
-		usage: { input_tokens: 100, output_tokens: 50 },
+		usage: usageOverride || { input_tokens: 100, output_tokens: 50 },
 		total_cost_usd: 0.001,
 	});
 }
@@ -170,6 +206,61 @@ async function main() {
 			emitAssistantChunks(['Thought complete.']);
 			emitResult('Thought complete.');
 		}
+		process.exit(0);
+	}
+
+	// Keyword: tool call
+	if (prompt.includes('__TOOLCALL__')) {
+		emitToolUse('Read', { file_path: '/tmp/test-file.ts', command: 'cat /tmp/test-file.ts' });
+		await sleep(100);
+		emitToolResult('tool_' + Date.now(), 'export function hello() { return "world"; }');
+		await sleep(50);
+		emitAssistantChunks(['I read the file. It contains a hello function.']);
+		emitResult('I read the file. It contains a hello function.');
+		process.exit(0);
+	}
+
+	// Keyword: markdown response
+	if (prompt.includes('__MARKDOWN__')) {
+		const md = '# Analysis Report\n\n## Summary\n\nHere are the findings:\n\n- Item one is **important**\n- Item two has `inline code`\n- Item three is _italicized_\n\n## Code Example\n\n```typescript\nfunction greet(name: string): string {\n  return `Hello, ${name}!`;\n}\n```\n\n## Conclusion\n\nAll tests passed successfully.\n';
+		emitAssistantChunks([md]);
+		emitResult(md);
+		process.exit(0);
+	}
+
+	// Keyword: JSON response
+	if (prompt.includes('__JSON__')) {
+		const json = '```json\n{\n  "status": "success",\n  "tests": 146,\n  "passed": 146,\n  "failed": 0,\n  "coverage": "95%"\n}\n```';
+		emitAssistantChunks([json]);
+		emitResult(json);
+		process.exit(0);
+	}
+
+	// Keyword: high context usage
+	if (prompt.includes('__HIGHCONTEXT__')) {
+		emitAssistantChunks(['Response with high context usage.']);
+		emitResult('Response with high context usage.', {
+			input_tokens: 180000,
+			output_tokens: 15000,
+			cache_read_input_tokens: 50000,
+			cache_creation_input_tokens: 10000,
+		});
+		process.exit(0);
+	}
+
+	// Keyword: long response
+	if (prompt.includes('__LONG__')) {
+		const paragraphs = [];
+		for (let i = 1; i <= 10; i++) {
+			paragraphs.push(`Paragraph ${i}: This is a detailed explanation of point number ${i}. It contains enough text to test scrolling behavior and rendering performance in the terminal output area. The mock agent generates this to verify that long responses render correctly without freezing the UI or causing layout issues.`);
+		}
+		const fullText = paragraphs.join('\n\n');
+		// Send in chunks to simulate streaming
+		for (const p of paragraphs) {
+			emitAssistantChunks([p + '\n\n']);
+			await sleep(50);
+		}
+		emitResult(fullText);
 		process.exit(0);
 	}
 
