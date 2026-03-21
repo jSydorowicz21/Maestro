@@ -1890,7 +1890,7 @@ describe('process IPC handlers', () => {
 			remoteEnv: {},
 		};
 
-		it('should pass --append-system-prompt as CLI arg for supported agents (local)', async () => {
+		it('should deliver system prompt via CLI for supported agents (local)', async () => {
 			const mockAgent = {
 				id: 'claude-code',
 				name: 'Claude Code',
@@ -1917,10 +1917,17 @@ describe('process IPC handlers', () => {
 			});
 
 			const spawnCall = mockProcessManager.spawn.mock.calls[0][0];
-			// --append-system-prompt should be in the args
-			const idx = spawnCall.args.indexOf('--append-system-prompt');
-			expect(idx).toBeGreaterThan(-1);
-			expect(spawnCall.args[idx + 1]).toBe('You are Maestro system prompt content');
+			if (process.platform === 'win32') {
+				// Windows: uses --append-system-prompt-file with temp file
+				const idx = spawnCall.args.indexOf('--append-system-prompt-file');
+				expect(idx).toBeGreaterThan(-1);
+				expect(spawnCall.args[idx + 1]).toContain('maestro-sysprompt-session-1');
+			} else {
+				// Non-Windows: passes inline
+				const idx = spawnCall.args.indexOf('--append-system-prompt');
+				expect(idx).toBeGreaterThan(-1);
+				expect(spawnCall.args[idx + 1]).toBe('You are Maestro system prompt content');
+			}
 			// User prompt should remain clean (not embedded)
 			expect(spawnCall.prompt).toBe('Hello world');
 			expect(spawnCall.prompt).not.toContain('Maestro system prompt');

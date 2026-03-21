@@ -1,6 +1,8 @@
 import { ipcMain, BrowserWindow } from 'electron';
 import Store from 'electron-store';
 import * as os from 'os';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ProcessManager } from '../../process-manager';
 import { AgentDetector } from '../../agents';
 import { logger } from '../../utils/logger';
@@ -212,17 +214,40 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 
 				// ========================================================================
 				// System prompt delivery: use --append-system-prompt for supported agents,
-				// otherwise embed in the user prompt as fallback
+				// otherwise embed in the user prompt as fallback.
+				// On Windows local execution, use --append-system-prompt-file with a temp
+				// file to avoid exceeding the ~32K CreateProcess command-line length limit.
+				// SSH sessions are exempt (the command runs inside a stdin script, not the
+				// OS command line) and always use inline --append-system-prompt.
 				// ========================================================================
 				let effectivePrompt = config.prompt;
+				let systemPromptTempFile: string | undefined;
+				const isSshSession = config.sessionSshRemoteConfig?.enabled;
 				if (config.appendSystemPrompt) {
 					if (agent?.capabilities?.supportsAppendSystemPrompt) {
-						// Agent supports --append-system-prompt: pass as CLI arg
-						finalArgs = [...finalArgs, '--append-system-prompt', config.appendSystemPrompt];
-						logger.debug('Using --append-system-prompt for system prompt delivery', LOG_CONTEXT, {
-							agentId: agent?.id,
-							systemPromptLength: config.appendSystemPrompt.length,
-						});
+						if (isWindows() && !isSshSession) {
+							// Windows local: write to temp file to avoid CLI length limits
+							const tmpDir = os.tmpdir();
+							systemPromptTempFile = path.join(tmpDir, `maestro-sysprompt-${config.sessionId}.txt`);
+							fs.writeFileSync(systemPromptTempFile, config.appendSystemPrompt, 'utf-8');
+							finalArgs = [...finalArgs, '--append-system-prompt-file', systemPromptTempFile];
+							logger.debug(
+								'Using --append-system-prompt-file for system prompt delivery (Windows)',
+								LOG_CONTEXT,
+								{
+									agentId: agent?.id,
+									systemPromptLength: config.appendSystemPrompt.length,
+									tempFile: systemPromptTempFile,
+								}
+							);
+						} else {
+							// Non-Windows or SSH: pass inline (no command-line length concern)
+							finalArgs = [...finalArgs, '--append-system-prompt', config.appendSystemPrompt];
+							logger.debug('Using --append-system-prompt for system prompt delivery', LOG_CONTEXT, {
+								agentId: agent?.id,
+								systemPromptLength: config.appendSystemPrompt.length,
+							});
+						}
 					} else if (effectivePrompt) {
 						// Fallback: embed system prompt in user message
 						effectivePrompt = `${config.appendSystemPrompt}\n\n---\n\n# User Request\n\n${effectivePrompt}`;
@@ -588,6 +613,17 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 						sshRemoteName: sshRemoteUsed.name,
 					}),
 				});
+
+				// Clean up temp system prompt file after agent has had time to read it
+				if (systemPromptTempFile) {
+					setTimeout(() => {
+						try {
+							fs.unlinkSync(systemPromptTempFile!);
+						} catch {
+							// Ignore - temp dir cleanup will handle it
+						}
+					}, 5000);
+				}
 
 				// Add power block reason for AI sessions (not terminals)
 				// This prevents system sleep while AI is processing
