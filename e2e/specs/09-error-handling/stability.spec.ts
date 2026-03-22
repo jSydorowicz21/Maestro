@@ -1,59 +1,64 @@
 /**
  * App Stability E2E Tests
  *
- * Stress tests that verify the app doesn't crash under various conditions.
+ * Stress tests that verify the app handles rapid, overlapping
+ * interactions without freezing or losing state.
+ * Limited to 2 stress tests as these are broad "app survives" checks.
  */
 import { test, expect } from '../../fixtures/session-factory';
 import { SELECTORS } from '../../utils/selectors';
 
 test.describe('App Stability', () => {
-	test('app survives rapid shortcut spam', async ({ windowWithSession }) => {
-		// Rapidly press multiple shortcuts
-		const shortcuts = ['Control+j', 'Control+k', 'Escape', 'Control+,', 'Escape', 'Control+Shift+f', 'Control+Shift+h', 'Control+Shift+1'];
+	test('rapid shortcut sequence does not freeze the UI', async ({ windowWithSession }) => {
+		await windowWithSession.keyboard.press('Escape');
+		await windowWithSession.waitForTimeout(200);
+
+		// Fire a sequence of shortcuts that open/close various UI elements
+		const shortcuts = [
+			'Control+k', 'Escape',           // Quick actions open/close
+			'Control+,', 'Escape',            // Settings open/close
+			'Control+Shift+f', 'Control+Shift+h', 'Control+Shift+1', // Right panel tabs
+			'Alt+Control+ArrowLeft', 'Alt+Control+ArrowLeft',        // Left panel toggle
+		];
+
 		for (const shortcut of shortcuts) {
 			await windowWithSession.keyboard.press(shortcut);
 			await windowWithSession.waitForTimeout(100);
 		}
 
-		// App should still be responsive
 		await windowWithSession.waitForTimeout(500);
-		const inputArea = windowWithSession.locator(SELECTORS.INPUT_AREA);
-		await expect(inputArea).toBeVisible({ timeout: 5000 });
+
+		// After all that, verify the textarea is still editable (not frozen)
+		const textarea = windowWithSession.locator(`${SELECTORS.INPUT_AREA} textarea`);
+		await textarea.fill('still alive after shortcut storm');
+		expect(await textarea.inputValue()).toBe('still alive after shortcut storm');
+		await textarea.fill('');
 	});
 
-	test('app survives creating and closing multiple tabs', async ({ windowWithSession }) => {
-		// Create 3 tabs rapidly
+	test('creating and closing multiple tabs preserves tab bar', async ({ windowWithSession }) => {
+		await windowWithSession.keyboard.press('Escape');
+		await windowWithSession.waitForTimeout(200);
+
+		const tabBar = windowWithSession.locator(SELECTORS.TAB_BAR);
+		const tabBarTextBefore = await tabBar.textContent() ?? '';
+
+		// Create 3 tabs using Ctrl+N (new agent)
 		for (let i = 0; i < 3; i++) {
 			await windowWithSession.keyboard.press('Control+n');
 			await windowWithSession.waitForTimeout(300);
 		}
 
-		// Close them all
+		const tabBarTextAfterCreate = await tabBar.textContent() ?? '';
+		// Tab bar text should have grown (more tab labels)
+		expect(tabBarTextAfterCreate.length).toBeGreaterThan(tabBarTextBefore.length);
+
+		// Close the created tabs
 		for (let i = 0; i < 3; i++) {
 			await windowWithSession.keyboard.press('Control+w');
 			await windowWithSession.waitForTimeout(300);
 		}
 
-		// App should still work
-		const tabBar = windowWithSession.locator(SELECTORS.TAB_BAR);
-		await expect(tabBar).toBeVisible({ timeout: 5000 });
-	});
-
-	test('app survives opening all right panel tabs in sequence', async ({ windowWithSession }) => {
-		const tabs = ['Control+Shift+f', 'Control+Shift+h', 'Control+Shift+1'];
-		for (const tab of tabs) {
-			await windowWithSession.keyboard.press(tab);
-			await windowWithSession.waitForTimeout(300);
-		}
-
-		// Toggle right panel off and on
-		await windowWithSession.keyboard.press('Alt+Control+ArrowRight');
-		await windowWithSession.waitForTimeout(300);
-		await windowWithSession.keyboard.press('Alt+Control+ArrowRight');
-		await windowWithSession.waitForTimeout(300);
-
-		// App should still be responsive
-		const inputArea = windowWithSession.locator(SELECTORS.INPUT_AREA);
-		await expect(inputArea).toBeVisible({ timeout: 5000 });
+		// Tab bar should still be visible and functional
+		await expect(tabBar).toBeVisible({ timeout: 3000 });
 	});
 });

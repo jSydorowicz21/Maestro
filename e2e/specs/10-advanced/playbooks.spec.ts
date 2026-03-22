@@ -1,72 +1,65 @@
 /**
  * Playbooks (Auto Run) E2E Tests
  *
- * Verifies that the Auto Run tab is accessible from the right panel
- * and that the panel can be toggled and navigated to.
+ * Verifies the Auto Run tab in the right panel is accessible,
+ * switchable, and renders its content panel.
  */
 import { test, expect } from '../../fixtures/session-factory';
 import { SELECTORS } from '../../utils/selectors';
 
 test.describe('Playbooks', () => {
-	test('auto run tab is accessible in right panel', async ({ windowWithSession }) => {
-		// Use keyboard shortcut to open Auto Run tab (avoids header-controls click interception)
-		await windowWithSession.keyboard.press('Control+Shift+1');
+	test('right panel shows all three tabs: Files, History, Auto Run', async ({ windowWithSession }) => {
+		await windowWithSession.keyboard.press('Escape');
+		await windowWithSession.waitForTimeout(200);
+
+		// Ensure right panel is open
+		await windowWithSession.keyboard.press('Control+Shift+f');
 		await windowWithSession.waitForTimeout(500);
 
-		// The Auto Run tab should be visible
-		const autoRunTab = windowWithSession.locator(SELECTORS.AUTORUN_TAB);
-		await expect(autoRunTab).toBeVisible({ timeout: 5000 });
-
-		// If visible, verify the panel content area also exists
-		const autoRunPanel = windowWithSession.locator(SELECTORS.AUTORUN_PANEL);
-		const panelVisible = await autoRunPanel.isVisible().catch(() => false);
-		if (!panelVisible) {
-			// Panel might not render without documents - that's OK, tab is accessible
-
-			// Check one more time for the tab
-			const autoRunTabRetry = windowWithSession.locator(SELECTORS.AUTORUN_TAB);
-			const retryVisible = await autoRunTabRetry.isVisible().catch(() => false);
-			// If still not visible, the right panel may be collapsed by default - that's OK
-			expect(retryVisible || true).toBe(true);
-		}
-	});
-
-	test('right panel shows files, history, and auto run tabs', async ({ windowWithSession }) => {
-		// Open the right panel
-		await windowWithSession.keyboard.press('Alt+Control+ArrowRight');
-		await windowWithSession.waitForTimeout(500);
-
-		// Check for the three main tabs
 		const filesTab = windowWithSession.locator(SELECTORS.FILES_TAB);
 		const historyTab = windowWithSession.locator(SELECTORS.HISTORY_TAB);
 		const autoRunTab = windowWithSession.locator(SELECTORS.AUTORUN_TAB);
 
-		const filesVisible = await filesTab.isVisible().catch(() => false);
-		const historyVisible = await historyTab.isVisible().catch(() => false);
-		const autoRunVisible = await autoRunTab.isVisible().catch(() => false);
-
-		// At least one right panel tab should be visible when the panel is open
-		expect(filesVisible || historyVisible || autoRunVisible).toBe(true);
+		await expect(filesTab).toBeVisible({ timeout: 5000 });
+		await expect(historyTab).toBeVisible({ timeout: 5000 });
+		await expect(autoRunTab).toBeVisible({ timeout: 5000 });
 	});
 
-	test('switching to auto run tab shows auto run content area', async ({ windowWithSession }) => {
-		// Open the right panel
-		await windowWithSession.keyboard.press('Alt+Control+ArrowRight');
+	test('clicking Auto Run tab switches to the Auto Run panel', async ({ windowWithSession }) => {
+		await windowWithSession.keyboard.press('Escape');
+		await windowWithSession.waitForTimeout(200);
+
+		// Open right panel and switch to Auto Run
+		await windowWithSession.keyboard.press('Control+Shift+1');
 		await windowWithSession.waitForTimeout(500);
 
 		const autoRunTab = windowWithSession.locator(SELECTORS.AUTORUN_TAB);
+		await expect(autoRunTab).toBeVisible({ timeout: 5000 });
+		await autoRunTab.click();
+		await windowWithSession.waitForTimeout(500);
 
-		if (await autoRunTab.isVisible().catch(() => false)) {
-			await autoRunTab.click();
-			await windowWithSession.waitForTimeout(500);
+		// Auto Run panel should appear with content
+		const autoRunPanel = windowWithSession.locator(SELECTORS.AUTORUN_PANEL);
+		await expect(autoRunPanel).toBeVisible({ timeout: 5000 });
 
-			// The auto run panel should become visible
-			const autoRunPanel = windowWithSession.locator(SELECTORS.AUTORUN_PANEL);
-			await expect(autoRunPanel).toBeVisible({ timeout: 5000 });
+		// Panel should contain playbook-related text (e.g., "playbook", "auto run", "run", "create")
+		const content = (await autoRunPanel.textContent() ?? '').toLowerCase();
+		expect(content).toMatch(/playbook|auto run|run|create|document|no\s/i);
+	});
 
-			// The panel should have content (not be empty)
-			const content = await autoRunPanel.textContent();
-			expect(content).toBeTruthy();
-		}
+	test('keyboard shortcut Ctrl+Shift+1 activates Auto Run tab', async ({ windowWithSession }) => {
+		await windowWithSession.keyboard.press('Escape');
+		await windowWithSession.waitForTimeout(200);
+
+		// Switch to Files first to ensure we are not already on Auto Run
+		await windowWithSession.keyboard.press('Control+Shift+f');
+		await windowWithSession.waitForTimeout(300);
+
+		// Now activate Auto Run via shortcut
+		await windowWithSession.keyboard.press('Control+Shift+1');
+		await windowWithSession.waitForTimeout(500);
+
+		const autoRunPanel = windowWithSession.locator(SELECTORS.AUTORUN_PANEL);
+		await expect(autoRunPanel).toBeVisible({ timeout: 5000 });
 	});
 });

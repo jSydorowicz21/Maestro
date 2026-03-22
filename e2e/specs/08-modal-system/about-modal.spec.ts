@@ -1,50 +1,41 @@
 /**
  * About Modal E2E Tests
  *
- * Verifies the About modal is accessible from the hamburger menu.
+ * Verifies the About modal opens from the hamburger menu
+ * and displays version information.
  */
 import { test, expect } from '../../fixtures/session-factory';
 import { SELECTORS } from '../../utils/selectors';
 
 test.describe('About Modal', () => {
-	test('about option exists in hamburger menu', async ({ windowWithSession }) => {
+	test('about modal opens from hamburger menu and shows version', async ({ windowWithSession }) => {
+		await windowWithSession.keyboard.press('Escape');
+		await windowWithSession.waitForTimeout(200);
+
 		const menu = windowWithSession.locator(SELECTORS.HAMBURGER_MENU);
 		await menu.click();
 		await windowWithSession.waitForTimeout(500);
 
 		const menuContents = windowWithSession.locator(SELECTORS.HAMBURGER_MENU_CONTENTS);
-		const text = (await menuContents.textContent() ?? '').toLowerCase();
+		await expect(menuContents).toBeVisible({ timeout: 3000 });
 
-		// Menu should have an "about" option
-		expect(text.includes('about') || text.includes('version')).toBe(true);
-
-		await windowWithSession.keyboard.press('Escape');
-	});
-
-	test('about modal shows version info', async ({ windowWithSession }) => {
-		const menu = windowWithSession.locator(SELECTORS.HAMBURGER_MENU);
-		await menu.click();
+		// Click the About option
+		const aboutOption = menuContents.locator('text=About').first();
+		await expect(aboutOption).toBeVisible({ timeout: 3000 });
+		await aboutOption.click();
 		await windowWithSession.waitForTimeout(500);
 
-		// Find and click the About option
-		const aboutOption = windowWithSession.locator('text=About').first();
-		const isVisible = await aboutOption.isVisible().catch(() => false);
+		// The about modal should appear as a dialog
+		const dialog = windowWithSession.locator(SELECTORS.MODAL_DIALOG).first();
+		await expect(dialog).toBeVisible({ timeout: 5000 });
 
-		if (isVisible) {
-			await aboutOption.click();
-			await windowWithSession.waitForTimeout(500);
+		// Dialog must contain version information (e.g., "v0.x" or "version")
+		const dialogText = (await dialog.textContent() ?? '').toLowerCase();
+		expect(dialogText).toMatch(/version|v\d+\.\d+|maestro/);
 
-			// The about modal should show version info
-			const dialog = windowWithSession.locator(SELECTORS.MODAL_DIALOG);
-			if (await dialog.first().isVisible().catch(() => false)) {
-				const dialogText = (await dialog.first().textContent() ?? '').toLowerCase();
-				const hasVersionInfo = dialogText.includes('version') || dialogText.includes('maestro') || dialogText.includes('v0.');
-				expect(hasVersionInfo).toBe(true);
-				await windowWithSession.keyboard.press('Escape');
-			}
-		} else {
-			// About might be nested - close menu
-			await windowWithSession.keyboard.press('Escape');
-		}
+		// Close and verify it dismissed
+		await windowWithSession.keyboard.press('Escape');
+		await windowWithSession.waitForTimeout(300);
+		await expect(dialog).not.toBeVisible({ timeout: 3000 });
 	});
 });

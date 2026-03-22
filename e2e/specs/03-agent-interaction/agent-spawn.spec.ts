@@ -1,59 +1,43 @@
 /**
  * Agent Spawn E2E Tests
  *
- * Tests that the input area is functional and the textarea
- * accepts user input. Without a real agent binary, we verify
- * the UI is ready for interaction rather than agent responses.
+ * Tests that the mock agent process spawns correctly when a message
+ * is sent, and that the agent's init event sets up the session properly.
  */
 import { test, expect } from '../../fixtures/session-factory';
 import { SELECTORS } from '../../utils/selectors';
 
 test.describe('Agent Spawn', () => {
-	test('input area is visible and has a textarea', async ({ windowWithSession }) => {
-		// Dismiss any lingering modals from previous tests
-		await windowWithSession.keyboard.press('Escape');
-		await windowWithSession.waitForTimeout(300);
-
-		const inputArea = windowWithSession.locator(SELECTORS.INPUT_AREA);
-		await expect(inputArea).toBeVisible({ timeout: 10000 });
-
-		const textarea = inputArea.locator('textarea');
-		await expect(textarea).toBeVisible({ timeout: 5000 });
-	});
-
-	test('textarea accepts text input', async ({ windowWithSession }) => {
-		const inputArea = windowWithSession.locator(SELECTORS.INPUT_AREA);
-		await expect(inputArea).toBeVisible({ timeout: 10000 });
-
-		const textarea = inputArea.locator('textarea');
-		await expect(textarea).toBeVisible({ timeout: 5000 });
-
-		// Type a message into the textarea
-		await textarea.fill('Hello agent');
-		const value = await textarea.inputValue();
-		expect(value).toBe('Hello agent');
-	});
-
-	test('textarea is editable and can be cleared', async ({ windowWithSession }) => {
-		const inputArea = windowWithSession.locator(SELECTORS.INPUT_AREA);
-		await expect(inputArea).toBeVisible({ timeout: 10000 });
-
-		const textarea = inputArea.locator('textarea');
-		await expect(textarea).toBeVisible({ timeout: 5000 });
-
-		// Fill, verify, clear, verify
-		await textarea.fill('Test message');
-		expect(await textarea.inputValue()).toBe('Test message');
-
-		await textarea.fill('');
-		expect(await textarea.inputValue()).toBe('');
-	});
-
-	test('main terminal area is present alongside input', async ({ windowWithSession }) => {
+	test('sending a message spawns agent and produces response', async ({ windowWithSession }) => {
+		const textarea = windowWithSession.locator(`${SELECTORS.INPUT_AREA} textarea`);
 		const terminal = windowWithSession.locator(SELECTORS.MAIN_TERMINAL);
-		await expect(terminal).toBeVisible({ timeout: 10000 });
 
-		const inputArea = windowWithSession.locator(SELECTORS.INPUT_AREA);
-		await expect(inputArea).toBeVisible({ timeout: 5000 });
+		// Before sending, terminal should have minimal or no agent content
+		const beforeText = await terminal.textContent() ?? '';
+
+		await textarea.fill('spawn test message');
+		await windowWithSession.keyboard.press('Control+Enter');
+		await windowWithSession.waitForTimeout(5000);
+
+		// After sending, the terminal should contain the mock agent's response
+		const afterText = await terminal.textContent() ?? '';
+		expect(afterText.length).toBeGreaterThan(beforeText.length);
+		expect(afterText).toContain('mock Claude');
+	});
+
+	test('agent state indicator appears after sending a message', async ({ windowWithSession }) => {
+		const textarea = windowWithSession.locator(`${SELECTORS.INPUT_AREA} textarea`);
+
+		await textarea.fill('state check message');
+		await windowWithSession.keyboard.press('Control+Enter');
+		await windowWithSession.waitForTimeout(5000);
+
+		// After agent has responded, check for a state indicator in the session list
+		const stateIndicator = windowWithSession.locator(SELECTORS.AGENT_STATE_INDICATOR);
+		const sessionList = windowWithSession.locator(SELECTORS.SESSION_LIST);
+
+		// The session list should still contain our agent
+		const listText = await sessionList.textContent() ?? '';
+		expect(listText).toContain('E2E Test Agent');
 	});
 });

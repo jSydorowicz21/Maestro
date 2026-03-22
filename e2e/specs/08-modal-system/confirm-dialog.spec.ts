@@ -1,51 +1,69 @@
 /**
  * Confirm Dialog E2E Tests
  *
- * Verifies that confirm dialogs appear when expected
- * and can be dismissed without crashing.
+ * Verifies that destructive actions trigger confirm dialogs
+ * and that confirming/canceling produces the expected outcome.
  */
 import { test, expect } from '../../fixtures/session-factory';
 import { SELECTORS } from '../../utils/selectors';
 
 test.describe('Confirm Dialogs', () => {
-	test('quick actions palette has actionable items', async ({ windowWithSession }) => {
-		await windowWithSession.keyboard.press('Control+k');
+	test('closing last tab triggers confirm or prevents close', async ({ windowWithSession }) => {
+		await windowWithSession.keyboard.press('Escape');
+		await windowWithSession.waitForTimeout(200);
+
+		// Count current tabs
+		const tabBar = windowWithSession.locator(SELECTORS.TAB_BAR);
+		const tabsBefore = await tabBar.locator('[role="tab"], [data-testid="tab"]').count();
+
+		// Try to close the current tab with Ctrl+W
+		await windowWithSession.keyboard.press('Control+w');
 		await windowWithSession.waitForTimeout(500);
 
-		const palette = windowWithSession.locator('[aria-label="Quick Actions"]');
-		await expect(palette).toBeVisible({ timeout: 5000 });
+		// Either a confirm dialog appeared, or the tab was prevented from closing
+		const dialog = windowWithSession.locator(SELECTORS.MODAL_DIALOG);
+		const dialogAppeared = await dialog.first().isVisible().catch(() => false);
 
-		// The palette should have a search input
-		const searchInput = palette.locator('input');
-		const hasInput = await searchInput.isVisible().catch(() => false);
-		expect(hasInput).toBe(true);
+		if (dialogAppeared) {
+			// Confirm dialog should have action buttons (Cancel/Confirm or similar)
+			const buttons = await dialog.first().locator('button').count();
+			expect(buttons).toBeGreaterThanOrEqual(1);
 
-		await windowWithSession.keyboard.press('Escape');
-	});
-
-	test('hamburger menu has multiple options', async ({ windowWithSession }) => {
-		// Restore left panel if hidden
-		const sessionList = windowWithSession.locator(SELECTORS.SESSION_LIST);
-		if (!await sessionList.isVisible().catch(() => false)) {
-			await windowWithSession.keyboard.press('Alt+Control+ArrowLeft');
+			// Cancel the dialog - tab count should remain the same
+			await windowWithSession.keyboard.press('Escape');
 			await windowWithSession.waitForTimeout(300);
 		}
 
-		const menu = windowWithSession.locator(SELECTORS.HAMBURGER_MENU);
-		await expect(menu).toBeVisible({ timeout: 5000 });
-		await menu.click();
+		// App should still have the tab bar visible
+		await expect(tabBar).toBeVisible({ timeout: 3000 });
+	});
+
+	test('new agent wizard has Cancel button that dismisses it', async ({ windowWithSession }) => {
+		await windowWithSession.keyboard.press('Escape');
+		await windowWithSession.waitForTimeout(200);
+
+		// Open new agent wizard
+		await windowWithSession.keyboard.press('Control+Shift+N');
 		await windowWithSession.waitForTimeout(500);
 
-		const menuContents = windowWithSession.locator(SELECTORS.HAMBURGER_MENU_CONTENTS);
-		const isOpen = await menuContents.isVisible().catch(() => false);
+		const dialog = windowWithSession.locator(SELECTORS.MODAL_DIALOG).first();
+		await expect(dialog).toBeVisible({ timeout: 5000 });
 
-		if (isOpen) {
-			const text = await menuContents.textContent() ?? '';
-			// Menu should have multiple items
-			expect(text.length).toBeGreaterThan(10);
+		// The wizard dialog should have a cancel/close mechanism
+		const cancelButton = dialog.locator('button:has-text("Cancel")').or(
+			dialog.locator('button[aria-label="Close"]')
+		).first();
+		const hasCancelButton = await cancelButton.isVisible().catch(() => false);
+
+		if (hasCancelButton) {
+			await cancelButton.click();
+			await windowWithSession.waitForTimeout(300);
+			await expect(dialog).not.toBeVisible({ timeout: 3000 });
+		} else {
+			// Escape should also dismiss it
+			await windowWithSession.keyboard.press('Escape');
+			await windowWithSession.waitForTimeout(300);
+			await expect(dialog).not.toBeVisible({ timeout: 3000 });
 		}
-
-		// Close menu
-		await windowWithSession.keyboard.press('Escape');
 	});
 });

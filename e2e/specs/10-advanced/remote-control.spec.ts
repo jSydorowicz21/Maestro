@@ -1,34 +1,46 @@
 /**
  * Remote Control / LIVE Toggle E2E Tests
  *
- * Verifies the LIVE/OFFLINE remote control toggle indicator.
+ * Verifies the remote control indicator displays a state
+ * (LIVE or OFFLINE) and that clicking it produces a UI response.
  */
 import { test, expect } from '../../fixtures/session-factory';
 import { SELECTORS } from '../../utils/selectors';
 
 test.describe('Remote Control', () => {
-	test('remote control indicator exists in sidebar', async ({ windowWithSession }) => {
-		const remoteControl = windowWithSession.locator(SELECTORS.REMOTE_CONTROL);
-		const isVisible = await remoteControl.isVisible().catch(() => false);
+	test('remote control indicator shows LIVE or OFFLINE state', async ({ windowWithSession }) => {
+		await windowWithSession.keyboard.press('Escape');
+		await windowWithSession.waitForTimeout(200);
 
-		// The remote control indicator should exist (may show LIVE or OFFLINE)
-		if (isVisible) {
-			const text = (await remoteControl.textContent() ?? '').toLowerCase();
-			expect(text.includes('live') || text.includes('offline') || text.length > 0).toBe(true);
-		}
-		// If not visible, that's acceptable (may be hidden on smaller screens)
+		const remoteControl = windowWithSession.locator(SELECTORS.REMOTE_CONTROL);
+		await expect(remoteControl).toBeVisible({ timeout: 5000 });
+
+		const text = (await remoteControl.textContent() ?? '').toLowerCase();
+		expect(text).toMatch(/live|offline/);
 	});
 
-	test('remote control is clickable without crash', async ({ windowWithSession }) => {
+	test('clicking remote control toggles its state or opens config', async ({ windowWithSession }) => {
+		await windowWithSession.keyboard.press('Escape');
+		await windowWithSession.waitForTimeout(200);
+
 		const remoteControl = windowWithSession.locator(SELECTORS.REMOTE_CONTROL);
-		const isVisible = await remoteControl.isVisible().catch(() => false);
+		await expect(remoteControl).toBeVisible({ timeout: 5000 });
 
-		if (isVisible) {
-			await remoteControl.click();
-			await windowWithSession.waitForTimeout(500);
+		const textBefore = (await remoteControl.textContent() ?? '').toLowerCase();
+		await remoteControl.click();
+		await windowWithSession.waitForTimeout(500);
 
-			// App should still be responsive after clicking
-			await expect(windowWithSession.locator(SELECTORS.SESSION_LIST)).toBeVisible({ timeout: 5000 });
+		// After click, either the text changed (toggled) or a dialog opened
+		const textAfter = (await remoteControl.textContent() ?? '').toLowerCase();
+		const dialog = windowWithSession.locator(SELECTORS.MODAL_DIALOG);
+		const dialogOpened = await dialog.first().isVisible().catch(() => false);
+
+		const stateChanged = textAfter !== textBefore;
+		expect(stateChanged || dialogOpened).toBe(true);
+
+		// Clean up any dialog
+		if (dialogOpened) {
+			await windowWithSession.keyboard.press('Escape');
 		}
 	});
 });

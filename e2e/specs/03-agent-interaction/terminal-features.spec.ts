@@ -1,60 +1,49 @@
 /**
  * Terminal Features E2E Tests
  *
- * Tests terminal-specific features: search, scrolling, copy.
+ * Tests terminal-specific behaviors: content preservation after panel
+ * toggles, and layout correctness (input below terminal).
  */
 import { test, expect } from '../../fixtures/session-factory';
 import { SELECTORS } from '../../utils/selectors';
 
 test.describe('Terminal Features', () => {
-	test('Ctrl+F may open terminal search', async ({ windowWithSession }) => {
-		// Click terminal to focus it
-		await windowWithSession.locator(SELECTORS.MAIN_TERMINAL).click({ force: true });
-		await windowWithSession.waitForTimeout(300);
+	test('terminal preserves content after right panel toggle', async ({ windowWithSession }) => {
+		const textarea = windowWithSession.locator(`${SELECTORS.INPUT_AREA} textarea`);
+		const terminal = windowWithSession.locator(SELECTORS.MAIN_TERMINAL);
 
-		await windowWithSession.keyboard.press('Control+f');
+		// Send a message to create terminal content
+		await textarea.fill('preservation test content');
+		await windowWithSession.keyboard.press('Control+Enter');
+		await windowWithSession.waitForTimeout(5000);
+
+		const beforeText = await terminal.textContent() ?? '';
+		expect(beforeText).toContain('mock Claude');
+
+		// Toggle right panel open and closed via keyboard shortcut
+		await windowWithSession.keyboard.press('Control+Shift+f');
+		await windowWithSession.waitForTimeout(500);
+		await windowWithSession.keyboard.press('Control+Shift+f');
 		await windowWithSession.waitForTimeout(500);
 
-		// Check for a search bar appearance
-		const searchBar = windowWithSession.locator('input[placeholder*="Search"], input[placeholder*="Find"]');
-		const hasSearch = await searchBar.isVisible().catch(() => false);
-
-		// Close any search UI
-		await windowWithSession.keyboard.press('Escape');
-
-		// Terminal search may or may not exist - just verify no crash
-		expect(typeof hasSearch).toBe('boolean');
-	});
-
-	test('terminal area is scrollable', async ({ windowWithSession }) => {
-		const terminal = windowWithSession.locator(SELECTORS.MAIN_TERMINAL);
-		const box = await terminal.boundingBox();
-
-		expect(box).toBeTruthy();
-		if (box) {
-			// Terminal should have substantial height
-			expect(box.height).toBeGreaterThan(100);
-		}
-	});
-
-	test('terminal preserves content after panel toggles', async ({ windowWithSession }) => {
-		// Send a message first to have content
-		const textarea = windowWithSession.locator(`${SELECTORS.INPUT_AREA} textarea`);
-		await textarea.fill('Content preservation test');
-		await windowWithSession.keyboard.press('Control+Enter');
-		await windowWithSession.waitForTimeout(3000);
-
-		const terminal = windowWithSession.locator(SELECTORS.MAIN_TERMINAL);
-		const beforeText = await terminal.textContent() ?? '';
-
-		// Toggle right panel
-		await windowWithSession.keyboard.press('Control+Shift+f');
-		await windowWithSession.waitForTimeout(300);
-		await windowWithSession.keyboard.press('Control+Shift+f');
-		await windowWithSession.waitForTimeout(300);
-
-		// Content should be preserved
+		// Content must be preserved
 		const afterText = await terminal.textContent() ?? '';
-		expect(afterText.length).toBeGreaterThanOrEqual(beforeText.length - 10);
+		expect(afterText).toContain('mock Claude');
+	});
+
+	test('input area is positioned below terminal output', async ({ windowWithSession }) => {
+		const terminal = windowWithSession.locator(SELECTORS.MAIN_TERMINAL);
+		const inputArea = windowWithSession.locator(SELECTORS.INPUT_AREA);
+
+		const termBox = await terminal.boundingBox();
+		const inputBox = await inputArea.boundingBox();
+
+		expect(termBox).toBeTruthy();
+		expect(inputBox).toBeTruthy();
+
+		if (termBox && inputBox) {
+			// Input area's top edge must be below terminal's top edge
+			expect(inputBox.y).toBeGreaterThan(termBox.y);
+		}
 	});
 });

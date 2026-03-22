@@ -52,7 +52,7 @@ function sleep(ms) {
 // Prompt extraction
 // ---------------------------------------------------------------------------
 
-function getPrompt() {
+function getPromptFromArgs() {
 	const args = process.argv.slice(2);
 
 	// Look for prompt after "--"
@@ -61,12 +61,41 @@ function getPrompt() {
 		return args.slice(dashIdx + 1).join(' ');
 	}
 
-	// Fall back to the last arg
-	if (args.length > 0) {
-		return args[args.length - 1];
+	// Fall back to the last arg (skip flags starting with -)
+	for (let i = args.length - 1; i >= 0; i--) {
+		if (!args[i].startsWith('-') && args[i] !== 'stream-json') {
+			return args[i];
+		}
 	}
 
 	return '';
+}
+
+function readStdin() {
+	return new Promise((resolve) => {
+		// If stdin is a TTY (no piped input), resolve immediately
+		if (process.stdin.isTTY) {
+			resolve('');
+			return;
+		}
+
+		let data = '';
+		process.stdin.setEncoding('utf8');
+		process.stdin.on('data', (chunk) => { data += chunk; });
+		process.stdin.on('end', () => resolve(data.trim()));
+		// Timeout after 2 seconds in case stdin never closes
+		setTimeout(() => resolve(data.trim()), 2000);
+	});
+}
+
+async function getPrompt() {
+	// Try CLI args first
+	const argPrompt = getPromptFromArgs();
+	if (argPrompt) return argPrompt;
+
+	// Fall back to stdin (Windows sends prompt via stdin)
+	const stdinPrompt = await readStdin();
+	return stdinPrompt;
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +181,7 @@ function emitResult(fullText, usageOverride) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-	const prompt = getPrompt();
+	const prompt = await getPrompt();
 
 	// Keyword: authentication error
 	if (prompt.includes('__ERROR_AUTH__')) {

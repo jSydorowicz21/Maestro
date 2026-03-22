@@ -1,80 +1,53 @@
 /**
- * SSH Config Smoke Tests
+ * SSH Config E2E Tests
  *
- * Basic verification that the SSH remote configuration UI
- * is accessible through the settings modal. No actual SSH
- * connection is established.
+ * Verifies the SSH remote configuration is accessible via the
+ * settings modal and that related UI elements are present.
  */
 import { test, expect } from '../../fixtures/session-factory';
 import { SELECTORS } from '../../utils/selectors';
 
-test.describe('SSH config', () => {
-	test('SSH remote config is accessible via settings', async ({ windowWithSession }) => {
-		// Open settings modal
+test.describe('SSH Config', () => {
+	test('settings modal contains SSH or Remote configuration section', async ({ windowWithSession }) => {
+		await windowWithSession.keyboard.press('Escape');
+		await windowWithSession.waitForTimeout(200);
+
 		await windowWithSession.keyboard.press('Control+,');
 		await windowWithSession.waitForTimeout(500);
 
-		const dialog = windowWithSession.locator(SELECTORS.MODAL_DIALOG);
-		await expect(dialog.first()).toBeVisible({ timeout: 5000 });
+		const dialog = windowWithSession.locator(SELECTORS.MODAL_DIALOG).first();
+		await expect(dialog).toBeVisible({ timeout: 5000 });
 
-		// Look for SSH-related content in the settings
-		const dialogText = await dialog.first().textContent();
-		const hasSshReference = (dialogText ?? '').toLowerCase().includes('ssh') ||
-			(dialogText ?? '').toLowerCase().includes('remote');
+		const dialogText = (await dialog.textContent() ?? '').toLowerCase();
+		expect(dialogText).toMatch(/ssh|remote/);
 
-		// If SSH/remote is mentioned, the feature is accessible
-		if (hasSshReference) {
-			const sshText = dialog.locator('text=/ssh|remote/i');
-			const sshCount = await sshText.count();
-			expect(sshCount).toBeGreaterThan(0);
-		}
-
-		// Clean up
 		await windowWithSession.keyboard.press('Escape');
 	});
 
-	test('remote control indicator may be present', async ({ windowWithSession }) => {
-		// Check for the remote control UI element
-		const remoteControl = windowWithSession.locator(SELECTORS.REMOTE_CONTROL);
-		const hasRemoteControl = await remoteControl.isVisible().catch(() => false);
+	test('clicking SSH/Remote option reveals configuration inputs', async ({ windowWithSession }) => {
+		await windowWithSession.keyboard.press('Escape');
+		await windowWithSession.waitForTimeout(200);
 
-		// Remote control is optional - it may or may not be visible depending on config
-		// This is a smoke test - just verify the app doesn't crash checking for it
-		if (hasRemoteControl) {
-			await remoteControl.click();
-			await windowWithSession.waitForTimeout(500);
-
-			// A dialog or UI change may appear
-			const dialog = windowWithSession.locator(SELECTORS.MODAL_DIALOG);
-			if (await dialog.isVisible().catch(() => false)) {
-				await windowWithSession.keyboard.press('Escape');
-			}
-		}
-
-		// App should be responsive regardless
-		await expect(
-			windowWithSession.locator(SELECTORS.SESSION_LIST)
-		).toBeVisible({ timeout: 5000 });
-	});
-
-	test('settings modal is functional after SSH check', async ({ windowWithSession }) => {
-		// Open settings, verify it works, close it
 		await windowWithSession.keyboard.press('Control+,');
 		await windowWithSession.waitForTimeout(500);
 
-		const dialog = windowWithSession.locator(SELECTORS.MODAL_DIALOG);
-		await expect(dialog.first()).toBeVisible({ timeout: 5000 });
+		const dialog = windowWithSession.locator(SELECTORS.MODAL_DIALOG).first();
+		await expect(dialog).toBeVisible({ timeout: 5000 });
 
-		// Modal should have content
-		const content = await dialog.first().textContent();
-		expect(content).toBeTruthy();
+		// Look for SSH-related clickable elements (tabs, links, or buttons)
+		const sshElement = dialog.locator('text=/ssh|remote/i').first();
+		const hasSshElement = await sshElement.isVisible().catch(() => false);
 
-		// Close
+		if (hasSshElement) {
+			await sshElement.click();
+			await windowWithSession.waitForTimeout(300);
+
+			// After clicking, there should be inputs for SSH configuration
+			// (host, port, key path, etc.)
+			const inputs = await dialog.locator('input').count();
+			expect(inputs).toBeGreaterThan(0);
+		}
+
 		await windowWithSession.keyboard.press('Escape');
-		await windowWithSession.waitForTimeout(500);
-
-		// App remains stable
-		const inputArea = windowWithSession.locator(SELECTORS.INPUT_AREA);
-		await expect(inputArea).toBeVisible({ timeout: 5000 });
 	});
 });

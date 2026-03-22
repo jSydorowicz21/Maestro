@@ -64,21 +64,46 @@ export const test = base.extend<{}, ElectronWorkerFixtures>({
 	}, { scope: 'worker' }],
 
 	electronApp: [async ({ appPath, testDataDir }, use) => {
-		// Pre-seed mock agent config so Maestro uses our mock instead of real Claude
-		const mockAgentPath = path.join(__dirname, '..', 'mock-agent', 'mock-claude.mjs');
-		if (fs.existsSync(mockAgentPath)) {
-			const agentConfig = {
-				configs: {
-					'claude-code': {
-						customPath: mockAgentPath,
-					},
-				},
+		// Pre-seed mock agent config so Maestro uses our mock instead of real Claude.
+		// IMPORTANT: Agent configs are stored in the PRODUCTION data path (not MAESTRO_DATA_DIR)
+		// because Maestro shares agent configs between dev and prod.
+		// We need to write to the production path AND convert to Windows path format.
+		// Use .cmd wrapper on Windows (node can't execute .mjs directly as a binary)
+		const mockAgentPathWsl = path.join(__dirname, '..', 'mock-agent', 'mock-claude.cmd');
+		const productionDataPath = path.join(os.homedir(), 'AppData', 'Roaming', 'Electron');
+
+		// Back up existing agent config and restore after tests
+		const agentConfigFile = path.join(productionDataPath, 'maestro-agent-configs.json');
+		let originalAgentConfig: string | null = null;
+		if (fs.existsSync(agentConfigFile)) {
+			originalAgentConfig = fs.readFileSync(agentConfigFile, 'utf-8');
+		}
+
+		if (fs.existsSync(mockAgentPathWsl)) {
+			// Convert /mnt/c/... to C:\... for Windows
+			let mockAgentPath = mockAgentPathWsl;
+			const wslMatch = mockAgentPathWsl.match(/^\/mnt\/([a-z])\/(.*)/);
+			if (wslMatch) {
+				mockAgentPath = `${wslMatch[1].toUpperCase()}:\\${wslMatch[2].replace(/\//g, '\\')}`;
+			}
+
+			// Read existing config and merge (don't overwrite other agent configs)
+			let existingConfig: Record<string, any> = {};
+			if (originalAgentConfig) {
+				try {
+					existingConfig = JSON.parse(originalAgentConfig);
+				} catch {
+					existingConfig = {};
+				}
+			}
+			if (!existingConfig.configs) existingConfig.configs = {};
+			existingConfig.configs['claude-code'] = {
+				...existingConfig.configs['claude-code'],
+				customPath: mockAgentPath,
 			};
-			fs.writeFileSync(
-				path.join(testDataDir, 'maestro-agent-configs.json'),
-				JSON.stringify(agentConfig, null, '\t'),
-				'utf-8',
-			);
+
+			fs.mkdirSync(productionDataPath, { recursive: true });
+			fs.writeFileSync(agentConfigFile, JSON.stringify(existingConfig, null, '\t'), 'utf-8');
 		}
 
 		const app = await electron.launch({
@@ -92,6 +117,12 @@ export const test = base.extend<{}, ElectronWorkerFixtures>({
 			},
 			timeout: 30000,
 		});
+
+		// Minimize the window so it doesn't steal focus from the user's monitor
+		await app.evaluate(async ({ BrowserWindow }) => {
+			const win = BrowserWindow.getAllWindows()[0];
+			if (win) win.minimize();
+		}).catch(() => {});
 
 		// Auto-dismiss any native dialogs (quit confirmations, error alerts)
 		app.on('dialog', async (dialog) => {
@@ -122,6 +153,18 @@ export const test = base.extend<{}, ElectronWorkerFixtures>({
 		}).catch(() => {});
 
 		await use(app);
+
+		// Restore original agent config (remove mock agent path)
+		try {
+			if (originalAgentConfig !== null) {
+				fs.writeFileSync(agentConfigFile, originalAgentConfig, 'utf-8');
+			} else if (fs.existsSync(agentConfigFile)) {
+				// Remove the config we created if there was none before
+				fs.unlinkSync(agentConfigFile);
+			}
+		} catch {
+			// Ignore restore errors
+		}
 
 		// Force-close after ALL tests complete
 		try {

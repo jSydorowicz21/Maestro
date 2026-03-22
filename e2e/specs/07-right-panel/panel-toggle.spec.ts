@@ -1,57 +1,81 @@
 /**
- * Right Panel Tests
+ * Right Panel Toggle E2E Tests
  *
- * Verifies the right sidebar tabs using keyboard shortcuts
- * (Ctrl+Shift+F for Files, Ctrl+Shift+H for History, Ctrl+Shift+1 for Auto Run).
- * Direct tab clicks are unreliable due to header-controls z-index overlap.
+ * Verifies that keyboard shortcuts open specific right panel tabs
+ * and that switching between tabs shows the correct panel content.
  */
 import { test, expect } from '../../fixtures/session-factory';
 import { SELECTORS } from '../../utils/selectors';
 
-test.describe('Right panel', () => {
-	test('Ctrl+Shift+F opens Files tab', async ({ windowWithSession }) => {
+test.describe('Right Panel Tab Switching', () => {
+	test('Ctrl+Shift+F opens Files tab and shows files panel', async ({ windowWithSession }) => {
 		await windowWithSession.keyboard.press('Control+Shift+f');
 		await windowWithSession.waitForTimeout(500);
 
-		// Files tab should be visible
 		const filesTab = windowWithSession.locator(SELECTORS.FILES_TAB);
 		await expect(filesTab).toBeVisible({ timeout: 5000 });
+
+		// The files PANEL (content area) should be visible, not just the tab
+		const filesPanel = windowWithSession.locator(SELECTORS.FILES_PANEL);
+		await expect(filesPanel).toBeVisible({ timeout: 5000 });
+
+		// History panel should NOT be showing
+		const historyPanel = windowWithSession.locator(SELECTORS.HISTORY_PANEL);
+		await expect(historyPanel).not.toBeVisible({ timeout: 2000 });
 	});
 
-	test('Ctrl+Shift+H opens History tab', async ({ windowWithSession }) => {
+	test('Ctrl+Shift+H opens History tab and shows history panel', async ({ windowWithSession }) => {
 		await windowWithSession.keyboard.press('Control+Shift+h');
 		await windowWithSession.waitForTimeout(500);
 
-		// History tab should be visible
 		const historyTab = windowWithSession.locator(SELECTORS.HISTORY_TAB);
 		await expect(historyTab).toBeVisible({ timeout: 5000 });
+
+		// The history PANEL content should be visible
+		const historyPanel = windowWithSession.locator(SELECTORS.HISTORY_PANEL);
+		await expect(historyPanel).toBeVisible({ timeout: 5000 });
+
+		// Files panel should NOT be showing
+		const filesPanel = windowWithSession.locator(SELECTORS.FILES_PANEL);
+		await expect(filesPanel).not.toBeVisible({ timeout: 2000 });
 	});
 
 	test('Ctrl+Shift+1 opens Auto Run tab', async ({ windowWithSession }) => {
 		await windowWithSession.keyboard.press('Control+Shift+1');
 		await windowWithSession.waitForTimeout(500);
 
-		// Auto Run tab should be visible
+		// The auto run tab button should be visible
 		const autoRunTab = windowWithSession.locator(SELECTORS.AUTORUN_TAB);
 		await expect(autoRunTab).toBeVisible({ timeout: 5000 });
+
+		// The auto run panel may or may not be visible (depends on document configuration)
+		// But the history panel should NOT be showing since we switched away from it
+		const historyPanel = windowWithSession.locator(SELECTORS.HISTORY_PANEL);
+		await expect(historyPanel).not.toBeVisible({ timeout: 2000 });
 	});
 
-	test('right panel tabs coexist with main content', async ({ windowWithSession }) => {
-		// Open right panel via Files shortcut
+	test('sequential tab switches show the correct panel each time', async ({ windowWithSession }) => {
+		// Open Files
 		await windowWithSession.keyboard.press('Control+Shift+f');
 		await windowWithSession.waitForTimeout(500);
+		await expect(windowWithSession.locator(SELECTORS.FILES_PANEL)).toBeVisible({ timeout: 5000 });
 
-		// Both the right panel tab and main terminal should be visible simultaneously
-		const filesTab = windowWithSession.locator(SELECTORS.FILES_TAB);
-		const mainTerminal = windowWithSession.locator('[data-tour="main-terminal"]');
+		// Switch to History
+		await windowWithSession.keyboard.press('Control+Shift+h');
+		await windowWithSession.waitForTimeout(500);
+		await expect(windowWithSession.locator(SELECTORS.HISTORY_PANEL)).toBeVisible({ timeout: 5000 });
+		await expect(windowWithSession.locator(SELECTORS.FILES_PANEL)).not.toBeVisible({ timeout: 2000 });
 
-		const filesVisible = await filesTab.isVisible().catch(() => false);
-		const terminalVisible = await mainTerminal.isVisible().catch(() => false);
+		// Switch to Auto Run
+		await windowWithSession.keyboard.press('Control+Shift+1');
+		await windowWithSession.waitForTimeout(500);
+		// Auto Run tab should be visible (panel content depends on document state)
+		await expect(windowWithSession.locator(SELECTORS.AUTORUN_TAB)).toBeVisible({ timeout: 5000 });
+		await expect(windowWithSession.locator(SELECTORS.HISTORY_PANEL)).not.toBeVisible({ timeout: 2000 });
 
-		// At least the main terminal should always be visible
-		expect(terminalVisible).toBe(true);
-		// Files tab may or may not be visible depending on window size
-		// but the shortcut should not crash the app
-		expect(filesVisible || terminalVisible).toBe(true);
+		// Switch back to Files
+		await windowWithSession.keyboard.press('Control+Shift+f');
+		await windowWithSession.waitForTimeout(500);
+		await expect(windowWithSession.locator(SELECTORS.FILES_PANEL)).toBeVisible({ timeout: 5000 });
 	});
 });

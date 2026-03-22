@@ -1,41 +1,49 @@
 /**
  * Input Features E2E Tests
  *
- * Verifies input area features: placeholder, auto-grow, multiline.
+ * Verifies input area behaviors: meaningful placeholder text,
+ * multiline input support, and auto-grow height.
  */
 import { test, expect } from '../../fixtures/session-factory';
 import { SELECTORS } from '../../utils/selectors';
 
 test.describe('Input Features', () => {
-	test('textarea has a meaningful placeholder', async ({ windowWithSession }) => {
+	test('textarea placeholder indicates the active agent', async ({ windowWithSession }) => {
 		const textarea = windowWithSession.locator(`${SELECTORS.INPUT_AREA} textarea`);
 		const placeholder = await textarea.getAttribute('placeholder') ?? '';
-		expect(placeholder.length).toBeGreaterThan(5);
+
+		// Placeholder should mention "Talking to" and reference the agent
 		expect(placeholder.toLowerCase()).toContain('talking to');
 	});
 
-	test('textarea supports multiline input', async ({ windowWithSession }) => {
+	test('textarea supports multiline input via fill', async ({ windowWithSession }) => {
 		const textarea = windowWithSession.locator(`${SELECTORS.INPUT_AREA} textarea`);
 		await textarea.fill('line 1\nline 2\nline 3');
 		const value = await textarea.inputValue();
-		expect(value).toContain('\n');
-		expect(value.split('\n').length).toBe(3);
+		const lines = value.split('\n');
+		expect(lines.length).toBe(3);
+		expect(lines[0]).toBe('line 1');
+		expect(lines[2]).toBe('line 3');
 		await textarea.fill('');
 	});
 
-	test('textarea grows vertically with content', async ({ windowWithSession }) => {
+	test('textarea grows taller with more lines of content', async ({ windowWithSession }) => {
 		const textarea = windowWithSession.locator(`${SELECTORS.INPUT_AREA} textarea`);
-		const emptyBox = await textarea.boundingBox();
 
+		// Measure empty height
+		const emptyBox = await textarea.boundingBox();
+		expect(emptyBox).toBeTruthy();
+
+		// Fill with multiple lines
 		await textarea.fill('line 1\nline 2\nline 3\nline 4\nline 5');
 		await windowWithSession.waitForTimeout(200);
 		const fullBox = await textarea.boundingBox();
-
-		expect(emptyBox).toBeTruthy();
 		expect(fullBox).toBeTruthy();
+
 		if (emptyBox && fullBox) {
-			expect(fullBox.height).toBeGreaterThanOrEqual(emptyBox.height);
+			expect(fullBox.height).toBeGreaterThan(emptyBox.height);
 		}
+
 		await textarea.fill('');
 	});
 });
