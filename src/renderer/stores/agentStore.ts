@@ -492,6 +492,30 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 						sendPromptViaStdin,
 						sendPromptViaStdinRaw,
 					});
+
+					// Mark the associated interjection log entry as delivered
+					// (mirrors the message branch above)
+					if (item.interjectionLogId) {
+						useSessionStore.getState().setSessions((prev) =>
+							prev.map((s) => {
+								if (s.id !== sessionId) return s;
+								return {
+									...s,
+									aiTabs: s.aiTabs.map((tab) => {
+										if (tab.id !== deliveryTabId) return tab;
+										return {
+											...tab,
+											logs: tab.logs.map((log) =>
+												log.id === item.interjectionLogId
+													? { ...log, delivered: true, deliveryFailed: false }
+													: log
+											),
+										};
+									}),
+								};
+							})
+						);
+					}
 				} else {
 					// Unknown command - add error log and reset to idle
 					useSessionStore.getState().addLogToTab(sessionId, {
