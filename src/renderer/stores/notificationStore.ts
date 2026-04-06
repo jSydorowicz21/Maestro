@@ -190,6 +190,8 @@ export function notifyToast(toast: Omit<Toast, 'id' | 'timestamp'>): string {
 			taskDuration: toast.taskDuration,
 			agentSessionId: toast.agentSessionId,
 			tabName: toast.tabName,
+			sessionId: toast.sessionId,
+			tabId: toast.tabId,
 			audioNotification: willTriggerCustomNotification
 				? {
 						enabled: true,
@@ -214,6 +216,7 @@ export function notifyToast(toast: Omit<Toast, 'id' | 'timestamp'>): string {
 	if (willTriggerCustomNotification) {
 		if (typeof window !== 'undefined' && window.maestro?.notification?.speak) {
 			window.maestro.notification.speak(toast.message, config.audioFeedbackCommand).catch((err) => {
+				// Expected: audio/TTS may not be available on all platforms
 				console.error('[notificationStore] Custom notification failed:', err);
 			});
 		}
@@ -247,6 +250,7 @@ export function notifyToast(toast: Omit<Toast, 'id' | 'timestamp'>): string {
 			window.maestro.notification
 				.show(notifTitle, notifBody, toast.sessionId, toast.tabId)
 				.catch((err) => {
+					// Expected: OS notification API may be unavailable or permission denied
 					console.error('[notificationStore] Failed to show OS notification:', err);
 				});
 		}

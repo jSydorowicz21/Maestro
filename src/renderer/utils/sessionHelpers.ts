@@ -125,11 +125,13 @@ export async function buildSpawnConfigForAgent(
 	const agentConfig = await window.maestro.agents.get(toolType);
 
 	if (!agentConfig) {
+		// Expected: agent may not be installed on this machine
 		console.error(`[sessionHelpers] Agent not found: ${toolType}`);
 		return null;
 	}
 
 	if (!agentConfig.available) {
+		// Expected: agent binary may not be available (not installed or not in PATH)
 		console.error(`[sessionHelpers] Agent not available: ${toolType}`);
 		return null;
 	}
@@ -208,11 +210,13 @@ export async function createSessionForAgent(
 	const agentConfig = await window.maestro.agents.get(agentType);
 
 	if (!agentConfig) {
+		// Expected: agent may not be installed on this machine
 		console.error(`[sessionHelpers] Agent not found: ${agentType}`);
 		return null;
 	}
 
 	if (!agentConfig.available) {
+		// Expected: agent binary may not be available (not installed or not in PATH)
 		console.error(`[sessionHelpers] Agent not available: ${agentType}`);
 		return null;
 	}

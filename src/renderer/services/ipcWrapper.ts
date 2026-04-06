@@ -90,6 +90,7 @@ export async function createIpcMethod<T>(options: IpcMethodOptions<T>): Promise<
 		const result = await options.call();
 		return options.transform ? options.transform(result) : result;
 	} catch (error) {
+		// Expected: generic IPC wrapper - callers add Sentry individually for unexpected failures
 		console.error(`${options.errorContext} error:`, error);
 		if (options.rethrow) {
 			throw error;

@@ -59,6 +59,7 @@ export function createSpecCommandService(config: SpecCommandServiceConfig): Spec
 				}
 				return [];
 			} catch (error) {
+				// Expected: SpecKit/OpenSpec may not be configured or available
 				console.error(`${logPrefix} Failed to get commands:`, error);
 				return [];
 			}
@@ -76,6 +77,7 @@ export function createSpecCommandService(config: SpecCommandServiceConfig): Spec
 				}
 				return null;
 			} catch (error) {
+				// Expected: SpecKit/OpenSpec may not be configured or available
 				console.error(`${logPrefix} Failed to get metadata:`, error);
 				return null;
 			}
@@ -93,6 +95,7 @@ export function createSpecCommandService(config: SpecCommandServiceConfig): Spec
 				}
 				return null;
 			} catch (error) {
+				// Expected: command may not exist or SpecKit/OpenSpec not configured
 				console.error(`${logPrefix} Failed to get command:`, error);
 				return null;
 			}

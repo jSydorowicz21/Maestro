@@ -118,9 +118,22 @@ Sentry imports:
 
 ### 6. Audit renderer services/stores/utils (14 files)
 
-- [ ] These handle data flow and are often most critical
-- [ ] Add Sentry for unexpected data pipeline failures
-- [ ] Run targeted tests after changes
+- [x] These handle data flow and are often most critical
+  - Audited all 13 files with `console.error` across services (4), stores (4), and utils (5). Categorized into ADD Sentry (5 files, 11 catch blocks) and SKIP (8 files with expected/recoverable failures).
+- [x] Add Sentry for unexpected data pipeline failures
+  - Added `captureException` to 5 files (11 catch blocks total):
+    - `src/renderer/stores/sessionStore.ts` - 1 block (invariant: no target tab, "should not happen")
+    - `src/renderer/stores/settingsStore.ts` - 1 block (critical: settings load failure)
+    - `src/renderer/stores/agentStore.ts` - 5 blocks (session not found, no target tab x2, queue processing failure, no active tab in error path)
+    - `src/renderer/services/inlineWizardDocumentGeneration.ts` - 4 blocks (playbook creation x2, document save, top-level generation error)
+    - `src/renderer/utils/contextExtractor.ts` - 1 block (stored session context extraction)
+  - Added `// Expected:` skip comments to 8 SKIP files (~20 catch blocks total):
+    - Services: ipcWrapper (generic wrapper), contextSummarizer (process may be dead), specCommands (3 blocks, not configured)
+    - Stores: notificationStore (2 blocks, platform API), agentStore (1 cleanup block), settingsStore (3 web link race condition blocks)
+    - Utils: tokenCounter (WASM fallback), sessionHelpers (4 blocks, agent not installed), fileExplorer (re-thrown), gitDiffParser (malformed data)
+  - Also added skip comments to inlineWizardDocumentGeneration.ts: 2 timeout blocks + 1 disk read block
+- [x] Run targeted tests after changes
+  - 350 tests pass across 6 test files (0 regressions). TypeScript type check passes cleanly.
 
 ### 7. Verify full build
 

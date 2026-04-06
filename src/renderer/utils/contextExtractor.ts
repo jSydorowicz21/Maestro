@@ -13,6 +13,7 @@ import type { ContextSource, DuplicateDetectionResult, DuplicateInfo } from '../
 import type { ToolType } from '../../shared/types';
 import { countTokens, estimateTokens } from './tokenCounter';
 import { calculateContextTokens } from './contextUsage';
+import { captureException } from './sentry';
 
 /**
  * Extract context from an AI tab's conversation logs.
@@ -129,6 +130,9 @@ export async function extractStoredSessionContext(
 		};
 	} catch (error) {
 		console.error('Failed to extract stored session context:', error);
+		captureException(error, {
+			extra: { operation: 'extractStoredSessionContext', agentSessionId },
+		});
 		return null;
 	}
 }

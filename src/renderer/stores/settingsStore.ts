@@ -8,13 +8,14 @@
  * Key advantages:
  * - Selector-based subscriptions: components only re-render when their slice changes
  * - No refs needed: store.getState() gives current state synchronously
- * - Works outside React: services can read/write via getSettingsState()/getSettingsActions()
+ * - Works outside React: services can read/write via useSettingsStore.getState()
  * - Single batch load on startup eliminates ~60 individual IPC calls
  *
  * Can be used outside React via useSettingsStore.getState() / useSettingsStore.setState().
  */
 
 import { create } from 'zustand';
+import { captureException } from '../utils/sentry';
 import { isWindowsPlatform } from '../utils/platformUtils';
 import type {
 	LLMProvider,
@@ -51,7 +52,7 @@ const DOCUMENT_GRAPH_LAYOUT_TYPES: DocumentGraphLayoutType[] = ['mindmap', 'radi
 // ============================================================================
 
 /** Default local ignore patterns for new installations (includes .git, node_modules, __pycache__) */
-export const DEFAULT_LOCAL_IGNORE_PATTERNS = ['.git', 'node_modules', '__pycache__'];
+const DEFAULT_LOCAL_IGNORE_PATTERNS = ['.git', 'node_modules', '__pycache__'];
 
 const DEFAULT_CONTEXT_MANAGEMENT_SETTINGS: ContextManagementSettings = {
 	autoGroomContexts: true,
@@ -721,6 +722,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 							try {
 								await window.maestro.live.clearPersistentToken();
 							} catch (clearError) {
+								// Expected: race condition cleanup - stale request may fail harmlessly
 								console.error('[Settings] Failed to clear stale persistent web link:', clearError);
 							}
 						}
@@ -735,6 +737,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 					if (requestSeq === persistentWebLinkRequestSeq) {
 						// Rollback optimistic update on hard failure
 						set({ persistentWebLink: false });
+						// Expected: network/IPC failure during web link toggle - rolled back above
 						console.error('[Settings] Failed to persist web link token:', error);
 					}
 				}
@@ -756,6 +759,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 					if (requestSeq === persistentWebLinkRequestSeq) {
 						// Clear failed — rollback Zustand to match main-side state
 						set({ persistentWebLink: true });
+						// Expected: network/IPC failure during web link toggle - rolled back above
 						console.error('[Settings] Failed to clear persistent web link:', error);
 					}
 					// else: stale — a newer call is in charge, nothing to do
@@ -1838,6 +1842,7 @@ export async function loadAllSettings(): Promise<void> {
 		useSettingsStore.setState(patch);
 	} catch (error) {
 		console.error('[Settings] Failed to load settings:', error);
+		captureException(error, { extra: { operation: 'loadAllSettings' } });
 		// Mark settings as loaded even if there was an error (use defaults)
 		useSettingsStore.setState({ settingsLoaded: true });
 	}

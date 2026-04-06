@@ -17,6 +17,7 @@ import { wizardDocumentGenerationPrompt, wizardInlineIterateGenerationPrompt } f
 import { substituteTemplateVariables, type TemplateContext } from '../utils/templateVariables';
 
 import { PLAYBOOKS_DIR } from '../../shared/maestro-paths';
+import { captureException } from '../utils/sentry';
 
 /**
  * Auto Run folder name constant.
@@ -803,6 +804,7 @@ export async function generateInlineDocuments(
 					clearTimeout(timeoutId);
 
 					timeoutId = setTimeout(() => {
+						// Expected: generation inactivity timeout is a normal safeguard
 						console.error('[InlineWizardDocGen] TIMEOUT fired! Session:', sessionId);
 						cleanupAll();
 						window.maestro.process
@@ -820,6 +822,7 @@ export async function generateInlineDocuments(
 
 				// Set up timeout (20 minutes for complex generation)
 				let timeoutId = setTimeout(() => {
+					// Expected: generation inactivity timeout is a normal safeguard
 					console.error('[InlineWizardDocGen] TIMEOUT fired! Session:', sessionId);
 					cleanupAll();
 					window.maestro.process
@@ -1072,6 +1075,9 @@ export async function generateInlineDocuments(
 					);
 				} catch (error) {
 					console.error('[InlineWizardDocGen] Failed to create playbook:', error);
+					captureException(error, {
+						extra: { operation: 'createPlaybookForDocuments', subfolderName },
+					});
 				}
 			}
 
@@ -1131,6 +1137,7 @@ export async function generateInlineDocuments(
 				callbacks?.onDocumentComplete?.(savedDoc);
 			} catch (error) {
 				console.error('[InlineWizardDocGen] Failed to save document:', doc.filename, error);
+				captureException(error, { extra: { operation: 'saveDocument', filename: doc.filename } });
 				// Continue saving other documents even if one fails
 			}
 		}
@@ -1157,6 +1164,9 @@ export async function generateInlineDocuments(
 				);
 			} catch (error) {
 				console.error('[InlineWizardDocGen] Failed to create playbook:', error);
+				captureException(error, {
+					extra: { operation: 'createPlaybookForDocuments', subfolderName },
+				});
 				// Don't fail the overall operation if playbook creation fails
 			}
 		}
@@ -1175,6 +1185,7 @@ export async function generateInlineDocuments(
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 		console.error('[InlineWizardDocGen] Error:', error);
+		captureException(error, { extra: { operation: 'generateDocuments' } });
 		callbacks?.onError?.(errorMessage);
 		return {
 			success: false,
@@ -1298,6 +1309,7 @@ async function readDocumentsFromDisk(
 
 		return documents;
 	} catch (error) {
+		// Expected: directory may not exist yet or files may have been removed
 		console.error('[InlineWizardDocGen] Error reading documents from disk:', error);
 		return [];
 	}
