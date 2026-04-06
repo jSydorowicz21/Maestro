@@ -148,6 +148,7 @@ export function useAutoRunContentSync({
 			);
 			setSavedContent(localContent);
 		} catch (err) {
+			// Expected: file save operations can fail for file system reasons
 			console.error('Failed to save:', err);
 		}
 	}, [folderPath, selectedFile, localContent, isDirty, setSavedContent, sshRemoteId]);

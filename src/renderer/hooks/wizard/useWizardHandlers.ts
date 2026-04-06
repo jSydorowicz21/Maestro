@@ -227,6 +227,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				}
 			} catch (error) {
 				if (!cancelled) {
+					// Expected: wizard validation/file operations handle user input
 					console.error('[SlashCommandDiscovery] Failed to fetch custom commands:', error);
 				}
 			}
@@ -261,6 +262,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				}
 			} catch (error) {
 				if (!cancelled) {
+					// Expected: wizard validation/file operations handle user input
 					console.error('[SlashCommandDiscovery] Failed to discover agent commands:', error);
 				}
 			}
@@ -649,6 +651,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				);
 			}
 		} catch (error) {
+			// Expected: wizard validation/file operations handle user input
 			console.error('[handleHistoryCommand] Error:', error);
 			setSessions((prev) =>
 				prev.map((s) => {
@@ -766,6 +769,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 			};
 			addLogToTab(currentSession.id, skillsLog);
 		} catch (error) {
+			// Expected: wizard validation/file operations handle user input
 			console.error('[handleSkillsCommand] Error:', error);
 			const errorLog: LogEntry = {
 				id: generateId(),

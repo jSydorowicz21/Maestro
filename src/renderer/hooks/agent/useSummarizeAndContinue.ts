@@ -21,7 +21,7 @@ import type { SummarizeProgress, SummarizeResult } from '../../types/contextMerg
 import { contextSummarizationService } from '../../services/contextSummarizer';
 import { createTabAtPosition } from '../../utils/tabHelpers';
 import { useOperationStore, selectIsAnySummarizing } from '../../stores/operationStore';
-import { useSessionStore } from '../../stores/sessionStore';
+import { updateSessionWith } from '../../stores/sessionStore';
 import { notifyToast } from '../../stores/notificationStore';
 import type { SummarizeState, TabSummarizeState } from '../../stores/operationStore';
 
@@ -356,40 +356,36 @@ export function useSummarizeAndContinue(session: Session | null): UseSummarizeAn
 			// Store session info for toast navigation
 			const sourceSessionId = session.id;
 			const sourceSessionName = session.name;
-			const { setSessions } = useSessionStore.getState();
 
 			startSummarize(targetTabId)
 				.then((result) => {
 					if (result) {
 						// Apply only deterministic deltas to the live session (avoid stale snapshot spread)
-						setSessions((prev) =>
-							prev.map((s) => {
-								if (s.id !== sourceSessionId) return s;
-								// Insert the new tab if not already present
-								const newTab = result.updatedSession.aiTabs.find((t) => t.id === result.newTabId);
-								const hasNewTab = s.aiTabs.some((t) => t.id === result.newTabId);
-								// Find insertion point: right after the source tab
-								let updatedTabs = s.aiTabs;
-								if (newTab && !hasNewTab) {
-									const sourceIdx = s.aiTabs.findIndex((t) => t.id === targetTabId);
-									const insertIdx = sourceIdx >= 0 ? sourceIdx + 1 : s.aiTabs.length;
-									updatedTabs = [
-										...s.aiTabs.slice(0, insertIdx),
-										newTab,
-										...s.aiTabs.slice(insertIdx),
-									];
-								}
-								return {
-									...s,
-									activeTabId: result.newTabId,
-									aiTabs: updatedTabs.map((tab) =>
-										tab.id === targetTabId
-											? { ...tab, logs: [...tab.logs, result.systemLogEntry] }
-											: tab
-									),
-								};
-							})
-						);
+						updateSessionWith(sourceSessionId, (s) => {
+							// Insert the new tab if not already present
+							const newTab = result.updatedSession.aiTabs.find((t) => t.id === result.newTabId);
+							const hasNewTab = s.aiTabs.some((t) => t.id === result.newTabId);
+							// Find insertion point: right after the source tab
+							let updatedTabs = s.aiTabs;
+							if (newTab && !hasNewTab) {
+								const sourceIdx = s.aiTabs.findIndex((t) => t.id === targetTabId);
+								const insertIdx = sourceIdx >= 0 ? sourceIdx + 1 : s.aiTabs.length;
+								updatedTabs = [
+									...s.aiTabs.slice(0, insertIdx),
+									newTab,
+									...s.aiTabs.slice(insertIdx),
+								];
+							}
+							return {
+								...s,
+								activeTabId: result.newTabId,
+								aiTabs: updatedTabs.map((tab) =>
+									tab.id === targetTabId
+										? { ...tab, logs: [...tab.logs, result.systemLogEntry] }
+										: tab
+								),
+							};
+						});
 
 						// Show success notification with click-to-navigate
 						const reductionPercent = result.systemLogEntry.text.match(/(\d+)%/)?.[1] ?? '0';
@@ -416,6 +412,7 @@ export function useSummarizeAndContinue(session: Session | null): UseSummarizeAn
 					}
 				})
 				.catch((err) => {
+					// Expected: AI summarization operations can fail for model/network reasons
 					console.error('[handleSummarizeAndContinue] Unexpected error:', err);
 					notifyToast({
 						type: 'error',

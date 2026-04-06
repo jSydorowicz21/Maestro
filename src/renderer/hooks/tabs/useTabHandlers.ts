@@ -1061,6 +1061,7 @@ export function useTabHandlers(): TabHandlersReturn {
 						}
 					})
 					.catch((err) => {
+						// Expected: tab UI operations are recoverable
 						console.error('[handleDeleteLog] Error deleting from Claude session:', err);
 					});
 			}
@@ -1169,10 +1170,12 @@ export function useTabHandlers(): TabHandlersReturn {
 				if (agentId === 'claude-code') {
 					window.maestro.claude
 						.updateSessionStarred(s.projectRoot, tab.agentSessionId, starred)
+						// Expected: tab UI operations are recoverable
 						.catch((err) => console.error('Failed to persist tab starred:', err));
 				} else {
 					window.maestro.agentSessions
 						.setSessionStarred(agentId, s.projectRoot, tab.agentSessionId, starred)
+						// Expected: tab UI operations are recoverable
 						.catch((err) => console.error('Failed to persist tab starred:', err));
 				}
 			}
@@ -1322,6 +1325,7 @@ export function useTabHandlers(): TabHandlersReturn {
 					})
 				);
 			} catch (error) {
+				// Expected: tab UI operations are recoverable
 				console.error('Failed to navigate back:', error);
 			}
 		}
@@ -1370,6 +1374,7 @@ export function useTabHandlers(): TabHandlersReturn {
 					})
 				);
 			} catch (error) {
+				// Expected: tab UI operations are recoverable
 				console.error('Failed to navigate forward:', error);
 			}
 		}
@@ -1416,6 +1421,7 @@ export function useTabHandlers(): TabHandlersReturn {
 					})
 				);
 			} catch (error) {
+				// Expected: tab UI operations are recoverable
 				console.error('Failed to navigate to index:', error);
 			}
 		}

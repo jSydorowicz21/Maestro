@@ -126,6 +126,7 @@ export function useLiveOverlay(isLiveMode: boolean): UseLiveOverlayReturn {
 			try {
 				await window.maestro.tunnel.stop();
 			} catch (error) {
+				// Expected: tunnel stop can fail due to network/connectivity issues
 				console.error('[handleTunnelToggle] Failed to stop tunnel:', error);
 				// Continue anyway - we still want to update UI state
 			}
@@ -149,6 +150,7 @@ export function useLiveOverlay(isLiveMode: boolean): UseLiveOverlayReturn {
 					setTunnelError(result.error || 'Failed to start tunnel');
 				}
 			} catch (error) {
+				// Expected: tunnel start can fail due to network/connectivity issues
 				console.error('[handleTunnelToggle] Failed to start tunnel:', error);
 				setTunnelStatus('error');
 				setTunnelError(error instanceof Error ? error.message : 'Failed to start tunnel');
@@ -166,6 +168,7 @@ export function useLiveOverlay(isLiveMode: boolean): UseLiveOverlayReturn {
 		try {
 			await window.maestro.tunnel.stop();
 		} catch (error) {
+			// Expected: tunnel stop can fail due to network/connectivity issues
 			console.error('[restartTunnel] Failed to stop tunnel:', error);
 		}
 
@@ -179,6 +182,7 @@ export function useLiveOverlay(isLiveMode: boolean): UseLiveOverlayReturn {
 				setTunnelError(result.error || 'Failed to restart tunnel');
 			}
 		} catch (error) {
+			// Expected: tunnel restart can fail due to network/connectivity issues
 			console.error('[restartTunnel] Failed to restart tunnel:', error);
 			setTunnelStatus('error');
 			setTunnelError(error instanceof Error ? error.message : 'Failed to restart tunnel');

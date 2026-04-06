@@ -179,6 +179,7 @@ export function useWorktreeValidation({
 					error: !sameRepo ? 'This path contains a worktree for a different repository' : undefined,
 				});
 			} catch (error) {
+				// Expected: path validation can fail on invalid user input
 				console.error('Failed to validate worktree path:', error);
 				setValidation({
 					checking: false,

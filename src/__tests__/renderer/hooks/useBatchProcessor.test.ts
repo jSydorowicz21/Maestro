@@ -32,6 +32,11 @@ vi.mock('../../../renderer/stores/notificationStore', () => ({
 	notifyToast: (...args: unknown[]) => mockNotifyToast(...args),
 }));
 
+vi.mock('../../../renderer/utils/sentry', () => ({
+	captureException: vi.fn(),
+	captureMessage: vi.fn(),
+}));
+
 // ============================================================================
 // Tests for countUnfinishedTasks
 // ============================================================================

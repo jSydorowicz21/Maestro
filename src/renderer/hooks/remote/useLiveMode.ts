@@ -45,6 +45,7 @@ export function useLiveMode(): UseLiveModeReturn {
 				try {
 					await (window as any).maestro.live.disableAll();
 				} catch (disableErr) {
+					// Expected: live mode server shutdown can fail during cleanup
 					console.error('[toggleGlobalLive] disableAll failed after tunnel stop:', disableErr);
 				}
 			} else {
@@ -54,10 +55,12 @@ export function useLiveMode(): UseLiveModeReturn {
 					setIsLiveMode(true);
 					setWebInterfaceUrl(result.url);
 				} else {
+					// Expected: live mode server startup can fail due to port conflicts or network issues
 					console.error('[toggleGlobalLive] Failed to start server:', result.error);
 				}
 			}
 		} catch (error) {
+			// Expected: live mode server/tunnel operations can fail during startup/shutdown
 			console.error('[toggleGlobalLive] Error:', error);
 		}
 	}, [isLiveMode]);
@@ -75,6 +78,7 @@ export function useLiveMode(): UseLiveModeReturn {
 				// Server stopped but failed to restart — update state to reflect stopped server
 				setIsLiveMode(false);
 				setWebInterfaceUrl(null);
+				// Expected: live mode server restart can fail due to port conflicts or network issues
 				console.error('[restartWebServer] Failed to restart server:', result.error);
 				return null;
 			}
@@ -82,6 +86,7 @@ export function useLiveMode(): UseLiveModeReturn {
 			// stopServer may have succeeded — ensure state reflects server is down
 			setIsLiveMode(false);
 			setWebInterfaceUrl(null);
+			// Expected: live mode server/tunnel operations can fail during startup/shutdown
 			console.error('[restartWebServer] Error:', error);
 			return null;
 		}

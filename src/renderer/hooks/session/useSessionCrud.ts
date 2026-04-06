@@ -16,7 +16,8 @@
 
 import { useCallback, useState } from 'react';
 import type { ToolType, Session, AITab } from '../../types';
-import { useSessionStore } from '../../stores/sessionStore';
+import { useSessionStore, updateSessionWith, selectSessionById } from '../../stores/sessionStore';
+import { captureException } from '../../utils/sentry';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUIStore } from '../../stores/uiStore';
 import { getModalActions, useModalStore } from '../../stores/modalStore';
@@ -147,6 +148,9 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 				const agent = await (window as any).maestro.agents.get(agentId);
 				if (!agent) {
 					console.error(`Agent not found: ${agentId}`);
+					captureException(new Error(`Agent not found: ${agentId}`), {
+						extra: { context: 'useSessionCrud.createNewSession', agentId },
+					});
 					return;
 				}
 				const currentSessions = useSessionStore.getState().sessions;
@@ -158,6 +162,7 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 					sessionSshRemoteConfig?.enabled ? sessionSshRemoteConfig.remoteId : null
 				);
 				if (!validation.valid) {
+					// Expected: user input validation failure (duplicate name, invalid path)
 					console.error(`Session validation failed: ${validation.error}`);
 					notifyToast({
 						type: 'error',
@@ -276,6 +281,7 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 				setTimeout(() => inputRef.current?.focus(), 50);
 			} catch (error) {
 				console.error('Failed to create session:', error);
+				captureException(error, { extra: { context: 'useSessionCrud.createNewSession' } });
 			}
 		},
 		[setSessions, setActiveSessionId, setActiveFocus, inputRef]
@@ -286,7 +292,7 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 	// ========================================================================
 	const deleteSession = useCallback(
 		(id: string) => {
-			const session = useSessionStore.getState().sessions.find((s) => s.id === id);
+			const session = selectSessionById(id)(useSessionStore.getState());
 			if (!session) return;
 			setDeleteAgentSession(session);
 		},
@@ -315,11 +321,13 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 						try {
 							await (window as any).maestro.process.kill(`${session.id}-ai`);
 						} catch (error) {
+							// Expected: process may already be dead during cleanup
 							console.error('Failed to kill AI process:', error);
 						}
 						try {
 							await (window as any).maestro.process.kill(`${session.id}-terminal`);
 						} catch (error) {
+							// Expected: process may already be dead during cleanup
 							console.error('Failed to kill terminal process:', error);
 						}
 						// Kill terminal tab PTYs — each tab has its own PTY
@@ -329,12 +337,14 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 									getTerminalSessionId(session.id, tab.id)
 								);
 							} catch (error) {
+								// Expected: process may already be dead during cleanup
 								console.error('Failed to kill terminal tab process:', error);
 							}
 						}
 						try {
 							await (window as any).maestro.playbooks.deleteAll(session.id);
 						} catch (error) {
+							// Expected: playbooks may not exist for this session
 							console.error('Failed to delete playbooks:', error);
 						}
 					}
@@ -394,32 +404,30 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 
 	const finishRenamingSession = useCallback(
 		(sessId: string, newName: string) => {
-			setSessions((prev) => {
-				const updated = prev.map((s) => (s.id === sessId ? { ...s, name: newName } : s));
-				const session = updated.find((s) => s.id === sessId);
-				// Derive provider session ID: prefer session-level (legacy), fall back to active/first aiTab
-				const providerSessionId =
-					session?.agentSessionId ||
-					session?.aiTabs?.find((t) => t.id === session.activeTabId)?.agentSessionId ||
-					session?.aiTabs?.[0]?.agentSessionId;
-				if (providerSessionId && session?.projectRoot) {
-					const agentId = session.toolType || 'claude-code';
-					if (agentId === 'claude-code') {
-						(window as any).maestro.claude
-							.updateSessionName(session.projectRoot, providerSessionId, newName)
-							.catch((err: Error) =>
-								console.warn('[finishRenamingSession] Failed to sync session name:', err)
-							);
-					} else {
-						(window as any).maestro.agentSessions
-							.setSessionName(agentId, session.projectRoot, providerSessionId, newName)
-							.catch((err: Error) =>
-								console.warn('[finishRenamingSession] Failed to sync session name:', err)
-							);
-					}
+			updateSessionWith(sessId, (s) => ({ ...s, name: newName }));
+			// Sync name to provider after updating store
+			const session = selectSessionById(sessId)(useSessionStore.getState());
+			// Derive provider session ID: prefer session-level (legacy), fall back to active/first aiTab
+			const providerSessionId =
+				session?.agentSessionId ||
+				session?.aiTabs?.find((t) => t.id === session.activeTabId)?.agentSessionId ||
+				session?.aiTabs?.[0]?.agentSessionId;
+			if (providerSessionId && session?.projectRoot) {
+				const agentId = session.toolType || 'claude-code';
+				if (agentId === 'claude-code') {
+					(window as any).maestro.claude
+						.updateSessionName(session.projectRoot, providerSessionId, newName)
+						.catch((err: Error) =>
+							console.warn('[finishRenamingSession] Failed to sync session name:', err)
+						);
+				} else {
+					(window as any).maestro.agentSessions
+						.setSessionName(agentId, session.projectRoot, providerSessionId, newName)
+						.catch((err: Error) =>
+							console.warn('[finishRenamingSession] Failed to sync session name:', err)
+						);
 				}
-				return updated;
-			});
+			}
 			setEditingSessionId(null);
 		},
 		[setSessions, setEditingSessionId]
@@ -429,11 +437,7 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 	// toggleBookmark
 	// ========================================================================
 	const toggleBookmark = useCallback((sessionId: string) => {
-		useSessionStore
-			.getState()
-			.setSessions((prev) =>
-				prev.map((s) => (s.id === sessionId ? { ...s, bookmarked: !s.bookmarked } : s))
-			);
+		updateSessionWith(sessionId, (s) => ({ ...s, bookmarked: !s.bookmarked }));
 	}, []);
 
 	// ========================================================================
@@ -464,13 +468,11 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 	const handleGroupCreated = useCallback(
 		(groupId: string) => {
 			if (pendingMoveToGroupSessionId) {
-				setSessions((prev) =>
-					prev.map((s) => (s.id === pendingMoveToGroupSessionId ? { ...s, groupId } : s))
-				);
+				updateSessionWith(pendingMoveToGroupSessionId, (s) => ({ ...s, groupId }));
 				setPendingMoveToGroupSessionId(null);
 			}
 		},
-		[pendingMoveToGroupSessionId, setSessions]
+		[pendingMoveToGroupSessionId]
 	);
 
 	return {

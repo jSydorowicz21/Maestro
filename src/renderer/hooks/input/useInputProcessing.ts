@@ -168,6 +168,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 
 					// Execute the history command handler asynchronously
 					onHistoryCommand().catch((error) => {
+						// Expected: input processing errors are user-facing and recoverable
 						console.error('[processInput] /history command failed:', error);
 					});
 					return;
@@ -207,6 +208,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 
 					// Execute the skills command handler asynchronously
 					onSkillsCommand().catch((error) => {
+						// Expected: input processing errors are user-facing and recoverable
 						console.error('[processInput] /skills command failed:', error);
 					});
 					return;
@@ -362,6 +364,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 
 				// Send to wizard (with images if any were staged)
 				onWizardSendMessage(effectiveInputValue, imagesToSend).catch((error) => {
+					// Expected: input processing errors are user-facing and recoverable
 					console.error('[processInput] Wizard message failed:', error);
 				});
 				return;
@@ -956,6 +959,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 							sendPromptViaStdinRaw,
 						});
 					} catch (error) {
+						// Expected: input processing errors are user-facing and recoverable
 						console.error('Failed to spawn agent batch process:', error);
 						const errorLog: LogEntry = {
 							id: generateId(),
@@ -1019,6 +1023,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 						sessionSshRemoteConfig: activeSession.sessionSshRemoteConfig,
 					})
 					.catch((error) => {
+						// Expected: input processing errors are user-facing and recoverable
 						console.error('Failed to run command:', error);
 						updateSessionWith(activeSessionId, (s) => ({
 							...s,
@@ -1042,6 +1047,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 			} else if (targetPid > 0) {
 				// AI mode: Write to stdin
 				window.maestro.process.write(targetSessionId, capturedInputValue).catch((error) => {
+					// Expected: input processing errors are user-facing and recoverable
 					console.error('Failed to write to process:', error);
 					const errorLog: LogEntry = {
 						id: generateId(),

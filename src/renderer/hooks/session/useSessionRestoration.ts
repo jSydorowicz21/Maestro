@@ -15,9 +15,10 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Session, SessionState, ToolType, LogEntry } from '../../types';
-import { useSessionStore } from '../../stores/sessionStore';
+import { useSessionStore, updateSessionWith } from '../../stores/sessionStore';
 import { useGroupChatStore } from '../../stores/groupChatStore';
 import { gitService } from '../../services/git';
+import { captureException } from '../../utils/sentry';
 import { generateId } from '../../utils/ids';
 import { AUTO_RUN_FOLDER_NAME } from '../../components/Wizard';
 
@@ -87,17 +88,18 @@ export function useSessionRestoration(): SessionRestorationReturn {
 				const agent = await window.maestro.agents.get(toolType, sshRemoteId);
 				if (!agent) {
 					console.error(`[validateAgentInBackground] Agent not found for toolType: ${toolType}`);
-					setSessions((prev) =>
-						prev.map((s) =>
-							s.id === sessionId
-								? {
-										...s,
-										aiPid: -1,
-										state: 'error' as SessionState,
-									}
-								: s
-						)
-					);
+					captureException(new Error(`Agent not found for toolType: ${toolType}`), {
+						extra: {
+							context: 'useSessionRestoration.validateAgentInBackground',
+							toolType,
+							sessionId,
+						},
+					});
+					updateSessionWith(sessionId, (s) => ({
+						...s,
+						aiPid: -1,
+						state: 'error' as SessionState,
+					}));
 				}
 			} catch (err) {
 				// IPC failures are treated as transient (e.g. main process still
@@ -126,28 +128,20 @@ export function useSessionRestoration(): SessionRestorationReturn {
 					gitRefsCacheTime = Date.now();
 				}
 
-				setSessions((prev) =>
-					prev.map((s) =>
-						s.id === sessionId
-							? {
-									...s,
-									isGitRepo,
-									gitBranches,
-									gitTags,
-									gitRefsCacheTime,
-									sshConnectionFailed: false,
-								}
-							: s
-					)
-				);
+				updateSessionWith(sessionId, (s) => ({
+					...s,
+					isGitRepo,
+					gitBranches,
+					gitTags,
+					gitRefsCacheTime,
+					sshConnectionFailed: false,
+				}));
 			} catch (error) {
 				console.warn(
 					`[fetchGitInfoInBackground] Failed to fetch git info for session ${sessionId}:`,
 					error
 				);
-				setSessions((prev) =>
-					prev.map((s) => (s.id === sessionId ? { ...s, sshConnectionFailed: true } : s))
-				);
+				updateSessionWith(sessionId, (s) => ({ ...s, sshConnectionFailed: true }));
 			}
 		},
 		[]
@@ -184,6 +178,9 @@ export function useSessionRestoration(): SessionRestorationReturn {
 					'[restoreSession] Session has no aiTabs - data corruption, creating default tab:',
 					session.id
 				);
+				captureException(new Error('Session has no aiTabs - data corruption'), {
+					extra: { context: 'useSessionRestoration.restoreSession', sessionId: session.id },
+				});
 				const defaultTabId = generateId();
 				return {
 					...session,
@@ -399,6 +396,9 @@ export function useSessionRestoration(): SessionRestorationReturn {
 			};
 		} catch (error) {
 			console.error(`Error restoring session ${session.id}:`, error);
+			captureException(error, {
+				extra: { context: 'useSessionRestoration.restoreSession', sessionId: session.id },
+			});
 			return {
 				...session,
 				aiPid: -1,
@@ -476,10 +476,12 @@ export function useSessionRestoration(): SessionRestorationReturn {
 					setGroupChats(savedGroupChats || []);
 				} catch (gcError) {
 					console.error('Failed to load group chats:', gcError);
+					captureException(gcError, { extra: { context: 'useSessionRestoration.loadGroupChats' } });
 					setGroupChats([]);
 				}
 			} catch (e) {
 				console.error('Failed to load sessions/groups:', e);
+				captureException(e, { extra: { context: 'useSessionRestoration.loadSessionsAndGroups' } });
 				setSessions([]);
 				setGroups([]);
 				// Error loading sessions — no file tree to wait for

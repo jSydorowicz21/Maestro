@@ -169,6 +169,7 @@ export function useContributorStats(): UseContributorStatsReturn {
 				setRecentContributions(completedResponse.contributions as CompletedContribution[]);
 			}
 		} catch (err) {
+			// Expected: contributor stats are non-critical analytics
 			console.error('Failed to fetch contributor stats:', err);
 		} finally {
 			setIsLoading(false);

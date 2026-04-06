@@ -180,6 +180,7 @@ export function useAgentConfiguration(
 				setSelectedAgent(filtered[0].id);
 			}
 		} catch (error) {
+			// Expected: agent detection can fail if agent is not installed
 			console.error('Failed to detect agents:', error);
 		} finally {
 			setIsDetecting(false);
@@ -205,6 +206,7 @@ export function useAgentConfiguration(
 					if (latestLoadRequestRef.current !== requestId) return; // stale
 					setAvailableModels(models);
 				} catch (err) {
+					// Expected: model list lookup can fail if agent is unavailable
 					console.error('Failed to load models:', err);
 				} finally {
 					if (latestLoadRequestRef.current === requestId) {
@@ -229,6 +231,7 @@ export function useAgentConfiguration(
 			const models = await window.maestro.agents.getModels(selectedAgent, true);
 			setAvailableModels(models);
 		} catch (err) {
+			// Expected: model list refresh can fail if agent is unavailable
 			console.error('Failed to refresh models:', err);
 		} finally {
 			setLoadingModels(false);
@@ -245,6 +248,7 @@ export function useAgentConfiguration(
 				: agents.filter((a: AgentConfig) => a.available && !a.hidden);
 			setDetectedAgents(filtered);
 		} catch (error) {
+			// Expected: agent detection refresh can fail if agent is not installed
 			console.error('Failed to refresh agents:', error);
 		} finally {
 			setRefreshingAgent(false);
@@ -294,6 +298,7 @@ export function useAgentConfiguration(
 						setSshRemotes(configsResult.configs);
 					}
 				} catch (error) {
+					// Expected: SSH remote config loading can fail if not configured
 					console.error('Failed to load SSH remotes:', error);
 				}
 			})();

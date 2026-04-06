@@ -11,6 +11,7 @@ import { getActiveTab } from '../../utils/tabHelpers';
 import { getStdinFlags } from '../../utils/spawnHelpers';
 import { generateId } from '../../utils/ids';
 import { updateSessionWith } from '../../stores/sessionStore';
+import { captureException } from '../../utils/sentry';
 
 /**
  * Result from agent spawn operations.
@@ -179,6 +180,12 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 				const agent = await window.maestro.agents.get(session.toolType);
 				if (!agent) {
 					console.error(`[spawnAgentForSession] Agent not found for toolType: ${session.toolType}`);
+					captureException(new Error(`Agent not found for toolType: ${session.toolType}`), {
+						extra: {
+							context: 'useAgentExecution.spawnAgentForSession',
+							toolType: session.toolType,
+						},
+					});
 					return { success: false };
 				}
 
@@ -427,6 +434,7 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 				});
 			} catch (error) {
 				console.error('Error spawning agent:', error);
+				captureException(error, { extra: { context: 'useAgentExecution.spawnAgentForSession' } });
 				return { success: false };
 			}
 		},
@@ -479,6 +487,9 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 				const agent = await window.maestro.agents.get(toolType);
 				if (!agent) {
 					console.error(`[spawnBackgroundSynopsis] Agent not found for toolType: ${toolType}`);
+					captureException(new Error(`Agent not found for toolType: ${toolType}`), {
+						extra: { context: 'useAgentExecution.spawnBackgroundSynopsis', toolType },
+					});
 					return { success: false };
 				}
 
@@ -588,6 +599,9 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 				});
 			} catch (error) {
 				console.error('Error spawning background synopsis:', error);
+				captureException(error, {
+					extra: { context: 'useAgentExecution.spawnBackgroundSynopsis' },
+				});
 				return { success: false };
 			}
 		},

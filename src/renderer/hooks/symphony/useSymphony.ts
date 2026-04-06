@@ -191,6 +191,7 @@ export function useSymphony(): UseSymphonyReturn {
 				setSymphonyState(response.state as SymphonyState);
 			}
 		} catch (err) {
+			// Expected: group chat operations can fail for network/IPC reasons
 			console.error('Failed to fetch symphony state:', err);
 		}
 	}, []);
@@ -208,6 +209,7 @@ export function useSymphony(): UseSymphonyReturn {
 				setIssueCounts(response.counts);
 			}
 		} catch (err) {
+			// Expected: group chat operations can fail for network/IPC reasons
 			console.error('Failed to fetch issue counts:', err);
 			setIssueCounts(null);
 		} finally {
@@ -260,6 +262,7 @@ export function useSymphony(): UseSymphonyReturn {
 					await fetchSymphonyState();
 				}
 			} catch (err) {
+				// Expected: group chat operations can fail for network/IPC reasons
 				console.error('Auto-sync failed:', err);
 			}
 		};
@@ -287,6 +290,7 @@ export function useSymphony(): UseSymphonyReturn {
 				setRepoIssues(response.issues as SymphonyIssue[]);
 			}
 		} catch (err) {
+			// Expected: group chat operations can fail for network/IPC reasons
 			console.error('Failed to fetch issues:', err);
 		} finally {
 			setIsLoadingIssues(false);
@@ -307,6 +311,7 @@ export function useSymphony(): UseSymphonyReturn {
 				await window.maestro.symphony.checkPRStatuses();
 				await fetchSymphonyState();
 			} catch (err) {
+				// Expected: group chat operations can fail for network/IPC reasons
 				console.error('Failed to refresh symphony:', err);
 			} finally {
 				setIsRefreshing(false);

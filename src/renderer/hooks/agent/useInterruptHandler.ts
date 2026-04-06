@@ -17,6 +17,7 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { useActiveSession } from '../session/useActiveSession';
 import { generateId } from '../../utils/ids';
 import { getActiveTab } from '../../utils/tabHelpers';
+import { captureException } from '../../utils/sentry';
 
 // ============================================================================
 // Dependencies interface
@@ -214,12 +215,18 @@ export function useInterruptHandler(deps: UseInterruptHandlerDeps): UseInterrupt
 			if (queuedItemToProcess) {
 				setTimeout(() => {
 					processQueuedItem(queuedItemToProcess!.sessionId, queuedItemToProcess!.item).catch(
-						(err) => console.error('[useInterruptHandler] Failed to process queued item:', err)
+						(err) => {
+							console.error('[useInterruptHandler] Failed to process queued item:', err);
+							captureException(err, {
+								extra: { context: 'useInterruptHandler.processQueuedItem' },
+							});
+						}
 					);
 				}, 0);
 			}
 		} catch (error) {
 			console.error('Failed to interrupt process:', error);
+			captureException(error, { extra: { context: 'useInterruptHandler.interruptProcess' } });
 
 			// If interrupt fails, offer to kill the process
 			const shouldKill = confirm(
@@ -384,16 +391,21 @@ export function useInterruptHandler(deps: UseInterruptHandlerDeps): UseInterrupt
 					if (queuedItemAfterKill) {
 						setTimeout(() => {
 							processQueuedItem(queuedItemAfterKill!.sessionId, queuedItemAfterKill!.item).catch(
-								(err) =>
+								(err) => {
 									console.error(
 										'[useInterruptHandler] Failed to process queued item after kill:',
 										err
-									)
+									);
+									captureException(err, {
+										extra: { context: 'useInterruptHandler.processQueuedItemAfterKill' },
+									});
+								}
 							);
 						}, 0);
 					}
 				} catch (killError: unknown) {
 					console.error('Failed to kill process:', killError);
+					captureException(killError, { extra: { context: 'useInterruptHandler.killProcess' } });
 					const killErrorMessage =
 						killError instanceof Error ? killError.message : String(killError);
 					const errorLog: LogEntry = {

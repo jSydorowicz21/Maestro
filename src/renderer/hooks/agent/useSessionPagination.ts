@@ -175,6 +175,7 @@ export function useSessionPagination({
 					window.maestro.claude.getProjectStats(projectPath);
 				}
 			} catch (error) {
+				// Expected: session loading can fail transiently
 				console.error('Failed to load sessions:', error);
 			} finally {
 				setLoading(false);
@@ -223,6 +224,7 @@ export function useSessionPagination({
 			setHasMoreSessions(result.hasMore);
 			nextCursorRef.current = result.nextCursor;
 		} catch (error) {
+			// Expected: session loading can fail transiently
 			console.error('Failed to load more sessions:', error);
 		} finally {
 			setIsLoadingMoreSessions(false);

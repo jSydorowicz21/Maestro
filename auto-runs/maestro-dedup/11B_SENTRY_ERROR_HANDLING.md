@@ -73,16 +73,48 @@ Sentry imports:
 
 ### 4. Audit renderer components (40+ files)
 
-- [ ] For API call catch blocks: add Sentry for unexpected failures
-- [ ] For DOM operation catch blocks: usually expected, skip Sentry but add comment
-- [ ] For data parsing catch blocks: add Sentry if data comes from our systems, skip if user input
-- [ ] Run targeted tests after each batch
+- [x] For API call catch blocks: add Sentry for unexpected failures
+  - Added `captureException` to 2 P5 infrastructure components:
+    - `src/renderer/components/ProcessMonitor.tsx` - 2 catch blocks (fetchActiveProcesses, killProcess)
+    - `src/renderer/components/SymphonyModal.tsx` - 3 catch blocks (fetchDocumentPreview, syncContribution, checkPRStatuses)
+- [x] For DOM operation catch blocks: usually expected, skip Sentry but add comment
+  - Added `// Expected: <reason>` skip comments to ~37 SKIP component files (~72 catch blocks total)
+  - Categories: wizard screens, modal dialogs, data display, visual, settings UI, group chat, notifications
+- [x] For data parsing catch blocks: add Sentry if data comes from our systems, skip if user input
+  - Data parsing blocks (graphDataBuilder, phaseGenerator, MermaidRenderer) all handle user/external input - marked as SKIP with comments
+- [x] Run targeted tests after each batch
+  - 23,659 tests pass, 55 pre-existing failures (identical to baseline). Zero regressions. Lint passes.
 
 ### 5. Audit renderer hooks (24 files)
 
-- [ ] Focus on hooks that call IPC or external services
-- [ ] Add Sentry for unexpected IPC failures
-- [ ] Run targeted tests after changes
+- [x] Focus on hooks that call IPC or external services
+  - Audited all 41 hook files with `console.error`. Categorized into P3 (10 hooks needing Sentry) and SKIP (~28 hooks with expected failures).
+- [x] Add Sentry for unexpected IPC failures
+  - Added `captureException` to 10 P3 hooks (27 catch blocks total):
+    - `useAgentExecution.ts` - 4 catch blocks (agent spawn, background synopsis)
+    - `useAgentListeners.ts` - 8 catch blocks (data routing, exit verification, synopsis, session origin, SSH git)
+    - `useAgentSessionManagement.ts` - 1 catch block (session resume)
+    - `useQueueProcessing.ts` - 1 catch block (queue item processing)
+    - `useInterruptHandler.ts` - 4 catch blocks (interrupt, kill, queue processing)
+    - `useSessionRestoration.ts` - 5 catch blocks (agent validation, data corruption, restore, load)
+    - `useSessionCrud.ts` - 2 catch blocks (agent lookup, session creation) + 4 skip comments (cleanup kills)
+    - `useBatchProcessor.ts` - 4 catch blocks (debounce, working copy, task processing) + 2 skip comments (audio, kill)
+    - `useDocumentProcessor.ts` - 1 catch block (session origin registration)
+    - `useAppHandlers.ts` - 1 catch block (file read)
+  - Added `// Expected:` skip comments to ~28 SKIP hook files (~75 catch blocks total):
+    - Remote/SSH: useRemoteIntegration, useSshRemotes, useLiveMode, useLiveOverlay, useCliActivityMonitoring
+    - Git/Worktree: useWorktreeHandlers, useWorktreeValidation
+    - Agent detection: useAvailableAgents, useAgentCapabilities, useAgentConfiguration
+    - Batch/Playbook: useAutoRunMarkdown, useAutoRunContentSync, usePlaybookManagement, useMarketplace, useInlineWizard
+    - Summarization: useSummarizeAndContinue
+    - UI: useTabHandlers, useSessionPagination, useSessionViewer, useInputProcessing, useTabExportHandlers
+    - Stats: useStats, useContributorStats
+    - Wizard: useWizardHandlers
+    - Symphony: useSymphony, useSymphonyContribution
+    - Cue: useCueAutoDiscovery
+    - Init: useAppInitialization (4 skip comments)
+- [x] Run targeted tests after changes
+  - 225 tests pass across 7 modified hook test files (0 regressions). useBatchProcessor: 23 pre-existing failures (unrelated to sentry changes). Lint passes cleanly.
 
 ### 6. Audit renderer services/stores/utils (14 files)
 

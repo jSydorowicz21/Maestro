@@ -73,6 +73,7 @@ export function useCliActivityMonitoring(
 					})
 				);
 			} catch (error) {
+				// Expected: CLI activity polling can fail transiently
 				console.error('[CLI Activity] Error checking activity:', error);
 			}
 		};

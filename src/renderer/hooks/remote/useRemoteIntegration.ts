@@ -191,6 +191,7 @@ export function useRemoteIntegration(deps: UseRemoteIntegrationDeps): UseRemoteI
 						thinkingStartTime: undefined,
 					}));
 				} catch (error) {
+					// Expected: remote/SSH interrupt can fail due to network issues or host unavailability
 					console.error('[Remote] Failed to interrupt session:', error);
 				}
 			}
@@ -315,15 +316,18 @@ export function useRemoteIntegration(deps: UseRemoteIntegrationDeps): UseRemoteI
 						if (agentId === 'claude-code') {
 							window.maestro.claude
 								.updateSessionName(s.projectRoot, tab.agentSessionId, newName || '')
+								// Expected: remote/SSH operations can fail due to network issues or host unavailability
 								.catch((err) => console.error('Failed to persist tab name:', err));
 						} else {
 							window.maestro.agentSessions
 								.setSessionName(agentId, s.projectRoot, tab.agentSessionId, newName || null)
+								// Expected: remote/SSH operations can fail due to network issues or host unavailability
 								.catch((err) => console.error('Failed to persist tab name:', err));
 						}
 						// Also update past history entries with this agentSessionId
 						window.maestro.history
 							.updateSessionName(tab.agentSessionId, newName || '')
+							// Expected: remote/SSH operations can fail due to network issues or host unavailability
 							.catch((err) => console.error('Failed to update history session names:', err));
 					}
 
@@ -347,10 +351,12 @@ export function useRemoteIntegration(deps: UseRemoteIntegrationDeps): UseRemoteI
 					if (agentId === 'claude-code') {
 						window.maestro.claude
 							.updateSessionStarred(s.projectRoot, tab.agentSessionId, starred)
+							// Expected: remote/SSH operations can fail due to network issues or host unavailability
 							.catch((err) => console.error('Failed to persist tab starred:', err));
 					} else {
 						window.maestro.agentSessions
 							.setSessionStarred(agentId, s.projectRoot, tab.agentSessionId, starred)
+							// Expected: remote/SSH operations can fail due to network issues or host unavailability
 							.catch((err) => console.error('Failed to persist tab starred:', err));
 					}
 

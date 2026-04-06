@@ -5,6 +5,7 @@ import { useModalStore } from '../../stores/modalStore';
 import { useFileExplorerStore } from '../../stores/fileExplorerStore';
 import { updateSessionWith } from '../../stores/sessionStore';
 import { useEventListener } from '../utils/useEventListener';
+import { captureException } from '../../utils/sentry';
 
 /** Loading state for file preview (shown while fetching remote files) */
 export interface FilePreviewLoading {
@@ -225,6 +226,7 @@ export function useAppHandlers(deps: UseAppHandlersDeps): UseAppHandlersReturn {
 					setActiveFocus('main');
 				} catch (error) {
 					console.error('Failed to read file:', error);
+					captureException(error, { extra: { context: 'useAppHandlers.handleFileOpen' } });
 				} finally {
 					// Clear loading state
 					useFileExplorerStore.getState().setFilePreviewLoading(null);

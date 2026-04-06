@@ -119,6 +119,7 @@ export function usePlaybookManagement(
 					setPlaybooks(result.playbooks);
 				}
 			} catch (error) {
+				// Expected: playbook file operations can fail for user/filesystem reasons
 				console.error('Failed to load playbooks:', error);
 			}
 			setLoadingPlaybooks(false);
@@ -222,6 +223,7 @@ export function usePlaybookManagement(
 				}
 			}
 		} catch (error) {
+			// Expected: playbook file operations can fail for user/filesystem reasons
 			console.error('Failed to delete playbook:', error);
 		}
 
@@ -241,9 +243,11 @@ export function usePlaybookManagement(
 			try {
 				const result = await window.maestro.playbooks.export(sessionId, playbook.id, folderPath);
 				if (!result.success && result.error !== 'Export cancelled') {
+					// Expected: playbook file operations can fail for user/filesystem reasons
 					console.error('Failed to export playbook:', result.error);
 				}
 			} catch (error) {
+				// Expected: playbook file operations can fail for user/filesystem reasons
 				console.error('Failed to export playbook:', error);
 			}
 		},
@@ -260,9 +264,11 @@ export function usePlaybookManagement(
 				// Load the imported playbook
 				handleLoadPlaybook(result.playbook);
 			} else if (result.error && result.error !== 'Import cancelled') {
+				// Expected: playbook file/network operations can fail for user/filesystem reasons
 				console.error('Failed to import playbook:', result.error);
 			}
 		} catch (error) {
+			// Expected: playbook file/network operations can fail for user/filesystem reasons
 			console.error('Failed to import playbook:', error);
 		}
 	}, [sessionId, folderPath, handleLoadPlaybook]);
@@ -297,6 +303,7 @@ export function usePlaybookManagement(
 					setShowSavePlaybookModal(false);
 				}
 			} catch (error) {
+				// Expected: playbook file operations can fail for user/filesystem reasons
 				console.error('Failed to save playbook:', error);
 			}
 			setSavingPlaybook(false);
@@ -338,6 +345,7 @@ export function usePlaybookManagement(
 				);
 			}
 		} catch (error) {
+			// Expected: playbook file operations can fail for user/filesystem reasons
 			console.error('Failed to update playbook:', error);
 		}
 		setSavingPlaybook(false);

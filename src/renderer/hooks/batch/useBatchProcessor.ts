@@ -26,6 +26,7 @@ import { notifyToast } from '../../stores/notificationStore';
 import { useTimeTracking } from './useTimeTracking';
 import { useWorktreeManager } from './useWorktreeManager';
 import { useDocumentProcessor } from './useDocumentProcessor';
+import { captureException } from '../../utils/sentry';
 
 // Debounce delay for batch state updates (Quick Win 1)
 const BATCH_STATE_DEBOUNCE_MS = 200;
@@ -430,6 +431,9 @@ export function useBatchProcessor({
 						broadcastAutoRunState(sessionId, newStateForSession);
 					} catch (error) {
 						console.error('[BatchProcessor:onUpdate] ERROR in debounce callback:', error);
+						captureException(error, {
+							extra: { context: 'useBatchProcessor.onUpdate.debounce', sessionId },
+						});
 					}
 				},
 				[broadcastAutoRunState]
@@ -1006,6 +1010,13 @@ export function useBatchProcessor({
 								`[BatchProcessor] Failed to create working copy for ${docEntry.filename}:`,
 								err
 							);
+							captureException(err, {
+								extra: {
+									context: 'useBatchProcessor.createWorkingCopy',
+									filename: docEntry.filename,
+									sessionId,
+								},
+							});
 							// Continue with original document as fallback
 						}
 					}
@@ -1239,6 +1250,7 @@ export function useBatchProcessor({
 								window.maestro.notification
 									.speak(shortSummary, audioFeedbackCommandRef.current)
 									.catch((err) => {
+										// Expected: audio playback can fail on systems without audio devices
 										console.error('[BatchProcessor] Failed to speak synopsis:', err);
 									});
 							}
@@ -1306,6 +1318,13 @@ export function useBatchProcessor({
 								`[BatchProcessor] Error running task in ${docEntry.filename} for session ${sessionId}:`,
 								error
 							);
+							captureException(error, {
+								extra: {
+									context: 'useBatchProcessor.processTask',
+									filename: docEntry.filename,
+									sessionId,
+								},
+							});
 
 							// Check if an error resolution promise was created (e.g., by onAgentError → pauseBatchOnError)
 							// This handles the case where the agent error (e.g., context limit) triggered a pause,
@@ -1835,6 +1854,7 @@ export function useBatchProcessor({
 			try {
 				await window.maestro.process.kill(sessionId);
 			} catch (error) {
+				// Expected: process may already be dead or not started
 				console.error('[BatchProcessor:killBatchRun] Failed to kill process:', error);
 			}
 

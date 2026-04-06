@@ -18,7 +18,8 @@ import type {
 	OpenSpecCommand,
 	BmadCommand,
 } from '../../types';
-import { useSessionStore } from '../../stores/sessionStore';
+import { captureException } from '../../utils/sentry';
+import { useSessionStore, updateSessionWith } from '../../stores/sessionStore';
 import { useAgentStore } from '../../stores/agentStore';
 import { getActiveTab } from '../../utils/tabHelpers';
 
@@ -68,9 +69,6 @@ export function useQueueProcessing(deps: UseQueueProcessingDeps): UseQueueProces
 	// --- Reactive subscriptions ---
 	const sessionsLoaded = useSessionStore((s) => s.sessionsLoaded);
 	const sessions = useSessionStore((s) => s.sessions);
-
-	// --- Store actions (stable via getState) ---
-	const { setSessions } = useSessionStore.getState();
 
 	// --- Refs ---
 	const processQueuedItemRef = useRef<
@@ -124,63 +122,56 @@ export function useQueueProcessing(deps: UseQueueProcessingDeps): UseQueueProces
 					});
 
 					// Set session to busy and remove item from queue
-					setSessions((prev) =>
-						prev.map((s) => {
-							if (s.id !== session.id) return s;
+					updateSessionWith(session.id, (s) => {
+						const [, ...remainingQueue] = s.executionQueue;
+						const targetTab = s.aiTabs.find((tab) => tab.id === firstItem.tabId) || getActiveTab(s);
 
-							const [, ...remainingQueue] = s.executionQueue;
-							const targetTab =
-								s.aiTabs.find((tab) => tab.id === firstItem.tabId) || getActiveTab(s);
+						// Set the target tab to busy
+						const updatedAiTabs = s.aiTabs.map((tab) =>
+							tab.id === targetTab?.id
+								? {
+										...tab,
+										state: 'busy' as const,
+										thinkingStartTime: Date.now(),
+									}
+								: tab
+						);
 
-							// Set the target tab to busy
-							const updatedAiTabs = s.aiTabs.map((tab) =>
-								tab.id === targetTab?.id
-									? {
-											...tab,
-											state: 'busy' as const,
-											thinkingStartTime: Date.now(),
-										}
-									: tab
-							);
-
-							return {
-								...s,
-								state: 'busy' as SessionState,
-								busySource: 'ai',
-								thinkingStartTime: Date.now(),
-								currentCycleTokens: 0,
-								currentCycleBytes: 0,
-								executionQueue: remainingQueue,
-								aiTabs: updatedAiTabs,
-							};
-						})
-					);
+						return {
+							...s,
+							state: 'busy' as SessionState,
+							busySource: 'ai',
+							thinkingStartTime: Date.now(),
+							currentCycleTokens: 0,
+							currentCycleBytes: 0,
+							executionQueue: remainingQueue,
+							aiTabs: updatedAiTabs,
+						};
+					});
 
 					// Process the item
 					processQueuedItem(session.id, firstItem).catch((err) => {
 						console.error(`[App] Failed to process queued item for session ${session.id}:`, err);
+						captureException(err, {
+							extra: { context: 'useQueueProcessing.processQueuedItem', sessionId: session.id },
+						});
 						// Reset session busy state and re-queue the failed item so it isn't lost
-						setSessions((prev) =>
-							prev.map((s) => {
-								if (s.id !== session.id) return s;
-								return {
-									...s,
-									state: 'idle',
-									busySource: undefined,
-									thinkingStartTime: undefined,
-									executionQueue: [firstItem, ...s.executionQueue],
-									aiTabs: s.aiTabs.map((tab) =>
-										tab.state === 'busy'
-											? {
-													...tab,
-													state: 'idle' as const,
-													thinkingStartTime: undefined,
-												}
-											: tab
-									),
-								};
-							})
-						);
+						updateSessionWith(session.id, (s) => ({
+							...s,
+							state: 'idle',
+							busySource: undefined,
+							thinkingStartTime: undefined,
+							executionQueue: [firstItem, ...s.executionQueue],
+							aiTabs: s.aiTabs.map((tab) =>
+								tab.state === 'busy'
+									? {
+											...tab,
+											state: 'idle' as const,
+											thinkingStartTime: undefined,
+										}
+									: tab
+							),
+						}));
 					});
 				});
 			}, 500); // Small delay to ensure everything is initialized

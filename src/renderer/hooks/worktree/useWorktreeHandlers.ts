@@ -235,6 +235,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 					}
 				}
 			} catch (err) {
+				// Expected: worktree scan can fail for user-provided paths
 				console.error('Failed to scan for worktrees:', err);
 			}
 		},
@@ -353,6 +354,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 				});
 			} catch (err) {
 				recentlyCreatedWorktreePathsRef.current.delete(normalizedCreatedPath);
+				// Expected: worktree creation can fail for user-provided paths
 				console.error('[WorktreeConfig] Failed to create worktree:', err);
 				notifyToast({
 					type: 'error',
@@ -547,6 +549,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 						);
 					}
 				} catch (err) {
+					// Expected: worktree scan can fail for user-provided paths
 					console.error(
 						`[WorktreeStartup] Error scanning ${parentSession.worktreeConfig!.basePath}:`,
 						err
@@ -759,6 +762,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 						);
 					}
 				} catch (error) {
+					// Expected: worktree scan can fail for user-provided paths
 					console.error(`[WorktreeScanner] Error scanning ${session.worktreeParentPath}:`, error);
 				}
 			}

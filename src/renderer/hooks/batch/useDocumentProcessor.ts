@@ -16,6 +16,7 @@ import { useCallback } from 'react';
 import type { Session, UsageStats } from '../../types';
 import { substituteTemplateVariables, TemplateContext } from '../../utils/templateVariables';
 import { countUnfinishedTasks, countCheckedTasks } from './batchUtils';
+import { captureException } from '../../utils/sentry';
 
 /**
  * Configuration for document processing
@@ -344,9 +345,12 @@ export function useDocumentProcessor(): UseDocumentProcessorReturn {
 				// Use effectiveCwd (worktree path when active) so session can be found later
 				window.maestro.agentSessions
 					.registerSessionOrigin(effectiveCwd, result.agentSessionId, 'auto')
-					.catch((err) =>
-						console.error('[DocumentProcessor] Failed to register session origin:', err)
-					);
+					.catch((err) => {
+						console.error('[DocumentProcessor] Failed to register session origin:', err);
+						captureException(err, {
+							extra: { context: 'useDocumentProcessor.registerSessionOrigin' },
+						});
+					});
 			}
 
 			// Re-read document to get updated task count and content

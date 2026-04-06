@@ -140,6 +140,7 @@ export function useMarketplace(): UseMarketplaceReturn {
 					setError(result.error || 'Failed to load marketplace data');
 				}
 			} catch (err) {
+				// Expected: marketplace network operations can fail due to connectivity
 				console.error('Failed to load marketplace manifest:', err);
 				setError('Failed to load marketplace data');
 			}
@@ -161,6 +162,7 @@ export function useMarketplace(): UseMarketplaceReturn {
 					setCacheAge(result.cacheAge ?? null);
 				}
 			} catch (err) {
+				// Expected: marketplace network operations can fail due to connectivity
 				console.error('Failed to reload manifest after change:', err);
 			}
 		});
@@ -219,6 +221,7 @@ export function useMarketplace(): UseMarketplaceReturn {
 				setError(result.error || 'Failed to refresh marketplace data');
 			}
 		} catch (err) {
+			// Expected: marketplace network operations can fail due to connectivity
 			console.error('Failed to refresh marketplace manifest:', err);
 			setError('Failed to refresh marketplace data');
 		}
@@ -246,6 +249,7 @@ export function useMarketplace(): UseMarketplaceReturn {
 				setIsImporting(false);
 				return result;
 			} catch (err) {
+				// Expected: marketplace network/file operations can fail due to connectivity
 				console.error('Failed to import playbook:', err);
 				setIsImporting(false);
 				return { success: false, error: 'Import failed' };
@@ -264,6 +268,7 @@ export function useMarketplace(): UseMarketplaceReturn {
 			}
 			return null;
 		} catch (err) {
+			// Expected: marketplace network operations can fail due to connectivity
 			console.error('Failed to fetch README:', err);
 			return null;
 		}
@@ -279,6 +284,7 @@ export function useMarketplace(): UseMarketplaceReturn {
 				}
 				return null;
 			} catch (err) {
+				// Expected: marketplace network operations can fail due to connectivity
 				console.error('Failed to fetch document:', err);
 				return null;
 			}

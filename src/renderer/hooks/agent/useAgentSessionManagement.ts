@@ -6,6 +6,7 @@ import { buildSharedHistoryContext } from '../../utils/sessionHelpers';
 import type { RightPanelHandle } from '../../components/RightPanel';
 import { FALLBACK_CONTEXT_WINDOW } from '../../../shared/agentConstants';
 import { updateSessionWith } from '../../stores/sessionStore';
+import { captureException } from '../../utils/sentry';
 
 /**
  * History entry for the addHistoryEntry function.
@@ -289,6 +290,7 @@ export function useAgentSessionManagement(
 				setActiveAgentSessionId(agentSessionId);
 			} catch (error) {
 				console.error('Failed to resume session:', error);
+				captureException(error, { extra: { context: 'useAgentSessionManagement.resumeSession' } });
 			}
 		},
 		[
