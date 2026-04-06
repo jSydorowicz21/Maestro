@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import {
 	X,
 	RotateCcw,
@@ -348,9 +349,7 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 	]);
 
 	// Focus textarea on mount
-	useEffect(() => {
-		setTimeout(() => textareaRef.current?.focus(), 100);
-	}, []);
+	useFocusAfterRender(textareaRef, true, 100);
 
 	const handleReset = () => {
 		showConfirmation('Reset the prompt to the default? Your customizations will be lost.', () => {

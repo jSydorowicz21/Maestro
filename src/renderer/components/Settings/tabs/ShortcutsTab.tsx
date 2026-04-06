@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useFocusAfterRender } from '../../../hooks/utils/useFocusAfterRender';
 import { useSettings } from '../../../hooks';
 import { formatShortcutKeys } from '../../../utils/shortcutFormatter';
 import type { Theme, Shortcut } from '../../../types';
@@ -30,10 +31,7 @@ export function ShortcutsTab({ theme, hasNoAgents, onRecordingChange }: Shortcut
 	}, [recordingId, onRecordingChange]);
 
 	// Auto-focus filter input on mount
-	useEffect(() => {
-		const timer = setTimeout(() => shortcutsFilterRef.current?.focus(), 50);
-		return () => clearTimeout(timer);
-	}, []);
+	useFocusAfterRender(shortcutsFilterRef, true, 50);
 
 	const handleRecord = (
 		e: React.KeyboardEvent,

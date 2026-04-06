@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { Search, Star, FileText, Terminal } from 'lucide-react';
 import type { AITab, FilePreviewTab, TerminalTab, Theme, Shortcut, ToolType } from '../types';
 import { fuzzyMatchWithScore } from '../utils/search';
@@ -262,10 +263,7 @@ export function TabSwitcherModal({
 	}, [updateLayerHandler]);
 
 	// Focus input on mount
-	useEffect(() => {
-		const timer = setTimeout(() => inputRef.current?.focus(), 50);
-		return () => clearTimeout(timer);
-	}, []);
+	useFocusAfterRender(inputRef, true, 50);
 
 	// On mount: sync any named tabs to the origins store, then load named sessions
 	// This ensures tabs that were named before persistence was added get saved

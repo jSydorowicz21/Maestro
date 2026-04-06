@@ -23,6 +23,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useFocusAfterRender } from '../../hooks/utils/useFocusAfterRender';
 import { Server, Plus, Trash2, CheckCircle, XCircle, FileCode, ChevronDown } from 'lucide-react';
 import type { Theme } from '../../types';
 import type { SshRemoteConfig, SshRemoteTestResult } from '../../../shared/types';
@@ -189,13 +190,14 @@ export function SshRemoteModal({
 		return () => document.removeEventListener('mousedown', handleClickOutside);
 	}, []);
 
-	// Reset filter and highlight when dropdown opens, focus filter input
+	// Focus filter input when dropdown opens
+	useFocusAfterRender(filterInputRef, showSshConfigDropdown, 0);
+
+	// Reset filter and highlight when dropdown opens
 	useEffect(() => {
 		if (showSshConfigDropdown) {
 			setSshConfigFilter('');
 			setSshConfigHighlightIndex(0);
-			// Focus filter input after dropdown renders
-			setTimeout(() => filterInputRef.current?.focus(), 0);
 		}
 	}, [showSshConfigDropdown]);
 

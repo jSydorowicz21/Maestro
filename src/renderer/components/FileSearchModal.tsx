@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { Search, File, FileImage, FileText } from 'lucide-react';
 import type { Theme, Shortcut } from '../types';
 import type { FileNode } from '../types/fileTree';
@@ -266,10 +267,7 @@ export function FileSearchModal({
 	}, [updateLayerHandler]);
 
 	// Focus input on mount
-	useEffect(() => {
-		const timer = setTimeout(() => inputRef.current?.focus(), 50);
-		return () => clearTimeout(timer);
-	}, []);
+	useFocusAfterRender(inputRef, true, 50);
 
 	// Flatten the file tree to only previewable files
 	const allFiles = useMemo(() => {

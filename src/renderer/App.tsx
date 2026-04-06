@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
+import { useFocusAfterRender } from './hooks/utils/useFocusAfterRender';
 // SettingsModal is lazy-loaded for performance (large component, only loaded when settings opened)
 const SettingsModal = lazy(() =>
 	import('./components/Settings/SettingsModal').then((m) => ({ default: m.SettingsModal }))
@@ -1071,12 +1072,11 @@ function MaestroConsoleInner() {
 
 	// Auto-focus the AI input box when switching from terminal to AI mode
 	const prevInputModeRef = useRef(activeSession?.inputMode);
+	const shouldFocusOnModeSwitch =
+		prevInputModeRef.current === 'terminal' && activeSession?.inputMode === 'ai';
+	useFocusAfterRender(inputRef, shouldFocusOnModeSwitch, 0);
 	useEffect(() => {
-		const currentMode = activeSession?.inputMode;
-		if (prevInputModeRef.current === 'terminal' && currentMode === 'ai') {
-			setTimeout(() => inputRef.current?.focus(), 0);
-		}
-		prevInputModeRef.current = currentMode;
+		prevInputModeRef.current = activeSession?.inputMode;
 	}, [activeSession?.inputMode]);
 
 	// PERF: Memoize sessions for NewInstanceModal validation (only recompute when modal is open)
@@ -3736,6 +3736,10 @@ function MaestroConsoleInner() {
 								savedSelectedLevels={logViewerSelectedLevels}
 								onSelectedLevelsChange={setLogViewerSelectedLevels}
 								onShortcutUsed={handleLogViewerShortcutUsed}
+								onSessionClick={(sessionId, tabId) => {
+									handleCloseLogViewer();
+									handleToastSessionClick(sessionId, tabId);
+								}}
 							/>
 						</Suspense>
 					</div>

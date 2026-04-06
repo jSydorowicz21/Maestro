@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { FALLBACK_CONTEXT_WINDOW } from '../../shared/agentConstants';
 import {
 	Search,
@@ -455,10 +456,7 @@ export function AgentSessionsBrowser({
 	}, [loading, sessions, activeAgentSessionId, viewingSession, handleViewSession]);
 
 	// Focus input on mount
-	useEffect(() => {
-		const timer = setTimeout(() => inputRef.current?.focus(), 50);
-		return () => clearTimeout(timer);
-	}, []);
+	useFocusAfterRender(inputRef, true, 50);
 
 	// Scroll selected item into view
 	useEffect(() => {

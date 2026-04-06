@@ -15,6 +15,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
+import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { Search, ChevronRight, ChevronDown, GitMerge, Clipboard, Check, X } from 'lucide-react';
 import type { Theme, Session, AITab } from '../types';
 import type { MergeResult } from '../types/contextMerge';
@@ -226,13 +227,8 @@ export function MergeSessionModal({
 		}
 	}, [updateLayerHandler]);
 
-	// Focus input on mount
-	useEffect(() => {
-		if (isOpen) {
-			const timer = setTimeout(() => inputRef.current?.focus(), 50);
-			return () => clearTimeout(timer);
-		}
-	}, [isOpen]);
+	// Focus input when modal opens
+	useFocusAfterRender(inputRef, isOpen, 50);
 
 	// Get source tab info
 	const sourceTab = useMemo(() => {

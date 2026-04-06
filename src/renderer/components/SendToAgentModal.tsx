@@ -14,6 +14,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { Search, ArrowRight, X, Circle } from 'lucide-react';
 import { EmptyState, Spinner } from './ui';
 import type { Theme, Session, AITab, ToolType } from '../types';
@@ -196,13 +197,8 @@ export function SendToAgentModal({
 		}
 	}, [updateLayerHandler]);
 
-	// Focus input on mount
-	useEffect(() => {
-		if (isOpen) {
-			const timer = setTimeout(() => inputRef.current?.focus(), 50);
-			return () => clearTimeout(timer);
-		}
-	}, [isOpen]);
+	// Focus input when modal opens
+	useFocusAfterRender(inputRef, isOpen, 50);
 
 	// Reset state when modal opens
 	useEffect(() => {

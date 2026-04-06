@@ -1,4 +1,5 @@
 import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
+import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { Search } from 'lucide-react';
 import type { Session, Group, Theme, Shortcut, RightPanelTab, SettingsTab } from '../types';
 import type { GroupChat } from '../../shared/group-chat-types';
@@ -284,12 +285,8 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		}
 	}, [updateLayerHandler]);
 
-	// Focus input on mount
-	useEffect(() => {
-		// Small delay to ensure DOM is ready and layer is registered
-		const timer = setTimeout(() => inputRef.current?.focus(), 50);
-		return () => clearTimeout(timer);
-	}, []);
+	// Focus input on mount (small delay to ensure DOM is ready and layer is registered)
+	useFocusAfterRender(inputRef, true, 50);
 
 	// Track scroll position to determine which items are visible
 	const handleScroll = () => {

@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -18,7 +19,6 @@ import {
 	RefreshCw,
 	X,
 	Search,
-	Loader2,
 	ArrowLeft,
 	ExternalLink,
 	GitBranch,
@@ -41,6 +41,7 @@ import {
 	Lock,
 	Star,
 } from 'lucide-react';
+import { Spinner } from './ui';
 import type { Theme, Session } from '../types';
 import type {
 	RegisteredRepository,
@@ -141,12 +142,12 @@ function getStatusInfo(status: ContributionStatus): {
 	icon: React.ReactNode;
 } {
 	const icons: Record<string, React.ReactNode> = {
-		cloning: <Loader2 className="w-3 h-3 animate-spin" />,
-		creating_pr: <Loader2 className="w-3 h-3 animate-spin" />,
+		cloning: <Spinner size="xs" />,
+		creating_pr: <Spinner size="xs" />,
 		running: <Play className="w-3 h-3" />,
 		paused: <Pause className="w-3 h-3" />,
 		completed: <CheckCircle className="w-3 h-3" />,
-		completing: <Loader2 className="w-3 h-3 animate-spin" />,
+		completing: <Spinner size="xs" />,
 		ready_for_review: <GitPullRequest className="w-3 h-3" />,
 		failed: <AlertCircle className="w-3 h-3" />,
 		cancelled: <X className="w-3 h-3" />,
@@ -707,12 +708,7 @@ function RepositoryDetailView({
 									style={{ color: theme.colors.textDim }}
 								>
 									<span>Available Issues ({availableIssues.length})</span>
-									{isLoadingIssues && (
-										<Loader2
-											className="w-3 h-3 animate-spin"
-											style={{ color: theme.colors.accent }}
-										/>
-									)}
+									{isLoadingIssues && <Spinner size="xs" style={{ color: theme.colors.accent }} />}
 								</h4>
 								{availableIssues.length === 0 && blockedIssues.length === 0 ? (
 									<p className="text-sm text-center py-4" style={{ color: theme.colors.textDim }}>
@@ -858,10 +854,7 @@ function RepositoryDetailView({
 								<style>{proseStyles}</style>
 								{isLoadingDocument ? (
 									<div className="flex items-center justify-center h-32">
-										<Loader2
-											className="w-6 h-6 animate-spin"
-											style={{ color: theme.colors.accent }}
-										/>
+										<Spinner size="lg" style={{ color: theme.colors.accent }} />
 									</div>
 								) : documentPreview ? (
 									<div
@@ -946,7 +939,7 @@ function RepositoryDetailView({
 					>
 						{isStarting ? (
 							<>
-								<Loader2 className="w-4 h-4 animate-spin" />
+								<Spinner size="sm" />
 								Starting...
 							</>
 						) : (
@@ -1426,12 +1419,7 @@ export function SymphonyModal({
 	}, [isOpen, registerLayer, unregisterLayer]);
 
 	// Focus tile grid for keyboard navigation (keyboard-first design)
-	useEffect(() => {
-		if (isOpen && activeTab === 'projects' && !showDetailView) {
-			const timer = setTimeout(() => tileGridRef.current?.focus(), 50);
-			return () => clearTimeout(timer);
-		}
-	}, [isOpen, activeTab, showDetailView]);
+	useFocusAfterRender(tileGridRef, isOpen && activeTab === 'projects' && !showDetailView, 50);
 
 	// Select repo
 	const handleSelectRepo = useCallback(
@@ -2050,7 +2038,7 @@ export function SymphonyModal({
 									>
 										<span className="flex items-center gap-1">
 											{filteredRepositories.length} repositories • Contribute to open source with AI
-											{isLoadingIssueCounts && <Loader2 className="w-3 h-3 animate-spin ml-1" />}
+											{isLoadingIssueCounts && <Spinner size="xs" className="ml-1" />}
 										</span>
 										<span>{`↑↓←→ navigate • Enter select • / search • ${formatShortcutKeys(['Meta', 'Shift'])}[] tabs`}</span>
 									</div>
@@ -2376,10 +2364,7 @@ export function SymphonyModal({
 						>
 							{isCheckingGh ? (
 								<div className="flex items-center gap-3 py-4">
-									<Loader2
-										className="w-5 h-5 animate-spin"
-										style={{ color: theme.colors.textDim }}
-									/>
+									<Spinner size="md" style={{ color: theme.colors.textDim }} />
 									<span className="text-sm" style={{ color: theme.colors.textDim }}>
 										Checking prerequisites…
 									</span>

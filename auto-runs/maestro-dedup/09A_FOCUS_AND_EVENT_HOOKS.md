@@ -48,19 +48,36 @@ Create two shared hooks to replace repetitive patterns:
 
 ### 3. Write tests for useFocusAfterRender
 
-- [ ] Create test file for the hook
-- [ ] Test focuses element after render
-- [ ] Test respects delay parameter
-- [ ] Test cleans up timeout on unmount
-- [ ] Test does nothing when `shouldFocus` is false
-- [ ] Run tests: `CI=1 rtk vitest run <hook-test-path>`
+- [x] Create test file for the hook
+- [x] Test focuses element after render
+- [x] Test respects delay parameter
+- [x] Test cleans up timeout on unmount
+- [x] Test does nothing when `shouldFocus` is false
+- [x] Run tests: `CI=1 rtk vitest run <hook-test-path>`
+
+**Test Results (2026-04-06):**
+- Test file: `src/__tests__/renderer/hooks/utils/useFocusAfterRender.test.ts`
+- 10 tests across 4 describe blocks: basic focus, delay parameter, cleanup on unmount, shouldFocus parameter
+- Also tests: null ref safety, shouldFocus toggling from false->true, cancellation when shouldFocus changes mid-delay
+- All 10 tests pass (16ms)
 
 ### 4. Migrate setTimeout focus patterns (45 instances across 28 files)
 
-- [ ] For each file: identify whether the `setTimeout(() => ref.current?.focus(), N)` is inside a `useEffect` or an event handler
-- [ ] If inside `useEffect`: replace entirely with `useFocusAfterRender(ref, condition, delay)`
-- [ ] If inside an event handler: keep inline (the hook is for render-time focus only)
-- [ ] Run targeted tests after each batch of files
+- [x] For each file: identify whether the `setTimeout(() => ref.current?.focus(), N)` is inside a `useEffect` or an event handler
+- [x] If inside `useEffect`: replace entirely with `useFocusAfterRender(ref, condition, delay)`
+- [x] If inside an event handler: keep inline (the hook is for render-time focus only)
+- [x] Run targeted tests after each batch of files
+
+**Migration Results (2026-04-06):**
+- **15 useEffect-based patterns migrated** across 15 files to use `useFocusAfterRender`
+- **30 event-handler-based patterns kept inline** (inside useCallback/onClick handlers)
+- Migrated files:
+  - Group 1 (mount-only useEffect, entire useEffect replaced): AgentSessionsBrowser, FileSearchModal, QuickActionsModal, TabSwitcherModal, ShortcutsTab, ThemeTab, BatchRunnerModal
+  - Group 2 (conditional useEffect, entire useEffect replaced): MarketplaceModal, MergeSessionModal, SendToAgentModal, SymphonyModal, AgentDrawer
+  - Group 3 (mixed useEffect, setTimeout removed + hook added): CreateWorktreeModal, SshRemoteModal
+  - Group 4 (complex useEffect, refactored): App.tsx (mode-switch transition)
+- Unused `useEffect` imports cleaned from: ThemeTab, AgentDrawer
+- All 10 useFocusAfterRender tests pass, lint clean, 23,426 tests pass (55 pre-existing failures unchanged)
 
 ### Part 2: useEventListener
 

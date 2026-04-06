@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { X, GitBranch, AlertTriangle } from 'lucide-react';
 import type { Theme, Session, GhCliStatus } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
@@ -57,14 +58,15 @@ export function CreateWorktreeModal({
 		}
 	}, [isOpen, registerLayer, unregisterLayer]);
 
+	// Auto-focus the input when modal opens
+	useFocusAfterRender(inputRef, isOpen, 50);
+
 	// Check gh CLI status and reset state on open
 	useEffect(() => {
 		if (isOpen) {
 			checkGhCli();
 			setBranchName('');
 			setError(null);
-			// Auto-focus the input
-			setTimeout(() => inputRef.current?.focus(), 50);
 		}
 	}, [isOpen]);
 

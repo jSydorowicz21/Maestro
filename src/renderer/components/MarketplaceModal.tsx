@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -844,12 +845,7 @@ export function MarketplaceModal({
 	}, [isOpen, registerLayer, unregisterLayer]);
 
 	// Focus search input when modal opens
-	useEffect(() => {
-		if (isOpen) {
-			const timer = setTimeout(() => searchInputRef.current?.focus(), 50);
-			return () => clearTimeout(timer);
-		}
-	}, [isOpen]);
+	useFocusAfterRender(searchInputRef, isOpen, 50);
 
 	// Handle selecting a playbook (opens detail view)
 	const handleSelectPlaybook = useCallback(

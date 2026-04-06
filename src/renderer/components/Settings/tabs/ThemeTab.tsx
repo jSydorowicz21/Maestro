@@ -5,7 +5,8 @@
  * plus the custom theme builder. Self-sources theme settings from useSettings().
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
+import { useFocusAfterRender } from '../../../hooks/utils/useFocusAfterRender';
 import { Moon, Sun, Sparkles, Check } from 'lucide-react';
 import { useSettings } from '../../../hooks';
 import { CustomThemeBuilder } from '../../CustomThemeBuilder';
@@ -36,10 +37,7 @@ export function ThemeTab({
 	const themePickerRef = useRef<HTMLDivElement>(null);
 
 	// Auto-focus theme picker on mount
-	useEffect(() => {
-		const timer = setTimeout(() => themePickerRef.current?.focus(), 50);
-		return () => clearTimeout(timer);
-	}, []);
+	useFocusAfterRender(themePickerRef, true, 50);
 
 	// Group themes by mode (exclude 'custom' theme - it's handled separately)
 	const groupedThemes = Object.values(themes).reduce(
