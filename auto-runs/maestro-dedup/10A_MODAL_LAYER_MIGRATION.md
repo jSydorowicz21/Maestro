@@ -12,9 +12,9 @@ Migrate 50+ files from manual `registerLayer`/`unregisterLayer` boilerplate to t
 
 ## Pre-flight Checks
 
-- [ ] Phase 09 (shared hooks) is complete
-- [ ] `rtk npm run lint` passes
-- [ ] `rtk vitest run` passes
+- [x] Phase 09 (shared hooks) is complete
+- [x] `rtk npm run lint` passes (fixed stale `setSessions` prop in useInputHandlers.ts)
+- [x] `CI=1 rtk vitest run` passes (pre-existing cue test failures only)
 
 ---
 
@@ -22,28 +22,45 @@ Migrate 50+ files from manual `registerLayer`/`unregisterLayer` boilerplate to t
 
 ### 1. Read the existing useModalLayer hook
 
-- [ ] Read `src/renderer/hooks/ui/useModalLayer.ts`
-- [ ] Document what parameters it accepts
-- [ ] Confirm it handles the `isOpen` conditional logic
-- [ ] Confirm it accepts priority from `modalPriorities.ts`
-- [ ] Confirm it handles the `onCloseRef` pattern internally
+- [x] Read `src/renderer/hooks/ui/useModalLayer.ts`
+- [x] Document what parameters it accepts: `priority: number`, `ariaLabel: string`, `onEscape: () => void`, `options: { isDirty?, onBeforeClose?, focusTrap?, blocksLowerLayers?, capturesFocus? }`
+- [x] Confirm it handles the `isOpen` conditional logic - it does NOT have internal isOpen gating; components must be conditionally rendered (standard React pattern)
+- [x] Confirm it accepts priority from `modalPriorities.ts` - yes, takes numeric priority as first arg
+- [x] Confirm it handles the `onCloseRef` pattern internally - yes, uses `updateLayerHandler` to update onEscape without re-registering
 
 ### 2. Verify useModalLayer covers all manual patterns
 
-- [ ] Compare the manual boilerplate pattern (`useLayerStack` + `useRef` + `useEffect` with `registerLayer`/`unregisterLayer`) against what `useModalLayer` provides
-- [ ] If the hook is missing any capability (e.g., custom layer type, conditional priority), extend it before migration
-- [ ] Run hook tests after any extension: `rtk vitest run <hook-test-path>`
+- [x] Compare the manual boilerplate pattern (`useLayerStack` + `useRef` + `useEffect` with `registerLayer`/`unregisterLayer`) against what `useModalLayer` provides
+  - Hook already covered: modal type, priority, ariaLabel, onEscape, isDirty, onBeforeClose, focusTrap, blocksLowerLayers, capturesFocus, updateLayerHandler
+  - Gap found: no support for `type: 'overlay'` + `allowClickOutside` (~10 overlay registrations across 6 files)
+  - `parentModalId` defined in types but unused by any component - no gap
+  - `isOpen` gating is component-level, not hook-level (by design) - no gap
+- [x] If the hook is missing any capability (e.g., custom layer type, conditional priority), extend it before migration
+  - Extended `UseModalLayerOptions` with `type?: LayerType` (defaults to 'modal') and `allowClickOutside?: boolean` (overlay-only, defaults to true)
+  - Overlay defaults differ from modal: `focusTrap: 'none'`, `blocksLowerLayers: false`, `capturesFocus: false`
+  - All defaults can be overridden per-component
+- [x] Run hook tests after any extension: `CI=1 rtk vitest run <hook-test-path>`
+  - 17/17 tests pass (12 existing + 5 new overlay tests). Lint passes.
 
 ### 3. Find all files with manual boilerplate
 
-- [ ] Run: `rtk grep "registerLayer|unregisterLayer" src/renderer/ --glob "*.{ts,tsx}"` (exclude `__tests__`, `useModalLayer`, `LayerStackContext`)
-- [ ] List all files and count total instances
+- [x] Run: `rtk grep "registerLayer|unregisterLayer" src/renderer/ --glob "*.{ts,tsx}"` (exclude `__tests__`, `useModalLayer`, `LayerStackContext`)
+- [x] List all files and count total instances
+  - **49 component files** with manual `registerLayer`/`unregisterLayer` boilerplate (226 total instances across 53 files, minus 4 infrastructure: `useModalLayer.ts`, `useLayerStack.ts`, `LayerStackContext.tsx`, `layer.ts`)
+  - **DocumentGraphView.tsx** is the most complex with 17 instances (multiple nested layers)
+  - All other component files have 4-5 instances each (typical pattern: destructure, registerLayer call, unregisterLayer cleanup, dependency array refs)
+  - Files by category:
+    - **Simple modals** (~12): `AgentCreationDialog`, `CreateWorktreeModal`, `CreatePRModal`, `ExecutionQueueBrowser`, `MarketplaceModal`, `TerminalSearchBar`, `WorktreeConfigModal`, `UsageDashboardModal`, `SymphonyModal`, `TourOverlay`, `MaestroWizard`, `LeaderboardRegistrationModal`
+    - **Modals with updateLayerHandler** (~26): `FirstRunCelebration`, `BatchRunnerModal`, `FileSearchModal`, `FilePreview`, `DirectorNotesModal`, `GitLogViewer`, `GitDiffViewer`, `HistoryDetailModal`, `KeyboardMasteryCelebration`, `LogViewer`, `AutoRunExpandedModal`, `LightboxModal`, `MergeSessionModal`, `PlaygroundPanel`, `ProcessMonitor`, `QuickActionsModal`, `QuitConfirmModal`, `AgentSessionsBrowser`, `SendToAgentModal`, `TabSwitcherModal`, `TransferProgressModal`, `StandingOvationOverlay`, `ExistingDocsModal`, `WizardResumeModal`, `WizardExitConfirmModal`, `WizardExitConfirmDialog`, `ExistingAutoRunDocsModal`, `TerminalOutput`
+    - **Special behavior** (~4): `AgentPromptComposerModal` (autocomplete interaction), `PromptComposerModal`, `CueModal`, `SettingsModal`
+    - **Panels/overlays** (~5): `DocumentsPanel`, `FileExplorerPanel`, `AutoRunSearchBar`, `AutoRunLightbox`
+    - **Complex** (1): `DocumentGraphView` (17 registerLayer calls, 5 distinct layers)
 
 ### 4. Migrate simple modals (~30 files)
 
 - [ ] For each file with direct `isOpen` + `onClose` props: replace the manual `useLayerStack` + `useRef` + `useEffect` block with `useModalLayer({ isOpen, priority, onEscape: onClose })`
 - [ ] Remove now-unused imports of `useLayerStack`, `useRef` (if no longer needed), and `useEffect` (if no longer needed)
-- [ ] Run targeted tests after each batch: `rtk vitest run <relevant-test>`
+- [ ] Run targeted tests after each batch: `CI=1 rtk vitest run <relevant-test>`
 
 ### 5. Migrate complex modals (~15 files)
 
@@ -61,7 +78,7 @@ Migrate 50+ files from manual `registerLayer`/`unregisterLayer` boilerplate to t
 - [ ] Read the file to understand its multiple nested modal layers
 - [ ] Migrate each layer to its own `useModalLayer` call with the correct priority
 - [ ] Verify stacked modal Escape behavior works correctly
-- [ ] Run tests: `rtk vitest run` (filter for DocumentGraphView tests)
+- [ ] Run tests: `CI=1 rtk vitest run` (filter for DocumentGraphView tests)
 
 ### 8. Verify Escape key behavior across migrated modals
 
@@ -72,7 +89,7 @@ Migrate 50+ files from manual `registerLayer`/`unregisterLayer` boilerplate to t
 ### 9. Verify full build
 
 - [ ] Run lint: `rtk npm run lint`
-- [ ] Run tests: `rtk vitest run`
+- [ ] Run tests: `CI=1 rtk vitest run`
 - [ ] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
 
 ### 10. Count remaining manual registrations
@@ -87,7 +104,7 @@ Migrate 50+ files from manual `registerLayer`/`unregisterLayer` boilerplate to t
 After completing changes, run targeted tests for the files you modified:
 
 ```bash
-rtk vitest run <path-to-relevant-test-files>
+CI=1 rtk vitest run <path-to-relevant-test-files>
 ```
 
 **Rule: Zero new test failures from your changes.** Pre-existing failures on the baseline are acceptable.
