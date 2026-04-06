@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import type { Theme } from '../types';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
-import { useLayerStack } from '../contexts/LayerStackContext';
+import { useModalLayer } from '../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { safeClipboardWrite } from '../utils/clipboard';
 import { ConfirmModal } from './ConfirmModal';
@@ -130,13 +130,9 @@ export function LogViewer({
 	const [showClearConfirm, setShowClearConfirm] = useState(false);
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
-	const layerIdRef = useRef<string>();
-
 	// Store onClose in ref to avoid re-registering layer when callback identity changes
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
-
-	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
 
 	const toggleDataExpanded = (index: number) => {
 		setExpandedData((prev) => {
@@ -231,48 +227,20 @@ export function LogViewer({
 		setFilteredLogs(filtered);
 	}, [logs, searchQuery, selectedLevels]);
 
-	// Register layer on mount
-	// Note: Using 'modal' type because LogViewer blocks all shortcuts (like the original modalOpen check)
-	useEffect(() => {
-		layerIdRef.current = registerLayer({
-			type: 'modal',
-			priority: MODAL_PRIORITIES.LOG_VIEWER,
-			blocksLowerLayers: true,
-			capturesFocus: true,
-			focusTrap: 'lenient',
-			ariaLabel: 'System Log Viewer',
-			onEscape: () => {
-				if (searchOpen) {
-					setSearchOpen(false);
-					setSearchQuery('');
-					containerRef.current?.focus();
-				} else {
-					onCloseRef.current();
-				}
-			},
-		});
-
-		return () => {
-			if (layerIdRef.current) {
-				unregisterLayer(layerIdRef.current);
-			}
-		};
-	}, [registerLayer, unregisterLayer]); // Note: onClose NOT in deps (using ref)
-
-	// Update layer handler when dependencies change
-	useEffect(() => {
-		if (layerIdRef.current) {
-			updateLayerHandler(layerIdRef.current, () => {
-				if (searchOpen) {
-					setSearchOpen(false);
-					setSearchQuery('');
-					containerRef.current?.focus();
-				} else {
-					onCloseRef.current();
-				}
-			});
+	// Escape handler for layer stack
+	const handleEscape = useCallback(() => {
+		if (searchOpen) {
+			setSearchOpen(false);
+			setSearchQuery('');
+			containerRef.current?.focus();
+		} else {
+			onCloseRef.current();
 		}
-	}, [searchOpen, updateLayerHandler]); // Note: onClose NOT in deps (using ref)
+	}, [searchOpen]);
+
+	useModalLayer(MODAL_PRIORITIES.LOG_VIEWER, 'System Log Viewer', handleEscape, {
+		focusTrap: 'lenient',
+	});
 
 	// Auto-focus container on mount for keyboard navigation
 	useEffect(() => {

@@ -53,7 +53,7 @@ import type {
 } from '../../shared/symphony-types';
 import { SYMPHONY_CATEGORIES, SYMPHONY_BLOCKING_LABEL } from '../../shared/symphony-constants';
 import { COLORBLIND_AGENT_PALETTE } from '../constants/colorblindPalettes';
-import { useLayerStack } from '../contexts/LayerStackContext';
+import { useModalLayer } from '../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { useSymphony } from '../hooks/symphony';
 import { useContributorStats, type Achievement } from '../hooks/symphony/useContributorStats';
@@ -1295,7 +1295,6 @@ export function SymphonyModal({
 	sessions,
 	onSelectSession,
 }: SymphonyModalProps) {
-	const { registerLayer, unregisterLayer } = useLayerStack();
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
 
@@ -1390,29 +1389,20 @@ export function SymphonyModal({
 	const handleBackRef = useRef(handleBack);
 	handleBackRef.current = handleBack;
 
-	// Layer stack
-	useEffect(() => {
-		if (isOpen) {
-			const id = registerLayer({
-				type: 'modal',
-				priority: MODAL_PRIORITIES.SYMPHONY ?? 710,
-				blocksLowerLayers: true,
-				capturesFocus: true,
-				focusTrap: 'strict',
-				ariaLabel: 'Maestro Symphony',
-				onEscape: () => {
-					if (showHelpRef.current) {
-						setShowHelp(false);
-					} else if (showDetailViewRef.current) {
-						handleBackRef.current();
-					} else {
-						onCloseRef.current();
-					}
-				},
-			});
-			return () => unregisterLayer(id);
+	const handleEscape = useCallback(() => {
+		if (showHelpRef.current) {
+			setShowHelp(false);
+		} else if (showDetailViewRef.current) {
+			handleBackRef.current();
+		} else {
+			onCloseRef.current();
 		}
-	}, [isOpen, registerLayer, unregisterLayer]);
+	}, []);
+
+	useModalLayer(MODAL_PRIORITIES.SYMPHONY ?? 710, 'Maestro Symphony', handleEscape, {
+		isOpen,
+		focusTrap: 'strict',
+	});
 
 	// Focus tile grid for keyboard navigation (keyboard-first design)
 	useFocusAfterRender(tileGridRef, isOpen && activeTab === 'projects' && !showDetailView, 50);

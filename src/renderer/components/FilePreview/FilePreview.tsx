@@ -15,7 +15,7 @@ import { getSyntaxStyle } from '../../utils/syntaxTheme';
 import { FileCode, ChevronUp, ChevronDown, AlertTriangle, RefreshCw, X } from 'lucide-react';
 import { captureException } from '../../utils/sentry';
 import { safeClipboardWrite, safeClipboardWriteBlob } from '../../utils/clipboard';
-import { useLayerStack } from '../../contexts/LayerStackContext';
+import { useModalLayer } from '../../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
 import { useClickOutside } from '../../hooks/ui/useClickOutside';
 import { Modal, ModalFooter } from '../ui/Modal';
@@ -43,6 +43,7 @@ import {
 import { MarkdownImage } from './MarkdownImage';
 import { remarkHighlight } from './remarkHighlight';
 import { useFilePreviewSearch } from '../../hooks/file';
+import { useDebouncedCallback } from '../../hooks/utils';
 import { FilePreviewHeader } from './FilePreviewHeader';
 import { ImageViewer } from './ImageViewer';
 import { FilePreviewToc } from './FilePreviewToc';
@@ -109,30 +110,25 @@ export const FilePreview = React.memo(
 		const [isSaving, setIsSaving] = useState(false);
 		const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
 		const [copyNotificationMessage, setCopyNotificationMessage] = useState('');
-		const notificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+		const { debouncedCallback: dismissNotification } = useDebouncedCallback(() => {
+			setShowCopyNotification(false);
+		}, 2000);
 
-		// Clear notification timeout on unmount
-		useEffect(() => {
-			return () => {
-				if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
-			};
-		}, []);
-
-		const showNotification = useCallback((message: string) => {
-			setCopyNotificationMessage(message);
-			setShowCopyNotification(true);
-			if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
-			notificationTimeoutRef.current = setTimeout(() => setShowCopyNotification(false), 2000);
-		}, []);
+		const showNotification = useCallback(
+			(message: string) => {
+				setCopyNotificationMessage(message);
+				setShowCopyNotification(true);
+				dismissNotification();
+			},
+			[dismissNotification]
+		);
 
 		const codeContainerRef = useRef<HTMLDivElement>(null);
 		const contentRef = useRef<HTMLDivElement>(null);
 		const containerRef = useRef<HTMLDivElement>(null);
 		const textareaRef = useRef<HTMLTextAreaElement>(null);
 		const markdownContainerRef = useRef<HTMLDivElement>(null);
-		const layerIdRef = useRef<string>();
 		const cancelButtonRef = useRef<HTMLButtonElement>(null);
-		const scrollSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 		const tocButtonRef = useRef<HTMLButtonElement>(null);
 		const tocOverlayRef = useRef<HTMLDivElement>(null);
 
@@ -190,8 +186,6 @@ export const FilePreview = React.memo(
 
 		// Track if content has been modified
 		const hasChanges = markdownEditMode && editContent !== file?.content;
-
-		const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
 
 		// Compute derived values - must be before any early returns but after hooks
 		const language = file ? getLanguageFromFilename(file.name) : '';
@@ -528,6 +522,15 @@ export const FilePreview = React.memo(
 			}
 		}, [file, onSave, hasChanges, isSaving, editContent, sshRemoteId, showNotification]);
 
+		// Debounced scroll position save (200ms) - same timing as TerminalOutput
+		const { debouncedCallback: debouncedScrollSave, cancel: cancelScrollSave } =
+			useDebouncedCallback(() => {
+				const contentEl = contentRef.current;
+				if (contentEl && onScrollPositionChange) {
+					onScrollPositionChange(contentEl.scrollTop);
+				}
+			}, 200);
+
 		// Track scroll position to show/hide stats bar and report changes
 		useEffect(() => {
 			const contentEl = contentRef.current;
@@ -537,28 +540,17 @@ export const FilePreview = React.memo(
 				// Show stats bar when scrolled to top (within 10px), hide otherwise
 				setShowStatsBar(contentEl.scrollTop <= 10);
 
-				// Throttled scroll position save (200ms) - same timing as TerminalOutput
 				if (onScrollPositionChange) {
-					if (scrollSaveTimerRef.current) {
-						clearTimeout(scrollSaveTimerRef.current);
-					}
-					scrollSaveTimerRef.current = setTimeout(() => {
-						onScrollPositionChange(contentEl.scrollTop);
-						scrollSaveTimerRef.current = null;
-					}, 200);
+					debouncedScrollSave();
 				}
 			};
 
 			contentEl.addEventListener('scroll', handleScroll, { passive: true });
 			return () => {
 				contentEl.removeEventListener('scroll', handleScroll);
-				// Clear any pending scroll save timer
-				if (scrollSaveTimerRef.current) {
-					clearTimeout(scrollSaveTimerRef.current);
-					scrollSaveTimerRef.current = null;
-				}
+				cancelScrollSave();
 			};
-		}, [onScrollPositionChange]);
+		}, [onScrollPositionChange, debouncedScrollSave, cancelScrollSave]);
 
 		// Restore scroll position when initialScrollTop is provided (file tab switching)
 		// Use a ref to track if we've already restored for this file to avoid re-scrolling on re-renders
@@ -616,42 +608,14 @@ export const FilePreview = React.memo(
 			// In tab mode with no internal UI open, Escape does nothing
 		}, [showTocOverlay, searchOpen, hasChanges, onClose, isTabMode]);
 
-		// Register layer on mount - only for overlay mode (not tab mode)
-		// Tab mode: File preview is part of the main panel content, not an overlay
-		// It doesn't need layer registration since it doesn't block keyboard shortcuts or need focus trapping
-		// Note: handleEscapeRequest is intentionally NOT in the dependency array to prevent
-		// infinite re-registration loops when its dependencies (hasChanges, searchOpen) change.
-		// The subsequent useEffect with updateLayerHandler handles keeping the handler current.
-		useEffect(() => {
-			// Skip layer registration entirely in tab mode - tabs are main content, not overlays
-			if (isTabMode) {
-				return;
-			}
-
-			layerIdRef.current = registerLayer({
-				type: 'overlay',
-				priority: MODAL_PRIORITIES.FILE_PREVIEW,
-				blocksLowerLayers: true,
-				capturesFocus: true,
-				focusTrap: 'lenient',
-				ariaLabel: 'File Preview',
-				onEscape: handleEscapeRequest,
-				allowClickOutside: false,
-			});
-
-			return () => {
-				if (layerIdRef.current) {
-					unregisterLayer(layerIdRef.current);
-				}
-			};
-		}, [registerLayer, unregisterLayer, isTabMode]);
-
-		// Update handler when dependencies change (only for overlay mode)
-		useEffect(() => {
-			if (layerIdRef.current && !isTabMode) {
-				updateLayerHandler(layerIdRef.current, handleEscapeRequest);
-			}
-		}, [handleEscapeRequest, updateLayerHandler, isTabMode]);
+		useModalLayer(MODAL_PRIORITIES.FILE_PREVIEW, 'File Preview', handleEscapeRequest, {
+			isOpen: !isTabMode,
+			type: 'overlay',
+			allowClickOutside: false,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'lenient',
+		});
 
 		// Click outside to dismiss (same behavior as Escape)
 		// Use delay to prevent the click that opened the preview from immediately closing it

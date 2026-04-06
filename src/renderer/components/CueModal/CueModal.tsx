@@ -17,7 +17,7 @@ import {
 	AlertTriangle,
 } from 'lucide-react';
 import type { Theme } from '../../types';
-import { useLayerStack } from '../../contexts/LayerStackContext';
+import { useModalLayer } from '../../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
 import { useCue } from '../../hooks/useCue';
 import type { CueSessionStatus } from '../../hooks/useCue';
@@ -43,8 +43,6 @@ export interface CueModalProps {
 }
 
 export function CueModal({ theme, onClose, cueShortcutKeys }: CueModalProps) {
-	const { registerLayer, unregisterLayer } = useLayerStack();
-	const layerIdRef = useRef<string>();
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
 
@@ -117,37 +115,25 @@ export function CueModal({ theme, onClose, cueShortcutKeys }: CueModalProps) {
 		}
 	}, [isEnabled, enable, disable, toggling]);
 
-	// Register layer on mount
-	useEffect(() => {
-		const id = registerLayer({
-			type: 'modal',
-			priority: MODAL_PRIORITIES.CUE_MODAL,
-			blocksLowerLayers: true,
-			capturesFocus: true,
-			focusTrap: 'strict',
-			onEscape: () => {
-				if (showHelpRef.current) {
-					setShowHelp(false);
-					return;
-				}
-				if (pipelineDirtyRef.current) {
-					getModalActions().showConfirmation(
-						'You have unsaved changes in the pipeline editor. Discard and close?',
-						() => onCloseRef.current()
-					);
-					return;
-				}
-				onCloseRef.current();
-			},
-		});
-		layerIdRef.current = id;
+	// Layer registration via useModalLayer
+	const handleEscape = useCallback(() => {
+		if (showHelpRef.current) {
+			setShowHelp(false);
+			return;
+		}
+		if (pipelineDirtyRef.current) {
+			getModalActions().showConfirmation(
+				'You have unsaved changes in the pipeline editor. Discard and close?',
+				() => onCloseRef.current()
+			);
+			return;
+		}
+		onCloseRef.current();
+	}, []);
 
-		return () => {
-			if (layerIdRef.current) {
-				unregisterLayer(layerIdRef.current);
-			}
-		};
-	}, [registerLayer, unregisterLayer]);
+	useModalLayer(MODAL_PRIORITIES.CUE_MODAL, 'Cue Dashboard', handleEscape, {
+		focusTrap: 'strict',
+	});
 
 	// Tab state
 	const [activeTab, setActiveTab] = useState<CueModalTab>('pipeline');

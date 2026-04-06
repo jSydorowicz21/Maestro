@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useEventListener } from '../../hooks/utils/useEventListener';
 import {
 	X,
@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useSettings } from '../../hooks';
 import type { Theme, LLMProvider } from '../../types';
-import { useLayerStack } from '../../contexts/LayerStackContext';
+import { useModalLayer } from '../../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
 import { AICommandsPanel } from '../AICommandsPanel';
 import { SpecKitCommandsPanel } from '../SpecKitCommandsPanel';
@@ -112,9 +112,6 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 		status: 'success' | 'error' | null;
 		message: string;
 	}>({ status: null, message: '' });
-	// Layer stack integration
-	const { registerLayer, unregisterLayer } = useLayerStack();
-	const layerIdRef = useRef<string>();
 	const isRecordingShortcutRef = useRef(false);
 
 	useEffect(() => {
@@ -128,32 +125,17 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
 
-	// Register layer when modal opens
-	useEffect(() => {
-		if (!isOpen) return;
+	// Layer registration via useModalLayer
+	const handleEscape = useCallback(() => {
+		// If recording a shortcut, ShortcutsTab handles its own escape via onKeyDownCapture
+		if (isRecordingShortcutRef.current) return;
+		onCloseRef.current();
+	}, []);
 
-		const id = registerLayer({
-			type: 'modal',
-			priority: MODAL_PRIORITIES.SETTINGS,
-			blocksLowerLayers: true,
-			capturesFocus: true,
-			focusTrap: 'strict',
-			ariaLabel: 'Settings',
-			onEscape: () => {
-				// If recording a shortcut, ShortcutsTab handles its own escape via onKeyDownCapture
-				if (isRecordingShortcutRef.current) return;
-				onCloseRef.current();
-			},
-		});
-
-		layerIdRef.current = id;
-
-		return () => {
-			if (layerIdRef.current) {
-				unregisterLayer(layerIdRef.current);
-			}
-		};
-	}, [isOpen, registerLayer, unregisterLayer]); // Removed onClose from deps
+	useModalLayer(MODAL_PRIORITIES.SETTINGS, 'Settings', handleEscape, {
+		isOpen,
+		focusTrap: 'strict',
+	});
 
 	// Tab navigation with Cmd+Shift+[ and ]
 	useEventListener(

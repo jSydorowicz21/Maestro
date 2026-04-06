@@ -37,7 +37,7 @@ import {
 	countNodesInTree,
 } from '../utils/fileExplorer';
 import { getExplorerFileIcon, getExplorerFolderIcon } from '../utils/theme';
-import { useLayerStack } from '../contexts/LayerStackContext';
+import { useModalLayer } from '../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { useClickOutside } from '../hooks/ui/useClickOutside';
 import { useContextMenuPosition } from '../hooks/ui/useContextMenuPosition';
@@ -387,8 +387,20 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 		onOpenLastDocumentGraph,
 	} = props;
 
-	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
-	const layerIdRef = useRef<string>();
+	const handleFilterEscape = useCallback(() => {
+		setFileTreeFilterOpen(false);
+		setFileTreeFilter('');
+	}, [setFileTreeFilterOpen, setFileTreeFilter]);
+
+	useModalLayer(MODAL_PRIORITIES.FILE_TREE_FILTER, 'File Tree Filter', handleFilterEscape, {
+		isOpen: fileTreeFilterOpen,
+		type: 'overlay',
+		allowClickOutside: true,
+		blocksLowerLayers: false,
+		capturesFocus: true,
+		focusTrap: 'none',
+	});
+
 	const [isRefreshing, setIsRefreshing] = useState(false);
 
 	// Refresh overlay state
@@ -787,37 +799,6 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 		},
 		contextMenu ? window : null
 	);
-
-	// Register layer when filter is open
-	useEffect(() => {
-		if (fileTreeFilterOpen) {
-			const id = registerLayer({
-				type: 'overlay',
-				priority: MODAL_PRIORITIES.FILE_TREE_FILTER,
-				blocksLowerLayers: false,
-				capturesFocus: true,
-				focusTrap: 'none',
-				onEscape: () => {
-					setFileTreeFilterOpen(false);
-					setFileTreeFilter('');
-				},
-				allowClickOutside: true,
-				ariaLabel: 'File Tree Filter',
-			});
-			layerIdRef.current = id;
-			return () => unregisterLayer(id);
-		}
-	}, [fileTreeFilterOpen, registerLayer, unregisterLayer]);
-
-	// Update handler when dependencies change
-	useEffect(() => {
-		if (fileTreeFilterOpen && layerIdRef.current) {
-			updateLayerHandler(layerIdRef.current, () => {
-				setFileTreeFilterOpen(false);
-				setFileTreeFilter('');
-			});
-		}
-	}, [fileTreeFilterOpen, setFileTreeFilterOpen, setFileTreeFilter, updateLayerHandler]);
 
 	// Filter hidden files from the tree based on showHiddenFiles setting
 	const filterHiddenFiles = useCallback(

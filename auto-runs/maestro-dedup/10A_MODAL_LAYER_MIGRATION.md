@@ -77,14 +77,30 @@ Migrate 50+ files from manual `registerLayer`/`unregisterLayer` boilerplate to t
 
 ### 5. Migrate complex modals (~15 files)
 
-- [ ] For modals with conditional open states or multiple close paths: adapt the `useModalLayer` call to match the existing behavior
-- [ ] Verify each modal's Escape key behavior works correctly after migration
-- [ ] Run targeted tests after each file
+- [x] For modals with conditional open states or multiple close paths: adapt the `useModalLayer` call to match the existing behavior
+  - Migrated 12 component files across 4 parallel agent batches:
+    - Batch A (3 files): CueModal, DirectorNotesModal, SettingsModal (ref-based stable escape handlers)
+    - Batch B (3 files): SymphonyModal, MarketplaceModal, PromptComposerModal (isOpen-gated with ref-based handlers)
+    - Batch C (3 files): AgentPromptComposerModal, LogViewer, AgentSessionsBrowser (dynamic escape handlers with state deps)
+    - Batch D (3 files): BatchRunnerModal, FilePreview (overlay), FileExplorerPanel (overlay)
+  - Also migrated AgentSessionsModal (discovered during verification, 13th file)
+  - Each file uses `useCallback` for the escape handler to work with `useModalLayer`'s internal `updateLayerHandler`
+  - Complex modals with multiple close paths (BatchRunnerModal: 3 paths, LogViewer: search close, CueModal: help/dirty check)
+  - isOpen-gated modals: SettingsModal, SymphonyModal, MarketplaceModal, PromptComposerModal, AgentPromptComposerModal
+- [x] Verify each modal's Escape key behavior works correctly after migration
+  - All escape paths preserved: conditional close (search, help, detail view), dirty checks, ref-based handlers
+- [x] Run targeted tests after each file
+  - Fixed test mocks: CueModal (missing updateLayerHandler), SettingsModal (missing updateLayerHandler in one test), LogViewer (missing updateSessionWith), DirectorNotesModal (exact-match assertion updated to objectContaining), FileExplorerPanel (capturesFocus value corrected)
+  - 712 tests pass across 11 test files, zero new failures from migration
+  - 3 pre-existing failures in AgentSessionsBrowser (formatNumber case: "8.0k" vs "8.0K" from previous dedup phase)
 
 ### 6. Migrate non-modal layers (~5 files)
 
-- [ ] For drawers, panels, or other layers with escape handling: use `useModalLayer` with appropriate type/priority
-- [ ] Run targeted tests
+- [x] For drawers, panels, or other layers with escape handling: use `useModalLayer` with appropriate type/priority
+  - FileExplorerPanel: overlay type, `isOpen: fileTreeFilterOpen`, `capturesFocus: true`, `blocksLowerLayers: false`, `focusTrap: 'none'`
+  - FilePreview: overlay type, `isOpen: !isTabMode`, `allowClickOutside: false`, `blocksLowerLayers: true`, `focusTrap: 'lenient'`
+- [x] Run targeted tests
+  - All FileExplorerPanel and FilePreview tests pass
 
 ### 7. Handle DocumentGraphView.tsx (17 registerLayer calls)
 

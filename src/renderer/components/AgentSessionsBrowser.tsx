@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { Spinner, EmptyState } from './ui';
 import type { Theme, Session, LogEntry, UsageStats } from '../types';
-import { useLayerStack } from '../contexts/LayerStackContext';
+import { useModalLayer } from '../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { SessionActivityGraph, type ActivityEntry } from './SessionActivityGraph';
 import { SessionListItem } from './SessionListItem';
@@ -179,14 +179,11 @@ export function AgentSessionsBrowser({
 	const selectedItemRef = useRef<HTMLButtonElement>(null);
 	const searchModeDropdownRef = useRef<HTMLDivElement>(null);
 	const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-	const layerIdRef = useRef<string>();
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
 	const viewingSessionRef = useRef(viewingSession);
 	viewingSessionRef.current = viewingSession;
 	const autoJumpedRef = useRef<string | null>(null); // Track which session we've auto-jumped to
-
-	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
 
 	const handleSearchChange = useCallback((value: string) => {
 		setSearch(value);
@@ -198,44 +195,18 @@ export function AgentSessionsBrowser({
 		clearViewingSession();
 	}, [clearViewingSession]);
 
-	// Register layer on mount for Escape key handling
-	useEffect(() => {
-		layerIdRef.current = registerLayer({
-			type: 'modal',
-			priority: MODAL_PRIORITIES.AGENT_SESSIONS,
-			blocksLowerLayers: true,
-			capturesFocus: true,
-			focusTrap: 'lenient',
-			ariaLabel: 'Agent Sessions Browser',
-			onEscape: () => {
-				// If viewing a session detail, go back to list; otherwise close the panel
-				if (viewingSessionRef.current) {
-					clearViewingSession();
-				} else {
-					onCloseRef.current();
-				}
-			},
-		});
-
-		return () => {
-			if (layerIdRef.current) {
-				unregisterLayer(layerIdRef.current);
-			}
-		};
-	}, [registerLayer, unregisterLayer, clearViewingSession]);
-
-	// Update handler when viewingSession changes
-	useEffect(() => {
-		if (layerIdRef.current) {
-			updateLayerHandler(layerIdRef.current, () => {
-				if (viewingSessionRef.current) {
-					clearViewingSession();
-				} else {
-					onCloseRef.current();
-				}
-			});
+	// Escape handler for layer stack
+	const handleEscape = useCallback(() => {
+		if (viewingSessionRef.current) {
+			clearViewingSession();
+		} else {
+			onCloseRef.current();
 		}
-	}, [viewingSession, updateLayerHandler, clearViewingSession]);
+	}, [viewingSession, clearViewingSession]);
+
+	useModalLayer(MODAL_PRIORITIES.AGENT_SESSIONS, 'Agent Sessions Browser', handleEscape, {
+		focusTrap: 'lenient',
+	});
 
 	// Restore focus and scroll position when returning from detail view to list view
 	const prevViewingSessionRef = useRef<ClaudeSession | null>(null);

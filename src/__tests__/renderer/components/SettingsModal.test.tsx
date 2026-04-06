@@ -1580,6 +1580,7 @@ describe('SettingsModal', () => {
 					return 'layer-123';
 				}),
 				unregisterLayer: vi.fn(),
+				updateLayerHandler: vi.fn(),
 				getTopLayer: vi.fn(),
 				closeTopLayer: vi.fn(),
 				getLayers: vi.fn(),

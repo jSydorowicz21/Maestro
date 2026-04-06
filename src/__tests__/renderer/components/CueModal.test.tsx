@@ -25,6 +25,7 @@ vi.mock('../../../renderer/contexts/LayerStackContext', () => ({
 	useLayerStack: () => ({
 		registerLayer: mockRegisterLayer,
 		unregisterLayer: mockUnregisterLayer,
+		updateLayerHandler: vi.fn(),
 	}),
 }));
 
@@ -62,6 +63,7 @@ vi.mock('../../../renderer/stores/sessionStore', () => ({
 		};
 		return selector(mockState);
 	},
+	updateSessionWith: vi.fn(),
 }));
 
 // Mock modalStore getModalActions
