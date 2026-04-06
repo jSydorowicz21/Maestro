@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
-import { useFocusAfterRender } from './hooks/utils/useFocusAfterRender';
+import React, { useState, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 // SettingsModal is now lazy-loaded inside AppStandaloneModals
 import { SessionList } from './components/SessionList';
 import { RightPanel, RightPanelHandle } from './components/RightPanel';
@@ -71,8 +70,8 @@ import {
 	// UI
 	useThemeStyles,
 	useAppHandlers,
-	// Auto Run
-	useAutoRunHandlers,
+	// Auto Run coordination (batchStore state, handlers, achievements, document loader)
+	useAutoRunCoordination,
 	// Tab handlers
 	useTabHandlers,
 	useTerminalTabHandlers,
@@ -102,10 +101,6 @@ import {
 	useQueueProcessing,
 	// Tab export handlers (copy context, export HTML, publish gist)
 	useTabExportHandlers,
-	// Auto Run achievements (progress tracking, peak stats)
-	useAutoRunAchievements,
-	// Auto Run document loader (list, tree, task counts, file watching)
-	useAutoRunDocumentLoader,
 	// Prompt Composer modal handlers
 	usePromptComposerHandlers,
 	// Quick Actions modal handlers (Cmd+K)
@@ -114,6 +109,10 @@ import {
 	useCycleSession,
 	// Input mode toggle (Tier 3A)
 	useInputMode,
+	// Auto-focus on mode switch (Phase 13A)
+	useAutoFocusOnModeSwitch,
+	// Auto-send on tab activate (Phase 13A)
+	useAutoSendOnActivate,
 	// Live mode management (Tier 3B)
 	useLiveMode,
 	// Session switching callbacks (navigate to session/tab from various UI surfaces)
@@ -122,7 +121,7 @@ import {
 import { useMainPanelProps, useSessionListProps, useRightPanelProps } from './hooks/props';
 import { useAgentListeners } from './hooks/agent/useAgentListeners';
 import { useSymphonyContribution } from './hooks/symphony/useSymphonyContribution';
-import { useCueAutoDiscovery } from './hooks/useCueAutoDiscovery';
+import { useEncoreFeatures } from './hooks/settings/useEncoreFeatures';
 
 // Import contexts
 import { useLayerStack } from './contexts/LayerStackContext';
@@ -131,14 +130,8 @@ import { useModalActions, useModalStore } from './stores/modalStore';
 import { GitStatusProvider } from './contexts/GitStatusContext';
 import { InputProvider, useInputContext } from './contexts/InputContext';
 import { useGroupChatStore } from './stores/groupChatStore';
-import { useBatchStore } from './stores/batchStore';
 // All session state is read directly from useSessionStore in MaestroConsoleInner.
-import {
-	useSessionStore,
-	selectActiveSession,
-	updateSessionWith,
-	updateAiTab,
-} from './stores/sessionStore';
+import { useSessionStore, selectActiveSession, updateSessionWith } from './stores/sessionStore';
 import { useActiveSession } from './hooks/session/useActiveSession';
 // useAgentStore moved to useQueueProcessing hook
 import { InlineWizardProvider, useInlineWizardContext } from './contexts/InlineWizardContext';
@@ -276,10 +269,8 @@ function MaestroConsoleInner() {
 		setAgentSessionsOpen,
 		activeAgentSessionId,
 		setActiveAgentSessionId,
-		// Batch Runner Modal
-		setBatchRunnerModalOpen,
-		// Auto Run Setup Modal
-		setAutoRunSetupModalOpen,
+		// Batch Runner Modal — setBatchRunnerModalOpen now self-sourced in useAutoRunCoordination
+		// Auto Run Setup Modal — setAutoRunSetupModalOpen now self-sourced in useAutoRunCoordination
 		// Marketplace Modal — marketplaceModalOpen now self-sourced in AppStandaloneModals
 		setMarketplaceModalOpen,
 		// Wizard Resume Modal — open state and resume state now self-sourced in AppStandaloneModals
@@ -435,17 +426,7 @@ function MaestroConsoleInner() {
 		autoScrollAiMode,
 		setAutoScrollAiMode,
 		setSuppressWindowsWarning,
-		encoreFeatures,
 	} = settings;
-
-	// Reset modal-open flags when their Encore Feature toggle is disabled
-	useEffect(() => {
-		if (!encoreFeatures.symphony) setSymphonyModalOpen(false);
-	}, [encoreFeatures.symphony, setSymphonyModalOpen]);
-
-	useEffect(() => {
-		if (!encoreFeatures.usageStats) setUsageDashboardOpen(false);
-	}, [encoreFeatures.usageStats, setUsageDashboardOpen]);
 
 	// --- KEYBOARD SHORTCUT HELPERS ---
 	const { isShortcut, isTabShortcut } = useKeyboardShortcutHelpers({
@@ -671,15 +652,8 @@ function MaestroConsoleInner() {
 	// Global Live Mode — extracted to useLiveMode hook (Tier 3B)
 	const { isLiveMode, webInterfaceUrl, toggleGlobalLive, restartWebServer } = useLiveMode();
 
-	// Auto Run document management state (from batchStore)
-	// Content is per-session in session.autoRunContent
-	const autoRunDocumentList = useBatchStore((s) => s.documentList);
-	const autoRunDocumentTree = useBatchStore((s) => s.documentTree);
-	const {
-		setDocumentList: setAutoRunDocumentList,
-		setDocumentTree: setAutoRunDocumentTree,
-		setIsLoadingDocuments: setAutoRunIsLoadingDocuments,
-	} = useBatchStore.getState();
+	// Auto Run document management state, handlers, achievements, document loader
+	// — now provided by useAutoRunCoordination hook (called after useBatchHandlers)
 
 	// handleProcessMonitorNavigateToSession - now in useSessionSwitchCallbacks hook
 
@@ -688,12 +662,24 @@ function MaestroConsoleInner() {
 	// notification settings sync, playground debug) — provided by useAppInitialization hook
 
 	// Expose debug helpers to window for console access
-	// No dependency array - always keep functions fresh
+	// No dependency array - always keep functions fresh (render-time assignment)
 	(window as any).__maestroDebug = {
 		openDebugWizard: () => setDebugWizardModalOpen(true),
 		openCommandK: () => setQuickActionOpen(true),
 		openWizard: () => openWizardModal(),
 		openSettings: () => setSettingsModalOpen(true),
+		addToast: (type: 'success' | 'info' | 'warning' | 'error', title: string, message: string) => {
+			notifyToast({ type, title, message });
+		},
+		testToast: () => {
+			notifyToast({
+				type: 'success',
+				title: 'Test Notification',
+				message: 'This is a test toast notification from the console!',
+				group: 'Debug',
+				project: 'Test Project',
+			});
+		},
 	};
 
 	// Note: Standing ovation and keyboard mastery startup checks are now in useModalHandlers
@@ -735,31 +721,6 @@ function MaestroConsoleInner() {
 	// Note: thinkingChunkBufferRef and thinkingChunkRafIdRef moved into useAgentListeners hook
 	// Note: pauseBatchOnErrorRef and getBatchStateRef moved into useBatchHandlers hook
 
-	// Expose notifyToast to window for debugging/testing
-	useEffect(() => {
-		(window as any).__maestroDebug = {
-			addToast: (
-				type: 'success' | 'info' | 'warning' | 'error',
-				title: string,
-				message: string
-			) => {
-				notifyToast({ type, title, message });
-			},
-			testToast: () => {
-				notifyToast({
-					type: 'success',
-					title: 'Test Notification',
-					message: 'This is a test toast notification from the console!',
-					group: 'Debug',
-					project: 'Test Project',
-				});
-			},
-		};
-		return () => {
-			delete (window as any).__maestroDebug;
-		};
-	}, []);
-
 	// Keyboard navigation state
 	// Note: selectedSidebarIndex/setSelectedSidebarIndex are destructured from useUIStore() above
 	// Note: activeTab is memoized later at line ~3795 - use that for all tab operations
@@ -768,9 +729,6 @@ function MaestroConsoleInner() {
 
 	// --- SESSION RESTORATION (extracted hook, Phase 2E) ---
 	const { initialLoadComplete } = useSessionRestoration();
-
-	// --- CUE AUTO-DISCOVERY (gated by Encore Feature) ---
-	useCueAutoDiscovery(sessions, encoreFeatures);
 
 	// --- TAB HANDLERS (extracted hook) ---
 	const {
@@ -960,6 +918,16 @@ function MaestroConsoleInner() {
 		handleConfirmAndDeleteWorktreeOnDisk,
 	} = useWorktreeHandlers();
 
+	// --- ENCORE FEATURE GATING (modal resets, cue auto-discovery, gated callbacks) ---
+	const {
+		encoreFeatures,
+		gatedSetUsageDashboardOpen,
+		gatedOnOpenSymphony,
+		gatedOnOpenDirectorNotes,
+		gatedOnOpenMaestroCue,
+		gatedOnConfigureCue,
+	} = useEncoreFeatures({ handleConfigureCue });
+
 	// --- APP HANDLERS (drag, file, folder operations) ---
 	const {
 		handleImageDragEnter,
@@ -1011,13 +979,7 @@ function MaestroConsoleInner() {
 	);
 
 	// Auto-focus the AI input box when switching from terminal to AI mode
-	const prevInputModeRef = useRef(activeSession?.inputMode);
-	const shouldFocusOnModeSwitch =
-		prevInputModeRef.current === 'terminal' && activeSession?.inputMode === 'ai';
-	useFocusAfterRender(inputRef, shouldFocusOnModeSwitch, 0);
-	useEffect(() => {
-		prevInputModeRef.current = activeSession?.inputMode;
-	}, [activeSession?.inputMode]);
+	useAutoFocusOnModeSwitch(inputRef, activeSession?.inputMode);
 
 	// PERF: Memoize sessions for NewInstanceModal validation (only recompute when modal is open)
 	// This prevents re-renders of the modal's validation logic on every session state change
@@ -1419,36 +1381,8 @@ function MaestroConsoleInner() {
 		activeSessionIdRef,
 	});
 
-	// This is used by context transfer to automatically send the transferred context to the agent
-	useEffect(() => {
-		if (!activeSession) return;
-
-		const activeTab = getActiveTab(activeSession);
-		if (!activeTab?.autoSendOnActivate) return;
-
-		// Capture intended targets so we can verify they haven't changed after the delay
-		const targetSessionId = activeSession.id;
-		const targetTabId = activeTab.id;
-
-		// Clear the flag first to prevent multiple sends
-		updateAiTab(targetSessionId, targetTabId, (tab) => ({ ...tab, autoSendOnActivate: false }));
-
-		// Trigger the send after a short delay to ensure state is settled
-		// The inputValue and pendingMergedContext are already set on the tab
-		const timeoutId = setTimeout(() => {
-			// Verify the active session/tab still match the originally intended targets
-			const currentSessions = useSessionStore.getState().sessions;
-			const currentSession = currentSessions.find((s) => s.id === targetSessionId);
-			if (!currentSession) return;
-			const currentTab = getActiveTab(currentSession);
-			if (currentSession.id !== activeSessionIdRef.current || currentTab?.id !== targetTabId)
-				return;
-
-			processInput();
-		}, 100);
-
-		return () => clearTimeout(timeoutId);
-	}, [activeSession?.id, activeSession?.activeTabId]);
+	// Auto-send transferred context when tab has autoSendOnActivate flag
+	useAutoSendOnActivate({ activeSession, activeSessionIdRef, processInput });
 
 	// Initialize activity tracker for per-session time tracking
 	useActivityTracker(activeSessionId);
@@ -1457,26 +1391,10 @@ function MaestroConsoleInner() {
 	// Tracks total time user spends actively using Maestro (5-minute idle timeout)
 	useHandsOnTimeTracker(addTotalActiveTimeMs);
 
-	// Auto Run achievement tracking (progress intervals, peak usage stats)
-	useAutoRunAchievements({ activeBatchSessionIds });
-
-	// Handler for switching to autorun tab - shows setup modal if no folder configured
-	const handleSetActiveRightTab = useCallback(
-		(tab: RightPanelTab) => {
-			if (tab === 'autorun' && activeSession && !activeSession.autoRunFolderPath) {
-				// No folder configured - show setup modal
-				setAutoRunSetupModalOpen(true);
-				// Still switch to the tab (it will show an empty state or the modal)
-				setActiveRightTab(tab);
-			} else {
-				setActiveRightTab(tab);
-			}
-		},
-		[activeSession]
-	);
-
-	// Auto Run handlers (extracted to useAutoRunHandlers hook)
+	// --- AUTO RUN COORDINATION (batchStore state, handlers, achievements, document loader) ---
 	const {
+		autoRunDocumentList,
+		autoRunDocumentTree,
 		handleAutoRunFolderSelected,
 		handleStartBatchRun,
 		getDocumentTaskCount,
@@ -1487,39 +1405,17 @@ function MaestroConsoleInner() {
 		handleAutoRunRefresh,
 		handleAutoRunOpenSetup,
 		handleAutoRunCreateDocument,
-	} = useAutoRunHandlers(activeSession, {
-		setAutoRunDocumentList,
-		setAutoRunDocumentTree,
-		setAutoRunIsLoadingDocuments,
-		setAutoRunSetupModalOpen,
-		setBatchRunnerModalOpen,
-		setActiveRightTab,
-		setRightPanelOpen,
-		setActiveFocus,
-		setSuccessFlashNotification,
-		autoRunDocumentList,
+		handleSetActiveRightTab,
+		handleMarketplaceImportComplete,
+		handleSaveBatchPrompt,
+	} = useAutoRunCoordination({
 		startBatchRun,
+		activeBatchSessionIds,
+		handleAutoRunRefreshRef,
 	});
 
-	// Wire up refs for useWizardHandlers (circular dep resolution)
-	handleAutoRunRefreshRef.current = handleAutoRunRefresh;
+	// Wire up setInputValueRef for useWizardHandlers (circular dep resolution)
 	setInputValueRef.current = setInputValue;
-
-	// Handler for marketplace import completion - refresh document list
-	const handleMarketplaceImportComplete = useCallback(
-		async (folderName: string) => {
-			// Refresh the Auto Run document list to show newly imported documents
-			if (activeSession?.autoRunFolderPath) {
-				handleAutoRunRefresh();
-			}
-			notifyToast({
-				type: 'success',
-				title: 'Playbook Imported',
-				message: `Successfully imported playbook to ${folderName}`,
-			});
-		},
-		[activeSession?.autoRunFolderPath, handleAutoRunRefresh]
-	);
 
 	// File tree auto-refresh interval change handler (kept in App.tsx as it's not Auto Run specific)
 	const handleAutoRefreshChange = useCallback(
@@ -1601,10 +1497,7 @@ function MaestroConsoleInner() {
 
 	// Navigation history tracking — provided by useSessionLifecycle hook (Phase 2H)
 
-	// Auto Run document loading (list, tree, task counts, file watching)
-	useAutoRunDocumentLoader();
-
-	// NOTE: Auto Run document loading and file watching are now handled by useAutoRunDocumentLoader hook
+	// NOTE: Auto Run document loading, achievements, and file watching are now in useAutoRunCoordination hook
 
 	// --- ACTIONS ---
 	// cycleSession — provided by useCycleSession hook
@@ -1792,18 +1685,7 @@ function MaestroConsoleInner() {
 		[createPRSession, activeSession]
 	);
 
-	const handleSaveBatchPrompt = useCallback(
-		(prompt: string) => {
-			if (!activeSession) return;
-			// Save the custom prompt and modification timestamp to the session (persisted across restarts)
-			updateSessionWith(activeSession.id, (s) => ({
-				...s,
-				batchRunnerPrompt: prompt,
-				batchRunnerPromptModifiedAt: Date.now(),
-			}));
-		},
-		[activeSession]
-	);
+	// handleSaveBatchPrompt - now in useAutoRunCoordination hook
 	// handleUtilityTabSelect, handleUtilityFileTabSelect, handleNamedSessionSelect
 	// - now in useSessionSwitchCallbacks hook
 	const handleFileSearchSelect = useCallback(
@@ -2038,6 +1920,91 @@ function MaestroConsoleInner() {
 
 	// Wizard handlers (handleWizardComplete, handleWizardLetsGo, handleToggleWizardShowThinking)
 	// now in useWizardHandlers hook
+
+	// ============================================================================
+	// COMPUTED VALUES (extracted from inline JSX for readability)
+	// ============================================================================
+
+	// Title bar text (avoids 25-line IIFE in JSX)
+	const titleBarText = useMemo(() => {
+		if (activeGroupChatId) {
+			const chatName = groupChats.find((c) => c.id === activeGroupChatId)?.name || 'Unknown';
+			return `Maestro Group Chat: ${chatName}`;
+		}
+		if (!activeSession) return '';
+		const parts: string[] = [];
+		const group = groups.find((g) => g.id === activeSession.groupId);
+		if (group) parts.push(`${group.emoji} ${group.name}`);
+		parts.push(activeSession.name);
+		const tab = activeSession.aiTabs?.find((t) => t.id === activeSession.activeTabId);
+		if (tab) {
+			const tabLabel =
+				tab.name || (tab.agentSessionId ? tab.agentSessionId.split('-')[0].toUpperCase() : null);
+			if (tabLabel) parts.push(tabLabel);
+		}
+		return parts.join(' | ');
+	}, [activeGroupChatId, groupChats, activeSession, groups]);
+
+	const activeGroupChat = useMemo(
+		() => groupChats.find((c) => c.id === activeGroupChatId) ?? null,
+		[groupChats, activeGroupChatId]
+	);
+
+	const groupChatTotalCost = useMemo(() => {
+		if (!activeGroupChat) return 0;
+		const participantsCost = (activeGroupChat.participants || []).reduce(
+			(sum, p) => sum + (p.totalCost || 0),
+			0
+		);
+		const modCost = moderatorUsage?.totalCost || 0;
+		return participantsCost + modCost;
+	}, [activeGroupChat, moderatorUsage?.totalCost]);
+
+	const groupChatCostIncomplete = useMemo(() => {
+		if (!activeGroupChat) return false;
+		const participants = activeGroupChat.participants || [];
+		const anyParticipantMissingCost = participants.some(
+			(p) => p.totalCost === undefined || p.totalCost === null
+		);
+		const moderatorMissingCost =
+			moderatorUsage?.totalCost === undefined || moderatorUsage?.totalCost === null;
+		return anyParticipantMissingCost || moderatorMissingCost;
+	}, [activeGroupChat, moderatorUsage?.totalCost]);
+
+	const groupChatParticipantSessionPaths = useMemo(() => {
+		if (!activeGroupChat) return new Map<string, string>();
+		return new Map(
+			sessions
+				.filter((s) => activeGroupChat.participants.some((p) => p.sessionId === s.id))
+				.map((s) => [s.id, s.projectRoot])
+		);
+	}, [activeGroupChat, sessions]);
+
+	const handleShowGroupChatFlash = useCallback(
+		(message: string) => {
+			setSuccessFlashNotification(message);
+			setTimeout(() => setSuccessFlashNotification(null), 2000);
+		},
+		[setSuccessFlashNotification]
+	);
+
+	const handlePublishGroupChatMessageGist = useCallback(
+		(text: string) => {
+			if (!text.trim()) return;
+			const filename = `group_chat_response_${Date.now()}.md`;
+			useTabStore.getState().setTabGistContent({ filename, content: text });
+			setGistPublishModalOpen(true);
+		},
+		[setGistPublishModalOpen]
+	);
+
+	const handleLogViewerSessionClick = useCallback(
+		(sessionId: string, tabId?: string) => {
+			handleCloseLogViewer();
+			handleToastSessionClick(sessionId, tabId);
+		},
+		[handleCloseLogViewer, handleToastSessionClick]
+	);
 
 	// ============================================================================
 	// PROPS HOOKS FOR MAJOR COMPONENTS
@@ -2438,47 +2405,13 @@ function MaestroConsoleInner() {
 							} as React.CSSProperties
 						}
 					>
-						{activeGroupChatId ? (
+						{(activeGroupChatId || activeSession) && (
 							<span
 								className="text-xs select-none opacity-50"
 								style={{ color: theme.colors.textDim }}
 							>
-								Maestro Group Chat:{' '}
-								{groupChats.find((c) => c.id === activeGroupChatId)?.name || 'Unknown'}
+								{titleBarText}
 							</span>
-						) : (
-							activeSession && (
-								<span
-									className="text-xs select-none opacity-50"
-									style={{ color: theme.colors.textDim }}
-								>
-									{(() => {
-										const parts: string[] = [];
-										// Group name (if grouped)
-										const group = groups.find((g) => g.id === activeSession.groupId);
-										if (group) {
-											parts.push(`${group.emoji} ${group.name}`);
-										}
-										// Agent name (user-given name for this agent instance)
-										parts.push(activeSession.name);
-										// Active tab name or UUID octet
-										const activeTab = activeSession.aiTabs?.find(
-											(t) => t.id === activeSession.activeTabId
-										);
-										if (activeTab) {
-											const tabLabel =
-												activeTab.name ||
-												(activeTab.agentSessionId
-													? activeTab.agentSessionId.split('-')[0].toUpperCase()
-													: null);
-											if (tabLabel) {
-												parts.push(tabLabel);
-											}
-										}
-										return parts.join(' | ');
-									})()}
-								</span>
-							)
 						)}
 					</div>
 				)}
@@ -2583,7 +2516,7 @@ function MaestroConsoleInner() {
 					setFeedbackModalOpen={setFeedbackModalOpen}
 					setLogViewerOpen={setLogViewerOpen}
 					setProcessMonitorOpen={setProcessMonitorOpen}
-					setUsageDashboardOpen={encoreFeatures.usageStats ? setUsageDashboardOpen : undefined}
+					setUsageDashboardOpen={gatedSetUsageDashboardOpen}
 					setActiveRightTab={setActiveRightTab}
 					setAgentSessionsOpen={setAgentSessionsOpen}
 					setActiveAgentSessionId={setActiveAgentSessionId}
@@ -2659,12 +2592,10 @@ function MaestroConsoleInner() {
 					getDocumentTaskCount={getDocumentTaskCount}
 					onAutoRunRefresh={handleAutoRunRefresh}
 					onOpenMarketplace={handleOpenMarketplace}
-					onOpenSymphony={encoreFeatures.symphony ? () => setSymphonyModalOpen(true) : undefined}
-					onOpenDirectorNotes={
-						encoreFeatures.directorNotes ? () => setDirectorNotesOpen(true) : undefined
-					}
-					onOpenMaestroCue={encoreFeatures.maestroCue ? () => setCueModalOpen(true) : undefined}
-					onConfigureCue={encoreFeatures.maestroCue ? handleConfigureCue : undefined}
+					onOpenSymphony={gatedOnOpenSymphony}
+					onOpenDirectorNotes={gatedOnOpenDirectorNotes}
+					onOpenMaestroCue={gatedOnOpenMaestroCue}
+					onConfigureCue={gatedOnConfigureCue}
 					autoScrollAiMode={autoScrollAiMode}
 					setAutoScrollAiMode={setAutoScrollAiMode}
 					onCloseTabSwitcher={handleCloseTabSwitcher}
@@ -2869,135 +2800,84 @@ function MaestroConsoleInner() {
 								savedSelectedLevels={logViewerSelectedLevels}
 								onSelectedLevelsChange={setLogViewerSelectedLevels}
 								onShortcutUsed={handleLogViewerShortcutUsed}
-								onSessionClick={(sessionId, tabId) => {
-									handleCloseLogViewer();
-									handleToastSessionClick(sessionId, tabId);
-								}}
+								onSessionClick={handleLogViewerSessionClick}
 							/>
 						</Suspense>
 					</div>
 				)}
 
 				{/* --- GROUP CHAT VIEW (shown when a group chat is active, hidden when log viewer open) --- */}
-				{!logViewerOpen &&
-					activeGroupChatId &&
-					groupChats.find((c) => c.id === activeGroupChatId) && (
-						<>
-							<div className="flex-1 flex flex-col min-w-0">
-								<GroupChatPanel
-									theme={theme}
-									groupChat={groupChats.find((c) => c.id === activeGroupChatId)!}
-									messages={groupChatMessages}
-									state={groupChatState}
-									groups={groups}
-									totalCost={(() => {
-										const chat = groupChats.find((c) => c.id === activeGroupChatId);
-										const participantsCost = (chat?.participants || []).reduce(
-											(sum, p) => sum + (p.totalCost || 0),
-											0
-										);
-										const modCost = moderatorUsage?.totalCost || 0;
-										return participantsCost + modCost;
-									})()}
-									costIncomplete={(() => {
-										const chat = groupChats.find((c) => c.id === activeGroupChatId);
-										const participants = chat?.participants || [];
-										// Check if any participant is missing cost data
-										const anyParticipantMissingCost = participants.some(
-											(p) => p.totalCost === undefined || p.totalCost === null
-										);
-										// Moderator is also considered - if no usage stats yet, cost is incomplete
-										const moderatorMissingCost =
-											moderatorUsage?.totalCost === undefined || moderatorUsage?.totalCost === null;
-										return anyParticipantMissingCost || moderatorMissingCost;
-									})()}
-									onSendMessage={handleSendGroupChatMessage}
-									onRename={() =>
-										activeGroupChatId && handleOpenRenameGroupChatModal(activeGroupChatId)
-									}
-									onShowInfo={() => useModalStore.getState().openModal('groupChatInfo')}
-									rightPanelOpen={rightPanelOpen}
-									onToggleRightPanel={() => setRightPanelOpen(!rightPanelOpen)}
-									shortcuts={shortcuts}
-									sessions={sessions}
-									onDraftChange={handleGroupChatDraftChange}
-									onOpenPromptComposer={() => setPromptComposerOpen(true)}
-									stagedImages={groupChatStagedImages}
-									setStagedImages={setGroupChatStagedImages}
-									readOnlyMode={groupChatReadOnlyMode}
-									setReadOnlyMode={setGroupChatReadOnlyMode}
-									inputRef={groupChatInputRef}
-									handlePaste={handlePaste}
-									handleDrop={handleDrop}
-									onOpenLightbox={handleSetLightboxImage}
-									executionQueue={groupChatExecutionQueue.filter(
-										(item) => item.tabId === activeGroupChatId
-									)}
-									onRemoveQueuedItem={handleRemoveGroupChatQueueItem}
-									onReorderQueuedItems={handleReorderGroupChatQueueItems}
-									markdownEditMode={chatRawTextMode}
-									onToggleMarkdownEditMode={() => setChatRawTextMode(!chatRawTextMode)}
-									maxOutputLines={maxOutputLines}
-									enterToSendAI={enterToSendAI}
-									setEnterToSendAI={setEnterToSendAI}
-									showFlashNotification={(message: string) => {
-										setSuccessFlashNotification(message);
-										setTimeout(() => setSuccessFlashNotification(null), 2000);
-									}}
-									participantColors={groupChatParticipantColors}
-									messagesRef={groupChatMessagesRef}
-									ghCliAvailable={ghCliAvailable}
-									onPublishMessageGist={(text: string) => {
-										if (!text.trim()) return;
-										const filename = `group_chat_response_${Date.now()}.md`;
-										useTabStore.getState().setTabGistContent({ filename, content: text });
-										setGistPublishModalOpen(true);
-									}}
-								/>
-							</div>
-							<GroupChatRightPanel
+				{!logViewerOpen && activeGroupChatId && activeGroupChat && (
+					<>
+						<div className="flex-1 flex flex-col min-w-0">
+							<GroupChatPanel
 								theme={theme}
-								groupChatId={activeGroupChatId}
-								participants={
-									groupChats.find((c) => c.id === activeGroupChatId)?.participants || []
+								groupChat={activeGroupChat}
+								messages={groupChatMessages}
+								state={groupChatState}
+								groups={groups}
+								totalCost={groupChatTotalCost}
+								costIncomplete={groupChatCostIncomplete}
+								onSendMessage={handleSendGroupChatMessage}
+								onRename={() =>
+									activeGroupChatId && handleOpenRenameGroupChatModal(activeGroupChatId)
 								}
-								participantStates={participantStates}
-								participantSessionPaths={
-									new Map(
-										sessions
-											.filter((s) =>
-												groupChats
-													.find((c) => c.id === activeGroupChatId)
-													?.participants.some((p) => p.sessionId === s.id)
-											)
-											.map((s) => [s.id, s.projectRoot])
-									)
-								}
-								sessionSshRemoteNames={sessionSshRemoteNames}
-								isOpen={rightPanelOpen}
-								onToggle={() => setRightPanelOpen(!rightPanelOpen)}
-								width={rightPanelWidth}
-								setWidthState={setRightPanelWidth}
+								onShowInfo={() => useModalStore.getState().openModal('groupChatInfo')}
+								rightPanelOpen={rightPanelOpen}
+								onToggleRightPanel={() => setRightPanelOpen(!rightPanelOpen)}
 								shortcuts={shortcuts}
-								moderatorAgentId={
-									groupChats.find((c) => c.id === activeGroupChatId)?.moderatorAgentId ||
-									'claude-code'
-								}
-								moderatorSessionId={
-									groupChats.find((c) => c.id === activeGroupChatId)?.moderatorSessionId || ''
-								}
-								moderatorAgentSessionId={
-									groupChats.find((c) => c.id === activeGroupChatId)?.moderatorAgentSessionId
-								}
-								moderatorState={groupChatState === 'moderator-thinking' ? 'busy' : 'idle'}
-								moderatorUsage={moderatorUsage}
-								activeTab={groupChatRightTab}
-								onTabChange={handleGroupChatRightTabChange}
-								onJumpToMessage={handleJumpToGroupChatMessage}
-								onColorsComputed={setGroupChatParticipantColors}
+								sessions={sessions}
+								onDraftChange={handleGroupChatDraftChange}
+								onOpenPromptComposer={() => setPromptComposerOpen(true)}
+								stagedImages={groupChatStagedImages}
+								setStagedImages={setGroupChatStagedImages}
+								readOnlyMode={groupChatReadOnlyMode}
+								setReadOnlyMode={setGroupChatReadOnlyMode}
+								inputRef={groupChatInputRef}
+								handlePaste={handlePaste}
+								handleDrop={handleDrop}
+								onOpenLightbox={handleSetLightboxImage}
+								executionQueue={groupChatExecutionQueue.filter(
+									(item) => item.tabId === activeGroupChatId
+								)}
+								onRemoveQueuedItem={handleRemoveGroupChatQueueItem}
+								onReorderQueuedItems={handleReorderGroupChatQueueItems}
+								markdownEditMode={chatRawTextMode}
+								onToggleMarkdownEditMode={() => setChatRawTextMode(!chatRawTextMode)}
+								maxOutputLines={maxOutputLines}
+								enterToSendAI={enterToSendAI}
+								setEnterToSendAI={setEnterToSendAI}
+								showFlashNotification={handleShowGroupChatFlash}
+								participantColors={groupChatParticipantColors}
+								messagesRef={groupChatMessagesRef}
+								ghCliAvailable={ghCliAvailable}
+								onPublishMessageGist={handlePublishGroupChatMessageGist}
 							/>
-						</>
-					)}
+						</div>
+						<GroupChatRightPanel
+							theme={theme}
+							groupChatId={activeGroupChatId}
+							participants={activeGroupChat.participants || []}
+							participantStates={participantStates}
+							participantSessionPaths={groupChatParticipantSessionPaths}
+							sessionSshRemoteNames={sessionSshRemoteNames}
+							isOpen={rightPanelOpen}
+							onToggle={() => setRightPanelOpen(!rightPanelOpen)}
+							width={rightPanelWidth}
+							setWidthState={setRightPanelWidth}
+							shortcuts={shortcuts}
+							moderatorAgentId={activeGroupChat.moderatorAgentId || 'claude-code'}
+							moderatorSessionId={activeGroupChat.moderatorSessionId || ''}
+							moderatorAgentSessionId={activeGroupChat.moderatorAgentSessionId}
+							moderatorState={groupChatState === 'moderator-thinking' ? 'busy' : 'idle'}
+							moderatorUsage={moderatorUsage}
+							activeTab={groupChatRightTab}
+							onTabChange={handleGroupChatRightTabChange}
+							onJumpToMessage={handleJumpToGroupChatMessage}
+							onColorsComputed={setGroupChatParticipantColors}
+						/>
+					</>
+				)}
 
 				{/* --- CENTER WORKSPACE (hidden when no sessions, group chat is active, or log viewer is open) --- */}
 				{sessions.length > 0 && !activeGroupChatId && !logViewerOpen && (

@@ -142,9 +142,31 @@ Break down `App.tsx` from 4,034 lines into focused modules. This is the single l
 
 ### 9. Verify App.tsx is a thin coordinator
 
-- [ ] App.tsx should contain: minimal state, extracted hook calls, and a clean JSX return with `<AppLayout>`, `<LeftBar>`, `<MainPanel>`, `<RightBar>`, `<AppModals>`
-- [ ] No inline event handlers longer than 3 lines
-- [ ] No inline effects
+- [x] App.tsx should contain: minimal state, extracted hook calls, and a clean JSX return with `<AppLayout>`, `<LeftBar>`, `<MainPanel>`, `<RightBar>`, `<AppModals>`
+- [x] No inline event handlers longer than 3 lines
+- [x] No inline effects
+
+**Verification Result (2,918 lines):**
+
+**Inline effects: 0** (was 3). Extracted:
+1. Debug toast helpers effect (23 lines) - merged into render-time `__maestroDebug` assignment, eliminating the effect entirely
+2. Input mode tracking effect (8 lines) - extracted to `useAutoFocusOnModeSwitch` hook (`hooks/input/useAutoFocusOnModeSwitch.ts`)
+3. Auto-send on activate effect (30 lines) - extracted to `useAutoSendOnActivate` hook (`hooks/input/useAutoSendOnActivate.ts`)
+
+**Inline event handlers > 3 lines: 0** (was 5). Extracted:
+1. `showFlashNotification` (4-line lambda) - extracted to `handleShowGroupChatFlash` useCallback
+2. `onPublishMessageGist` (6-line lambda) - extracted to `handlePublishGroupChatMessageGist` useCallback
+3. `onSessionClick` in LogViewer (3-line lambda) - extracted to `handleLogViewerSessionClick` useCallback
+4. Title bar IIFE (25-line inline computation) - extracted to `titleBarText` useMemo
+5. `totalCost`/`costIncomplete`/`participantSessionPaths` IIFEs (32 lines total) - extracted to `groupChatTotalCost`, `groupChatCostIncomplete`, `groupChatParticipantSessionPaths` useMemos, plus `activeGroupChat` useMemo (shared lookup, eliminates 7 redundant `groupChats.find()` calls in JSX)
+
+**State: minimal** - only 1 local `useState` (gistPublishModalOpen). All other state is in Zustand stores (modalStore, sessionStore, uiStore, groupChatStore, fileExplorerStore, tabStore). `useEffect` import removed entirely.
+
+**JSX structure: clean** - Composed from `<AppModals>`, `<AppStandaloneModals>`, `<SessionList>` (left bar), `<MainPanel>` (center), `<RightPanel>` (right bar), `<EmptyStateView>`, `<GroupChatPanel>`/`<GroupChatRightPanel>`, `<LogViewer>`, `<ToastContainer>`. Props assembled via extracted `useMainPanelProps`/`useSessionListProps`/`useRightPanelProps` hooks.
+
+**Remaining bulk (2,918 lines):** ~180 lines imports, ~450 lines store destructuring (necessary for prop passing), ~900 lines extracted hook call sites, ~175 lines keyboardHandlerRef population, ~65 lines computed values, ~336 lines prop hook calls, ~580 lines JSX return, ~100 lines callbacks. The file is a coordinator - no business logic remains inline.
+
+Lint: 18 pre-existing errors (down from 19 - removed broken `updateAiTab` import). Tests: 24,573 passed, 42 pre-existing failures, 107 pending.
 
 ### 10. Measure result
 
