@@ -149,11 +149,13 @@ Break down `App.tsx` from 4,034 lines into focused modules. This is the single l
 **Verification Result (2,918 lines):**
 
 **Inline effects: 0** (was 3). Extracted:
+
 1. Debug toast helpers effect (23 lines) - merged into render-time `__maestroDebug` assignment, eliminating the effect entirely
 2. Input mode tracking effect (8 lines) - extracted to `useAutoFocusOnModeSwitch` hook (`hooks/input/useAutoFocusOnModeSwitch.ts`)
 3. Auto-send on activate effect (30 lines) - extracted to `useAutoSendOnActivate` hook (`hooks/input/useAutoSendOnActivate.ts`)
 
 **Inline event handlers > 3 lines: 0** (was 5). Extracted:
+
 1. `showFlashNotification` (4-line lambda) - extracted to `handleShowGroupChatFlash` useCallback
 2. `onPublishMessageGist` (6-line lambda) - extracted to `handlePublishGroupChatMessageGist` useCallback
 3. `onSessionClick` in LogViewer (3-line lambda) - extracted to `handleLogViewerSessionClick` useCallback
@@ -176,17 +178,18 @@ Lint: 18 pre-existing errors (down from 19 - removed broken `updateAiTab` import
 
 **Result:** App.tsx is **2,918 lines** - reduced from 4,034 (down 1,116 lines, -28%). The <1,000 target was aspirational; the remaining bulk is structural coordinator code with zero inline business logic:
 
-| Category | Lines | Notes |
-| --- | --- | --- |
-| Imports | ~180 | Lazy-loaded components, hooks, stores, types |
-| Store destructuring | ~450 | Necessary for prop threading between hooks and JSX |
-| Extracted hook call sites | ~900 | Calling 20+ extracted hooks with their deps |
-| keyboardHandlerRef population | ~175 | Binding ~100+ state/handler fields to ref |
-| Computed values (useMemo/useCallback) | ~165 | Bridge callbacks and derived state |
-| Prop hook calls | ~336 | useMainPanelProps, useSessionListProps, useRightPanelProps |
-| JSX return | ~580 | Layout composition with AppModals, panels, overlays |
+| Category                              | Lines | Notes                                                      |
+| ------------------------------------- | ----- | ---------------------------------------------------------- |
+| Imports                               | ~180  | Lazy-loaded components, hooks, stores, types               |
+| Store destructuring                   | ~450  | Necessary for prop threading between hooks and JSX         |
+| Extracted hook call sites             | ~900  | Calling 20+ extracted hooks with their deps                |
+| keyboardHandlerRef population         | ~175  | Binding ~100+ state/handler fields to ref                  |
+| Computed values (useMemo/useCallback) | ~165  | Bridge callbacks and derived state                         |
+| Prop hook calls                       | ~336  | useMainPanelProps, useSessionListProps, useRightPanelProps |
+| JSX return                            | ~580  | Layout composition with AppModals, panels, overlays        |
 
 **What was extracted across Phase 13-A (tasks 2-9):**
+
 1. `useAppRemoteEventListeners` - 569 lines, 15 remote event handlers
 2. `AppStandaloneModals` - 608 lines, 18 standalone modals
 3. `useSessionSwitchCallbacks` - 229 lines, 5 navigation callbacks + deep link effect
