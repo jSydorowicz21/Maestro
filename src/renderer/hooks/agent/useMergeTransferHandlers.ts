@@ -18,7 +18,8 @@ import type { MergeOptions } from '../../components/MergeSessionModal';
 import type { SendToAgentOptions } from '../../components/SendToAgentModal';
 import type { MergeState } from '../../stores/operationStore';
 import type { TransferState } from '../../stores/operationStore';
-import { useSessionStore, selectActiveSession, updateSessionWith } from '../../stores/sessionStore';
+import { useSessionStore, updateSessionWith } from '../../stores/sessionStore';
+import { useActiveSession } from '../session/useActiveSession';
 import { getModalActions } from '../../stores/modalStore';
 import { notifyToast } from '../../stores/notificationStore';
 import { substituteTemplateVariables } from '../../utils/templateVariables';
@@ -90,7 +91,7 @@ export function useMergeTransferHandlers(
 
 	// --- Store subscriptions ---
 	const sessions = useSessionStore((s) => s.sessions);
-	const activeSession = useSessionStore(selectActiveSession);
+	const activeSession = useActiveSession();
 
 	// --- Transfer agent tracking state ---
 	const [transferSourceAgent, setTransferSourceAgent] = useState<ToolType | null>(null);

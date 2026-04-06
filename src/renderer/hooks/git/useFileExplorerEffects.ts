@@ -17,7 +17,8 @@ import { useEffect, useMemo, useCallback } from 'react';
 import { useEventListener } from '../utils/useEventListener';
 import type { Session } from '../../types';
 import type { FileNode } from '../../types/fileTree';
-import { useSessionStore, selectActiveSession, updateSessionWith } from '../../stores/sessionStore';
+import { useSessionStore, updateSessionWith } from '../../stores/sessionStore';
+import { useActiveSession } from '../session/useActiveSession';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useFileExplorerStore } from '../../stores/fileExplorerStore';
@@ -94,7 +95,7 @@ export function useFileExplorerEffects(
 
 	// --- Store subscriptions ---
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
-	const activeSession = useSessionStore(selectActiveSession);
+	const activeSession = useActiveSession();
 	const activeFocus = useUIStore((s) => s.activeFocus);
 	const activeRightTab = useUIStore((s) => s.activeRightTab);
 	const setActiveFocus = useMemo(() => useUIStore.getState().setActiveFocus, []);

@@ -31,7 +31,8 @@ import { useUIStore } from '../stores/uiStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useFileExplorerStore } from '../stores/fileExplorerStore';
 import { useBatchStore } from '../stores/batchStore';
-import { useSessionStore, updateSessionWith, selectActiveSession } from '../stores/sessionStore';
+import { updateSessionWith } from '../stores/sessionStore';
+import { useActiveSession } from '../hooks/session/useActiveSession';
 import { formatElapsedTime } from '../../shared/formatters';
 
 export interface RightPanelHandle {
@@ -103,7 +104,7 @@ interface RightPanelProps {
 export const RightPanel = memo(
 	forwardRef<RightPanelHandle, RightPanelProps>(function RightPanel(props, ref) {
 		// === State from stores (direct subscriptions — no prop drilling) ===
-		const session = useSessionStore(selectActiveSession);
+		const session = useActiveSession();
 		const rightPanelOpen = useUIStore((s) => s.rightPanelOpen);
 		const activeRightTab = useUIStore((s) => s.activeRightTab);
 		const activeFocus = useUIStore((s) => s.activeFocus);

@@ -19,12 +19,8 @@ import type { Session, LeaderboardRegistration, AgentError } from '../../types';
 import type { RecoveryAction } from '../../components/AgentErrorModal';
 import { getModalActions, useModalStore } from '../../stores/modalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import {
-	useSessionStore,
-	selectActiveSession,
-	selectSessionById,
-	updateActiveAiTab,
-} from '../../stores/sessionStore';
+import { useSessionStore, selectSessionById, updateActiveAiTab } from '../../stores/sessionStore';
+import { useActiveSession } from '../session/useActiveSession';
 import { useGroupChatStore } from '../../stores/groupChatStore';
 import { useAgentStore } from '../../stores/agentStore';
 import { useAgentErrorRecovery } from '../agent/useAgentErrorRecovery';
@@ -800,7 +796,7 @@ export function useModalHandlers(
 	// Git Diff Opener (Tier 3C)
 	// ====================================================================
 
-	const activeSession = useSessionStore(selectActiveSession);
+	const activeSession = useActiveSession();
 
 	const handleViewGitDiff = useCallback(async () => {
 		if (!activeSession || !activeSession.isGitRepo) return;

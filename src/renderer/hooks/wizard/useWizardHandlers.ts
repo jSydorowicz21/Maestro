@@ -26,7 +26,8 @@ import type {
 	WizardMode,
 	SessionWizardState,
 } from '../../types';
-import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
+import { useSessionStore } from '../../stores/sessionStore';
+import { useActiveSession } from '../session/useActiveSession';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUIStore } from '../../stores/uiStore';
 import { getModalActions, useModalStore } from '../../stores/modalStore';
@@ -149,7 +150,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 	} = deps;
 
 	// --- Store subscriptions (reactive) ---
-	const activeSession = useSessionStore(selectActiveSession);
+	const activeSession = useActiveSession();
 
 	// --- Store actions (stable) ---
 	const { setSessions, setActiveSessionId } = useMemo(() => useSessionStore.getState(), []);

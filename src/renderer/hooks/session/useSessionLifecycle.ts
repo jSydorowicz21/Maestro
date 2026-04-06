@@ -19,6 +19,7 @@ import { useCallback, useEffect } from 'react';
 import type { Session, AITab } from '../../types';
 import type { ToolType } from '../../../shared/types';
 import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
+import { useActiveSession } from './useActiveSession';
 import { generateId } from '../../utils/ids';
 import { useGroupChatStore } from '../../stores/groupChatStore';
 import { useModalStore } from '../../stores/modalStore';
@@ -100,7 +101,7 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 	const { flushSessionPersistence, setRemovedWorktreePaths, pushNavigation } = deps;
 
 	// --- Store subscriptions ---
-	const activeSession = useSessionStore(selectActiveSession);
+	const activeSession = useActiveSession();
 	const renameTabId = useModalStore(selectRenameTabId);
 	const groups = useSessionStore(selectGroups);
 	const initialLoadComplete = useSessionStore(selectInitialLoadComplete);

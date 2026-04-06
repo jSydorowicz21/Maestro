@@ -55,3 +55,6 @@ export type { UseSessionCrudDeps, UseSessionCrudReturn } from './useSessionCrud'
 // Session cycling (Cmd+Shift+[/])
 export { useCycleSession } from './useCycleSession';
 export type { UseCycleSessionDeps, UseCycleSessionReturn } from './useCycleSession';
+
+// Active session shorthand (wraps selectActiveSession selector)
+export { useActiveSession } from './useActiveSession';

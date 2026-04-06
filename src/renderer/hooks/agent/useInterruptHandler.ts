@@ -13,7 +13,8 @@
 
 import { useCallback } from 'react';
 import type { Session, LogEntry, QueuedItem, SessionState } from '../../types';
-import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
+import { useSessionStore } from '../../stores/sessionStore';
+import { useActiveSession } from '../session/useActiveSession';
 import { generateId } from '../../utils/ids';
 import { getActiveTab } from '../../utils/tabHelpers';
 
@@ -47,7 +48,7 @@ export function useInterruptHandler(deps: UseInterruptHandlerDeps): UseInterrupt
 	const { sessionsRef, cancelPendingSynopsis, processQueuedItem } = deps;
 
 	// --- Reactive subscriptions ---
-	const activeSession = useSessionStore(selectActiveSession);
+	const activeSession = useActiveSession();
 
 	// --- Store actions (stable via getState) ---
 	const { setSessions } = useSessionStore.getState();

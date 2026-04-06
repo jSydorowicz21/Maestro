@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
+import { useSessionStore } from '../../stores/sessionStore';
+import { useActiveSession } from '../../hooks/session/useActiveSession';
 import { useGroupChatStore } from '../../stores/groupChatStore';
 import { useModalStore } from '../../stores/modalStore';
 import type {
@@ -400,7 +401,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
 	const groups = useSessionStore((s) => s.groups);
 	const setGroups = useSessionStore((s) => s.setGroups);
-	const activeSession = useSessionStore(selectActiveSession);
+	const activeSession = useActiveSession();
 	const groupChats = useGroupChatStore((s) => s.groupChats);
 	const activeGroupChatId = useGroupChatStore((s) => s.activeGroupChatId);
 

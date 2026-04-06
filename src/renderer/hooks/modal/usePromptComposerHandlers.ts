@@ -10,7 +10,8 @@
 
 import { useCallback } from 'react';
 import type { ThinkingMode } from '../../types';
-import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
+import { useSessionStore } from '../../stores/sessionStore';
+import { useActiveSession } from '../session/useActiveSession';
 import { useGroupChatStore } from '../../stores/groupChatStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { getActiveTab } from '../../utils/tabHelpers';
@@ -57,7 +58,7 @@ export function usePromptComposerHandlers(
 	const { handleSendGroupChatMessage, processInput, setInputValue } = deps;
 
 	// --- Reactive subscriptions ---
-	const activeSession = useSessionStore(selectActiveSession);
+	const activeSession = useActiveSession();
 	const activeGroupChatId = useGroupChatStore((s) => s.activeGroupChatId);
 	const groupChatStagedImages = useGroupChatStore((s) => s.groupChatStagedImages);
 	const groupChatReadOnlyMode = useGroupChatStore((s) => s.groupChatReadOnlyMode);

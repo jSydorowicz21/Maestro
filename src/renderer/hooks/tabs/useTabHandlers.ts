@@ -28,6 +28,7 @@ import {
 	updateAiTab,
 	updateSessionWith,
 } from '../../stores/sessionStore';
+import { useActiveSession } from '../session/useActiveSession';
 import { useModalStore } from '../../stores/modalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useTabStore } from '../../stores/tabStore';
@@ -122,7 +123,7 @@ export interface TabHandlersReturn {
 
 export function useTabHandlers(): TabHandlersReturn {
 	// --- Reactive subscriptions for derived state ---
-	const activeSession = useSessionStore(selectActiveSession);
+	const activeSession = useActiveSession();
 
 	// --- Derived state (useMemo) ---
 

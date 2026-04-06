@@ -15,7 +15,8 @@
 
 import { useCallback } from 'react';
 import type { ThinkingMode } from '../../types';
-import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
+import { useSessionStore } from '../../stores/sessionStore';
+import { useActiveSession } from '../session/useActiveSession';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUIStore } from '../../stores/uiStore';
 import type { MainPanelHandle } from '../../components/MainPanel';
@@ -75,7 +76,7 @@ export function useQuickActionsHandlers(
 	} = deps;
 
 	// --- Reactive subscriptions ---
-	const activeSession = useSessionStore(selectActiveSession);
+	const activeSession = useActiveSession();
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
 	const markdownEditMode = useSettingsStore((s) => s.markdownEditMode);
 	const chatRawTextMode = useSettingsStore((s) => s.chatRawTextMode);

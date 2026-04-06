@@ -15,7 +15,8 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo, useDeferredValue } from 'react';
 import type { Session, BatchRunState, QueuedItem, CustomAICommand } from '../../types';
-import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
+import { useSessionStore } from '../../stores/sessionStore';
+import { useActiveSession } from '../session/useActiveSession';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useGroupChatStore } from '../../stores/groupChatStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -154,7 +155,7 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 	} = deps;
 
 	// --- Store subscriptions (reactive) ---
-	const activeSession = useSessionStore(selectActiveSession);
+	const activeSession = useActiveSession();
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
 	const setSessions = useMemo(() => useSessionStore.getState().setSessions, []);
 	const activeGroupChatId = useGroupChatStore((s) => s.activeGroupChatId);

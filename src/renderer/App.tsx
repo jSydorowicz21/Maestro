@@ -168,6 +168,7 @@ import {
 	updateSessionWith,
 	updateAiTab,
 } from './stores/sessionStore';
+import { useActiveSession } from './hooks/session/useActiveSession';
 // useAgentStore moved to useQueueProcessing hook
 import { InlineWizardProvider, useInlineWizardContext } from './contexts/InlineWizardContext';
 import { ToastContainer } from './components/Toast';
@@ -506,7 +507,7 @@ function MaestroConsoleInner() {
 	const groups = useSessionStore((s) => s.groups);
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
 	// sessionsLoaded moved to useQueueProcessing hook
-	const activeSession = useSessionStore(selectActiveSession);
+	const activeSession = useActiveSession();
 
 	// Actions — stable references from store, never trigger re-renders
 	const {

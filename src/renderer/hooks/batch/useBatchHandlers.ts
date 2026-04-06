@@ -21,7 +21,8 @@ import type {
 	QueuedItem,
 	AgentError,
 } from '../../types';
-import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
+import { useSessionStore } from '../../stores/sessionStore';
+import { useActiveSession } from '../session/useActiveSession';
 import { useSettingsStore, selectIsLeaderboardRegistered } from '../../stores/settingsStore';
 import { useModalStore, getModalActions } from '../../stores/modalStore';
 import { notifyToast } from '../../stores/notificationStore';
@@ -125,7 +126,7 @@ export function useBatchHandlers(deps: UseBatchHandlersDeps): UseBatchHandlersRe
 	// --- Store subscriptions (reactive) ---
 	const sessions = useSessionStore(selectSessions);
 	const groups = useSessionStore(selectGroups);
-	const activeSession = useSessionStore(selectActiveSession);
+	const activeSession = useActiveSession();
 	const audioFeedbackEnabled = useSettingsStore(selectAudioFeedbackEnabled);
 	const audioFeedbackCommand = useSettingsStore(selectAudioFeedbackCommand);
 	const autoRunStats = useSettingsStore(selectAutoRunStats);
