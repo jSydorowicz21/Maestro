@@ -38,32 +38,32 @@ Break down `App.tsx` from 4,034 lines into focused modules. This is the single l
 
 **Analysis (3,934 lines total):**
 
-| Section | Lines | Range | Notes |
-|---------|-------|-------|-------|
-| Imports | 217 | 1-217 | Lazy-loaded components, hooks, stores, types |
-| Modal state destructuring (modalStore) | 150 | 222-372 | Already extracted to modalStore, just destructuring |
-| Wizard state + settings hook | 108 | 380-487 | Already extracted to useWizard/useSettings |
-| Session state (sessionStore) | 72 | 504-575 | Already extracted to sessionStore, ref-like getters |
-| UI layout state (uiStore) | 37 | 577-613 | Already extracted to uiStore |
-| Group chat state (groupChatStore) | 24 | 615-638 | Already extracted to groupChatStore |
-| Input context + file explorer state | 27 | 659-696 | Already extracted to InputContext |
-| Refs (DOM + value refs) | 33 | 766-798 | Essential - cannot extract further |
-| Debug helpers effect | 24 | 800-823 | Trivial |
-| Extracted hook calls (tab, group, modal, worktree, app) | 230 | 831-1046 | Already extracted - just call sites |
-| Theme/CWD memos + remote hooks | 67 | 1048-1118 | Small; already extracted |
-| Agent capabilities + merge/summarize | 40 | 1121-1160 | Already extracted |
-| allCustomCommands + allSlashCommands memos | 121 | 1162-1282 | **Extractable** - slash command assembly |
-| Agent execution/management/batch/listeners | 71 | 1287-1357 | Already extracted |
-| Callbacks (remove queue, exports, wizard, input) | 142 | 1359-1500 | Mixed; some are bridge wrappers |
-| Activity trackers + more callbacks | 102 | 1502-1604 | Small scattered handlers |
-| Deep link handler effect | 28 | 1606-1633 | **Extractable** |
-| Sorted sessions, keyboard nav, persistence, lifecycle | 159 | 1635-1793 | Already extracted - just call sites |
-| **Remote event listeners** | **494** | **1795-2288** | **LARGEST extractable section - 15 useEventListener handlers** |
-| Group management + session CRUD hooks | 42 | 2290-2331 | Already extracted - just call sites |
-| Inline callbacks (PR, batch, tab select, etc.) | 141 | 2333-2473 | Mixed; some extractable |
-| **Keyboard handler ref population** | **175** | **2476-2650** | **2nd largest - assigns ~100 fields to ref** |
-| Props hook calls (mainPanel, sessionList, rightPanel) | 336 | 2658-2993 | Already extracted to prop hooks |
-| **JSX return** | **922** | **2995-3916** | **3rd largest - modal rendering + layout** |
+| Section                                                 | Lines   | Range         | Notes                                                          |
+| ------------------------------------------------------- | ------- | ------------- | -------------------------------------------------------------- |
+| Imports                                                 | 217     | 1-217         | Lazy-loaded components, hooks, stores, types                   |
+| Modal state destructuring (modalStore)                  | 150     | 222-372       | Already extracted to modalStore, just destructuring            |
+| Wizard state + settings hook                            | 108     | 380-487       | Already extracted to useWizard/useSettings                     |
+| Session state (sessionStore)                            | 72      | 504-575       | Already extracted to sessionStore, ref-like getters            |
+| UI layout state (uiStore)                               | 37      | 577-613       | Already extracted to uiStore                                   |
+| Group chat state (groupChatStore)                       | 24      | 615-638       | Already extracted to groupChatStore                            |
+| Input context + file explorer state                     | 27      | 659-696       | Already extracted to InputContext                              |
+| Refs (DOM + value refs)                                 | 33      | 766-798       | Essential - cannot extract further                             |
+| Debug helpers effect                                    | 24      | 800-823       | Trivial                                                        |
+| Extracted hook calls (tab, group, modal, worktree, app) | 230     | 831-1046      | Already extracted - just call sites                            |
+| Theme/CWD memos + remote hooks                          | 67      | 1048-1118     | Small; already extracted                                       |
+| Agent capabilities + merge/summarize                    | 40      | 1121-1160     | Already extracted                                              |
+| allCustomCommands + allSlashCommands memos              | 121     | 1162-1282     | **Extractable** - slash command assembly                       |
+| Agent execution/management/batch/listeners              | 71      | 1287-1357     | Already extracted                                              |
+| Callbacks (remove queue, exports, wizard, input)        | 142     | 1359-1500     | Mixed; some are bridge wrappers                                |
+| Activity trackers + more callbacks                      | 102     | 1502-1604     | Small scattered handlers                                       |
+| Deep link handler effect                                | 28      | 1606-1633     | **Extractable**                                                |
+| Sorted sessions, keyboard nav, persistence, lifecycle   | 159     | 1635-1793     | Already extracted - just call sites                            |
+| **Remote event listeners**                              | **494** | **1795-2288** | **LARGEST extractable section - 15 useEventListener handlers** |
+| Group management + session CRUD hooks                   | 42      | 2290-2331     | Already extracted - just call sites                            |
+| Inline callbacks (PR, batch, tab select, etc.)          | 141     | 2333-2473     | Mixed; some extractable                                        |
+| **Keyboard handler ref population**                     | **175** | **2476-2650** | **2nd largest - assigns ~100 fields to ref**                   |
+| Props hook calls (mainPanel, sessionList, rightPanel)   | 336     | 2658-2993     | Already extracted to prop hooks                                |
+| **JSX return**                                          | **922** | **2995-3916** | **3rd largest - modal rendering + layout**                     |
 
 **Top extractable sections by size:**
 
