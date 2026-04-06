@@ -198,7 +198,10 @@ vi.mock('../../../../renderer/components/Wizard/services/phaseGenerator', () => 
 		isGenerationInProgress: vi.fn().mockReturnValue(false),
 		abort: vi.fn(),
 	},
-	AUTO_RUN_FOLDER_NAME: '.maestro/playbooks',
+}));
+
+vi.mock('../../../../shared/maestro-paths', () => ({
+	PLAYBOOKS_DIR: '.maestro/playbooks',
 }));
 // Mock available agents
 const mockAgents: AgentConfig[] = [

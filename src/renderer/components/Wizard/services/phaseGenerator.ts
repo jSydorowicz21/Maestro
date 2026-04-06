@@ -147,12 +147,6 @@ interface ParsedDocument {
 import { PLAYBOOKS_DIR } from '../../../../shared/maestro-paths';
 
 /**
- * Default Auto Run folder name.
- * @deprecated Import PLAYBOOKS_DIR from shared/maestro-paths instead.
- */
-export const AUTO_RUN_FOLDER_NAME = PLAYBOOKS_DIR;
-
-/**
  * Sanitize a filename to prevent path traversal attacks.
  * Removes path separators, directory traversal sequences, and other dangerous characters.
  *
@@ -342,9 +336,7 @@ export function generateDocumentGenerationPrompt(config: GenerationConfig): stri
 		.join('\n\n');
 
 	// Build the full Auto Run folder path (including subfolder if specified)
-	const autoRunFolderPath = subfolder
-		? `${AUTO_RUN_FOLDER_NAME}/${subfolder}`
-		: AUTO_RUN_FOLDER_NAME;
+	const autoRunFolderPath = subfolder ? `${PLAYBOOKS_DIR}/${subfolder}` : PLAYBOOKS_DIR;
 
 	// First, handle wizard-specific variables that have different semantics
 	// from the central template system. We do this BEFORE the central function
@@ -723,8 +715,8 @@ class PhaseGenerator {
 				wizardDebugLogger.log('info', 'Checking for documents on disk (parsed docs invalid)');
 				// Build the correct path including subfolder if specified
 				const autoRunPath = config.subfolder
-					? `${config.directoryPath}/${AUTO_RUN_FOLDER_NAME}/${config.subfolder}`
-					: `${config.directoryPath}/${AUTO_RUN_FOLDER_NAME}`;
+					? `${config.directoryPath}/${PLAYBOOKS_DIR}/${config.subfolder}`
+					: `${config.directoryPath}/${PLAYBOOKS_DIR}`;
 				const diskDocs = await this.readDocumentsFromDisk(autoRunPath, sshRemoteId);
 				if (diskDocs.length > 0) {
 					console.debug('[PhaseGenerator] Found documents on disk:', diskDocs.length);
@@ -771,7 +763,7 @@ class PhaseGenerator {
 
 			// Convert to GeneratedDocument format
 			// If read from disk, set savedPath since they're already saved
-			const autoRunPath = `${config.directoryPath}/${AUTO_RUN_FOLDER_NAME}`;
+			const autoRunPath = `${config.directoryPath}/${PLAYBOOKS_DIR}`;
 			const generatedDocs: GeneratedDocument[] = documents.map((doc) => ({
 				filename: doc.filename,
 				content: doc.content,
@@ -990,8 +982,8 @@ class PhaseGenerator {
 			// Set up file system watcher for Auto Run Docs folder (including subfolder if specified)
 			// This detects when the agent creates files and resets the timeout
 			const autoRunPath = config.subfolder
-				? `${config.directoryPath}/${AUTO_RUN_FOLDER_NAME}/${config.subfolder}`
-				: `${config.directoryPath}/${AUTO_RUN_FOLDER_NAME}`;
+				? `${config.directoryPath}/${PLAYBOOKS_DIR}/${config.subfolder}`
+				: `${config.directoryPath}/${PLAYBOOKS_DIR}`;
 			wizardDebugLogger.log('info', 'Setting up file watcher', {
 				autoRunPath,
 				subfolder: config.subfolder,
@@ -1152,6 +1144,7 @@ class PhaseGenerator {
 					wizardDebugLogger.log('spawn', 'Agent spawned successfully', { sessionId });
 				})
 				.catch((error: Error) => {
+					// Expected: agent operations may fail due to timeouts or unavailability
 					console.error('[PhaseGenerator] Spawn failed:', error.message);
 					wizardDebugLogger.log('error', 'Spawn failed', {
 						errorMessage: error.message,
@@ -1222,6 +1215,7 @@ class PhaseGenerator {
 
 			return documents;
 		} catch (error) {
+			// Expected: agent operations may fail due to timeouts or unavailability
 			console.error('[PhaseGenerator] Error reading documents from disk:', error);
 			return [];
 		}
@@ -1264,7 +1258,7 @@ class PhaseGenerator {
 		subfolder?: string,
 		sshRemoteId?: string
 	): Promise<{ success: boolean; savedPaths: string[]; error?: string; subfolderPath?: string }> {
-		const baseAutoRunPath = `${directoryPath}/${AUTO_RUN_FOLDER_NAME}`;
+		const baseAutoRunPath = `${directoryPath}/${PLAYBOOKS_DIR}`;
 		const autoRunPath = subfolder ? `${baseAutoRunPath}/${subfolder}` : baseAutoRunPath;
 		const savedPaths: string[] = [];
 
@@ -1313,6 +1307,7 @@ class PhaseGenerator {
 
 			return { success: true, savedPaths, subfolderPath: subfolder ? autoRunPath : undefined };
 		} catch (error) {
+			// Expected: agent operations may fail due to timeouts or unavailability
 			const errorMessage = error instanceof Error ? error.message : 'Failed to save documents';
 			console.error('[PhaseGenerator] Save error:', errorMessage);
 			return { success: false, savedPaths, error: errorMessage };
@@ -1323,7 +1318,7 @@ class PhaseGenerator {
 	 * Get the Auto Run folder path for a directory
 	 */
 	getAutoRunPath(directoryPath: string): string {
-		return `${directoryPath}/${AUTO_RUN_FOLDER_NAME}`;
+		return `${directoryPath}/${PLAYBOOKS_DIR}`;
 	}
 
 	/**
@@ -1353,5 +1348,5 @@ export const phaseGeneratorUtils = {
 	countTasks,
 	validateDocuments,
 	splitIntoPhases,
-	AUTO_RUN_FOLDER_NAME,
+	PLAYBOOKS_DIR,
 };

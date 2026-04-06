@@ -22,10 +22,10 @@ import {
 	MaestroWizard,
 	useWizard,
 	WizardResumeModal,
-	AUTO_RUN_FOLDER_NAME,
 	type SerializableWizardState,
 	type WizardStep,
 } from './components/Wizard';
+import { PLAYBOOKS_DIR } from '../shared/maestro-paths';
 import { TourOverlay } from './components/Wizard/tour';
 // CONDUCTOR_BADGES moved to useAutoRunAchievements hook
 import { EmptyStateView } from './components/EmptyStateView';
@@ -2142,7 +2142,7 @@ function MaestroConsoleInner() {
 				unifiedTabOrder: [{ type: 'ai' as const, id: initialTabId }],
 				unifiedClosedTabHistory: [],
 				groupId: groupId || undefined,
-				autoRunFolderPath: `${cwd}/${AUTO_RUN_FOLDER_NAME}`,
+				autoRunFolderPath: `${cwd}/${PLAYBOOKS_DIR}`,
 			};
 
 			setSessions((prev) => [...prev, newSession]);

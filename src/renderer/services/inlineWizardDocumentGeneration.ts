@@ -20,12 +20,6 @@ import { PLAYBOOKS_DIR } from '../../shared/maestro-paths';
 import { captureException } from '../utils/sentry';
 
 /**
- * Auto Run folder name constant.
- * @deprecated Import PLAYBOOKS_DIR from shared/maestro-paths instead.
- */
-export const AUTO_RUN_FOLDER_NAME = PLAYBOOKS_DIR;
-
-/**
  * Generation timeout in milliseconds (20 minutes).
  */
 const GENERATION_TIMEOUT = 1200000;

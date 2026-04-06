@@ -24,9 +24,9 @@ vi.mock('../../../renderer/utils/ids', () => ({
 	generateId: vi.fn(() => `mock-id-${++idCounter}`),
 }));
 
-// Mock AUTO_RUN_FOLDER_NAME
-vi.mock('../../../renderer/components/Wizard', () => ({
-	AUTO_RUN_FOLDER_NAME: '.maestro-autorun',
+// Mock PLAYBOOKS_DIR
+vi.mock('../../../shared/maestro-paths', () => ({
+	PLAYBOOKS_DIR: '.maestro-autorun',
 }));
 
 import { useSessionRestoration } from '../../../renderer/hooks/session/useSessionRestoration';

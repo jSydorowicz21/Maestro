@@ -16,8 +16,8 @@ Clean up remaining P3 (nice-to-have) duplications:
 
 ## Pre-flight Checks
 
-- [ ] Phase 11 (logging) is complete
-- [ ] `rtk npm run lint` passes
+- [x] Phase 11 (logging) is complete
+- [x] `rtk npm run lint` passes
 
 ---
 
@@ -25,12 +25,14 @@ Clean up remaining P3 (nice-to-have) duplications:
 
 ### 1. Remove AUTO_RUN_FOLDER_NAME aliases (3 definitions)
 
-- [ ] Verify canonical `PLAYBOOKS_DIR` exists in `src/shared/maestro-paths.ts:14`
-- [ ] Remove local `AUTO_RUN_FOLDER_NAME` declaration in `phaseGenerator.ts:153` and replace all usages with `PLAYBOOKS_DIR`
-- [ ] Remove local `AUTO_RUN_FOLDER_NAME` declaration in `inlineWizardDocumentGeneration.ts:25` and replace all usages with `PLAYBOOKS_DIR`
-- [ ] Remove local `AUTO_RUN_FOLDER_NAME` declaration in `existingDocsDetector.ts:13` and replace all usages with `PLAYBOOKS_DIR`
-- [ ] Add `import { PLAYBOOKS_DIR } from '../../shared/maestro-paths';` to each file (adjust relative path as needed)
-- [ ] Run targeted tests: `rtk vitest run` (filter for affected files)
+- [x] Verify canonical `PLAYBOOKS_DIR` exists in `src/shared/maestro-paths.ts:14`
+- [x] Remove local `AUTO_RUN_FOLDER_NAME` declaration in `phaseGenerator.ts:153` and replace all usages with `PLAYBOOKS_DIR`
+- [x] Remove local `AUTO_RUN_FOLDER_NAME` declaration in `inlineWizardDocumentGeneration.ts:25` and replace all usages with `PLAYBOOKS_DIR`
+- [x] Remove local `AUTO_RUN_FOLDER_NAME` declaration in `existingDocsDetector.ts:13` and replace all usages with `PLAYBOOKS_DIR`
+- [x] Add `import { PLAYBOOKS_DIR } from '../../shared/maestro-paths';` to each file (adjust relative path as needed)
+- [x] Run targeted tests: `CI=1 rtk vitest run` (filter for affected files)
+
+> **Note:** Also updated 7 consumer files (App.tsx, useWizardHandlers.ts, useSessionRestoration.ts, useSessionCrud.ts, DebugWizardModal.tsx, ConversationScreen.tsx, DirectorySelectionScreen.tsx, PhaseReviewScreen.tsx) and 5 test files to import PLAYBOOKS_DIR from shared/maestro-paths. Removed re-exports from Wizard/index.ts and Wizard/services/index.ts. Template variable regex patterns ({{AUTO_RUN_FOLDER_NAME}}) in prompt templates and code correctly preserved. All 255 targeted tests pass.
 
 ### 2. Consolidate DEFAULT_CAPABILITIES (2 definitions)
 
@@ -39,7 +41,7 @@ Clean up remaining P3 (nice-to-have) duplications:
 - [ ] Update import in `main/agents/capabilities.ts` to use shared location
 - [ ] Update import in `renderer/hooks/agent/useAgentCapabilities.ts` to use shared location
 - [ ] Remove the duplicate definition from the renderer hook
-- [ ] Run targeted tests: `rtk vitest run` (filter for agent capability tests)
+- [ ] Run targeted tests: `CI=1 rtk vitest run` (filter for agent capability tests)
 
 ### 3. Extract compound CSS className constants
 
@@ -54,7 +56,7 @@ Clean up remaining P3 (nice-to-have) duplications:
 ### 4. Verify full build
 
 - [ ] Run lint: `rtk npm run lint`
-- [ ] Run tests: `rtk vitest run`
+- [ ] Run tests: `CI=1 rtk vitest run`
 - [ ] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
 
 ---
@@ -64,7 +66,7 @@ Clean up remaining P3 (nice-to-have) duplications:
 After completing changes, run targeted tests for the files you modified:
 
 ```bash
-rtk vitest run <path-to-relevant-test-files>
+CI=1 rtk vitest run <path-to-relevant-test-files>
 ```
 
 **Rule: Zero new test failures from your changes.** Pre-existing failures on the baseline are acceptable.

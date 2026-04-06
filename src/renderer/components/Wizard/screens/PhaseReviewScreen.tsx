@@ -20,7 +20,7 @@ import { Rocket, Compass, X } from 'lucide-react';
 import { Spinner } from '../../ui';
 import type { Theme } from '../../../types';
 import { useWizard } from '../WizardContext';
-import { AUTO_RUN_FOLDER_NAME } from '../services/phaseGenerator';
+import { PLAYBOOKS_DIR } from '../../../../shared/maestro-paths';
 import { ScreenReaderAnnouncement } from '../ScreenReaderAnnouncement';
 import { DocumentEditor } from '../shared/DocumentEditor';
 import { ToggleSwitch } from '../../ui/ToggleSwitch';
@@ -81,7 +81,7 @@ function DocumentReview({
 
 	const { generatedDocuments, directoryPath, currentDocumentIndex } = state;
 	const currentDoc = generatedDocuments[currentDocumentIndex] || generatedDocuments[0];
-	const folderPath = `${directoryPath}/${AUTO_RUN_FOLDER_NAME}`;
+	const folderPath = `${directoryPath}/${PLAYBOOKS_DIR}`;
 
 	// Local content state for editing - tracks current document
 	const [localContent, setLocalContent] = useState(
@@ -165,6 +165,7 @@ function DocumentReview({
 						setEditedPhase1Content(localContent);
 					}
 				} catch (err) {
+					// Expected: file system write may fail transiently during auto-save
 					console.error('Auto-save failed:', err);
 				} finally {
 					isSavingRef.current = false;
@@ -189,6 +190,7 @@ function DocumentReview({
 								setEditedPhase1Content(pendingContent);
 							}
 						} catch (err) {
+							// Expected: file system write may fail transiently during auto-save
 							console.error('Auto-save (pending) failed:', err);
 						} finally {
 							isSavingRef.current = false;
