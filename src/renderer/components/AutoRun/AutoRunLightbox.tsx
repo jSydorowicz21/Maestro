@@ -1,9 +1,9 @@
-import React, { useState, useCallback, memo, useEffect, useRef } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Copy, Check, Trash2, FileText } from 'lucide-react';
 import type { Theme } from '../../types';
 import { formatShortcutKeys } from '../../utils/shortcutFormatter';
-import { useLayerStack } from '../../contexts/LayerStackContext';
+import { useModalLayer } from '../../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
 import { ConfirmModal } from '../ConfirmModal';
 import { safeClipboardWrite, safeClipboardWriteImage } from '../../utils/clipboard';
@@ -52,46 +52,16 @@ export const AutoRunLightbox = memo(
 		const [copied, setCopied] = useState(false);
 		const [copiedMarkdown, setCopiedMarkdown] = useState(false);
 		const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-		const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
-		const layerIdRef = useRef<string>();
-		const onCloseRef = useRef(onClose);
-		onCloseRef.current = onClose;
 
 		// Determine if lightbox is visible
 		const isVisible = Boolean(lightboxFilename);
 
 		// Register with layer stack when lightbox is visible
 		// This ensures Escape closes the lightbox first before the expanded modal
-		useEffect(() => {
-			if (isVisible) {
-				const id = registerLayer({
-					type: 'modal',
-					priority: MODAL_PRIORITIES.AUTORUN_LIGHTBOX,
-					blocksLowerLayers: true,
-					capturesFocus: true,
-					focusTrap: 'lenient',
-					onEscape: () => {
-						onCloseRef.current();
-					},
-				});
-				layerIdRef.current = id;
-
-				return () => {
-					if (layerIdRef.current) {
-						unregisterLayer(layerIdRef.current);
-					}
-				};
-			}
-		}, [isVisible, registerLayer, unregisterLayer]);
-
-		// Keep escape handler up to date
-		useEffect(() => {
-			if (layerIdRef.current) {
-				updateLayerHandler(layerIdRef.current, () => {
-					onCloseRef.current();
-				});
-			}
-		}, [onClose, updateLayerHandler]);
+		useModalLayer(MODAL_PRIORITIES.AUTORUN_LIGHTBOX, 'Auto Run Lightbox', onClose, {
+			isOpen: isVisible,
+			focusTrap: 'lenient',
+		});
 
 		// Calculate current index and navigation availability
 		const currentIndex = lightboxFilename ? attachmentsList.indexOf(lightboxFilename) : -1;

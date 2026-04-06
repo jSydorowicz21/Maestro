@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { X, GitBranch, FolderOpen, Plus, AlertTriangle, Server } from 'lucide-react';
 import type { Theme, Session, GhCliStatus } from '../types';
-import { useLayerStack } from '../contexts/LayerStackContext';
+import { useModalLayer } from '../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { GhostIconButton } from './ui/GhostIconButton';
 import { Spinner } from './ui';
@@ -48,9 +48,10 @@ export function WorktreeConfigModal({
 	onCreateWorktree,
 	onDisableConfig,
 }: WorktreeConfigModalProps) {
-	const { registerLayer, unregisterLayer } = useLayerStack();
-	const onCloseRef = useRef(onClose);
-	onCloseRef.current = onClose;
+	useModalLayer(MODAL_PRIORITIES.WORKTREE_CONFIG, 'Worktree Configuration', onClose, {
+		isOpen,
+		focusTrap: 'lenient',
+	});
 
 	// Form state — default base path to parent directory of the agent's cwd
 	const [basePath, setBasePath] = useState(
@@ -71,21 +72,6 @@ export function WorktreeConfigModal({
 	// we must fall back to sessionSshRemoteConfig.remoteId. See CLAUDE.md "SSH Remote Sessions".
 	const sshRemoteId = session.sshRemoteId || session.sessionSshRemoteConfig?.remoteId || undefined;
 	const isRemoteSession = !!sshRemoteId;
-
-	// Register with layer stack for Escape handling
-	useEffect(() => {
-		if (isOpen) {
-			const id = registerLayer({
-				type: 'modal',
-				priority: MODAL_PRIORITIES.WORKTREE_CONFIG,
-				onEscape: () => onCloseRef.current(),
-				blocksLowerLayers: true,
-				capturesFocus: true,
-				focusTrap: 'lenient',
-			});
-			return () => unregisterLayer(id);
-		}
-	}, [isOpen, registerLayer, unregisterLayer]);
 
 	// Check gh CLI status and load config on open
 	useEffect(() => {

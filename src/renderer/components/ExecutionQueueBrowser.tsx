@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useEventListener } from '../hooks/utils/useEventListener';
 import { X, MessageSquare, Command, Trash2, Clock, Folder, FolderOpen } from 'lucide-react';
-import { useLayerStack } from '../contexts/LayerStackContext';
+import { useModalLayer } from '../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import type { Session, Theme, QueuedItem } from '../types';
 
@@ -44,9 +44,12 @@ export function ExecutionQueueBrowser({
 	const [viewMode, setViewMode] = useState<'current' | 'global'>('current');
 	const [dragState, setDragState] = useState<DragState | null>(null);
 	const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
-	const { registerLayer, unregisterLayer } = useLayerStack();
-	const onCloseRef = useRef(onClose);
-	onCloseRef.current = onClose;
+	useModalLayer(
+		MODAL_PRIORITIES.EXECUTION_QUEUE_BROWSER || 50,
+		'Execution Queue Browser',
+		onClose,
+		{ isOpen }
+	);
 
 	// Drag handlers
 	const handleDragStart = (sessionId: string, itemId: string, index: number) => {
@@ -80,21 +83,6 @@ export function ExecutionQueueBrowser({
 		setDragState(null);
 		setDropIndicator(null);
 	};
-
-	// Register with layer stack for proper escape handling
-	useEffect(() => {
-		if (isOpen) {
-			const id = registerLayer({
-				type: 'modal',
-				priority: MODAL_PRIORITIES.EXECUTION_QUEUE_BROWSER || 50,
-				blocksLowerLayers: true,
-				capturesFocus: true,
-				focusTrap: 'strict',
-				onEscape: () => onCloseRef.current(),
-			});
-			return () => unregisterLayer(id);
-		}
-	}, [isOpen, registerLayer, unregisterLayer]);
 
 	if (!isOpen) return null;
 

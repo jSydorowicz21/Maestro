@@ -3,7 +3,7 @@ import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { Search } from 'lucide-react';
 import type { Session, Group, Theme, Shortcut, RightPanelTab, SettingsTab } from '../types';
 import type { GroupChat } from '../../shared/group-chat-types';
-import { useLayerStack } from '../contexts/LayerStackContext';
+import { useModalLayer } from '../hooks/ui/useModalLayer';
 import { notifyToast } from '../stores/notificationStore';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { gitService } from '../services/git';
@@ -240,50 +240,22 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 	const inputRef = useRef<HTMLInputElement>(null);
 	const selectedItemRef = useRef<HTMLButtonElement>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
-	const layerIdRef = useRef<string>();
 	const modalRef = useRef<HTMLDivElement>(null);
 
-	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
 	const activeSession = sessions.find((s) => s.id === activeSessionId);
 
-	// Register layer on mount (handler will be updated by separate effect)
-	useEffect(() => {
-		layerIdRef.current = registerLayer({
-			type: 'modal',
-			priority: MODAL_PRIORITIES.QUICK_ACTION,
-			blocksLowerLayers: true,
-			capturesFocus: true,
-			focusTrap: 'strict',
-			ariaLabel: 'Quick Actions',
-			onEscape: () => setQuickActionOpen(false), // Initial handler, updated below
-		});
-
-		return () => {
-			if (layerIdRef.current) {
-				unregisterLayer(layerIdRef.current);
-			}
-		};
-	}, [registerLayer, unregisterLayer, setQuickActionOpen]);
-
-	// Update handler when mode changes - use a ref-based approach to avoid stale closure
-	const handleEscapeRef = useRef<() => void>(() => setQuickActionOpen(false));
-	useEffect(() => {
-		handleEscapeRef.current = () => {
-			// Handle escape based on current mode
-			if (mode === 'move-to-group') {
-				setMode('main');
-				// Note: Selection will be reset by the search/mode change useEffect
-			} else {
-				setQuickActionOpen(false);
-			}
-		};
+	// Escape handler: in sub-mode go back, otherwise close
+	const handleEscape = useCallback(() => {
+		if (mode === 'move-to-group') {
+			setMode('main');
+			// Note: Selection will be reset by the search/mode change useEffect
+		} else {
+			setQuickActionOpen(false);
+		}
 	}, [mode, setQuickActionOpen]);
 
-	useEffect(() => {
-		if (layerIdRef.current) {
-			updateLayerHandler(layerIdRef.current, () => handleEscapeRef.current());
-		}
-	}, [updateLayerHandler]);
+	// Register layer on mount
+	useModalLayer(MODAL_PRIORITIES.QUICK_ACTION, 'Quick Actions', handleEscape);
 
 	// Focus input on mount (small delay to ensure DOM is ready and layer is registered)
 	useFocusAfterRender(inputRef, true, 50);

@@ -11,12 +11,12 @@
  * - Uses shared AgentSelector and AgentConfigPanel components
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Music, X, Bot, Settings, FolderOpen, ChevronRight, RefreshCw } from 'lucide-react';
 import type { Theme, AgentConfig } from '../types';
 import type { RegisteredRepository, SymphonyIssue } from '../../shared/symphony-types';
-import { useLayerStack } from '../contexts/LayerStackContext';
+import { useModalLayer } from '../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { GhostIconButton } from './ui/GhostIconButton';
 import { Spinner } from './ui';
@@ -70,9 +70,12 @@ export function AgentCreationDialog({
 	issue,
 	onCreateAgent,
 }: AgentCreationDialogProps) {
-	const { registerLayer, unregisterLayer } = useLayerStack();
-	const onCloseRef = useRef(onClose);
-	onCloseRef.current = onClose;
+	useModalLayer(
+		MODAL_PRIORITIES.SYMPHONY_AGENT_CREATION ?? 711,
+		'Create Agent for Symphony Contribution',
+		onClose,
+		{ isOpen }
+	);
 
 	// Filter function: only agents that support batch mode (required for Symphony)
 	const symphonyAgentFilter = useCallback((agent: AgentConfig) => {
@@ -182,22 +185,6 @@ export function AgentCreationDialog({
 		},
 		[ac.refreshAgent]
 	);
-
-	// Layer stack registration
-	useEffect(() => {
-		if (isOpen) {
-			const id = registerLayer({
-				type: 'modal',
-				priority: MODAL_PRIORITIES.SYMPHONY_AGENT_CREATION ?? 711,
-				blocksLowerLayers: true,
-				capturesFocus: true,
-				focusTrap: 'strict',
-				ariaLabel: 'Create Agent for Symphony Contribution',
-				onEscape: () => onCloseRef.current(),
-			});
-			return () => unregisterLayer(id);
-		}
-	}, [isOpen, registerLayer, unregisterLayer]);
 
 	// Handle folder selection
 	const handleSelectFolder = useCallback(async () => {

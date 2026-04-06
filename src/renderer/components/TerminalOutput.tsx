@@ -16,7 +16,7 @@ import type { Session, Theme, LogEntry, FocusArea, AgentError } from '../types';
 import type { FileNode } from '../types/fileTree';
 import Convert from 'ansi-to-html';
 import DOMPurify from 'dompurify';
-import { useLayerStack } from '../contexts/LayerStackContext';
+import { useModalLayer } from '../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { getActiveTab } from '../utils/tabHelpers';
 import { useDebouncedValue, useThrottledCallback } from '../hooks';
@@ -1183,45 +1183,17 @@ export const TerminalOutput = memo(
 		}, []);
 
 		// Layer stack integration for search overlay
-		const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
-		const layerIdRef = useRef<string>();
+		const handleSearchEscape = useCallback(() => {
+			setOutputSearchOpen(false);
+			setOutputSearchQuery('');
+			terminalOutputRef.current?.focus();
+		}, [setOutputSearchOpen, setOutputSearchQuery, terminalOutputRef]);
 
-		// Register layer when search is open
-		useEffect(() => {
-			if (outputSearchOpen) {
-				layerIdRef.current = registerLayer({
-					type: 'overlay',
-					priority: MODAL_PRIORITIES.SLASH_AUTOCOMPLETE, // Use same priority as slash autocomplete (low priority)
-					blocksLowerLayers: false,
-					capturesFocus: true,
-					focusTrap: 'none',
-					onEscape: () => {
-						setOutputSearchOpen(false);
-						setOutputSearchQuery('');
-						terminalOutputRef.current?.focus();
-					},
-					allowClickOutside: true,
-					ariaLabel: 'Output Search',
-				});
-
-				return () => {
-					if (layerIdRef.current) {
-						unregisterLayer(layerIdRef.current);
-					}
-				};
-			}
-		}, [outputSearchOpen, registerLayer, unregisterLayer]);
-
-		// Update the handler when dependencies change
-		useEffect(() => {
-			if (outputSearchOpen && layerIdRef.current) {
-				updateLayerHandler(layerIdRef.current, () => {
-					setOutputSearchOpen(false);
-					setOutputSearchQuery('');
-					terminalOutputRef.current?.focus();
-				});
-			}
-		}, [outputSearchOpen, updateLayerHandler]);
+		useModalLayer(MODAL_PRIORITIES.SLASH_AUTOCOMPLETE, 'Output Search', handleSearchEscape, {
+			isOpen: outputSearchOpen,
+			type: 'overlay',
+			capturesFocus: true,
+		});
 
 		const toggleExpanded = useCallback((logId: string) => {
 			setExpandedLogs((prev) => {

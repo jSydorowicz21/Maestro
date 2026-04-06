@@ -58,9 +58,22 @@ Migrate 50+ files from manual `registerLayer`/`unregisterLayer` boilerplate to t
 
 ### 4. Migrate simple modals (~30 files)
 
-- [ ] For each file with direct `isOpen` + `onClose` props: replace the manual `useLayerStack` + `useRef` + `useEffect` block with `useModalLayer({ isOpen, priority, onEscape: onClose })`
-- [ ] Remove now-unused imports of `useLayerStack`, `useRef` (if no longer needed), and `useEffect` (if no longer needed)
-- [ ] Run targeted tests after each batch: `CI=1 rtk vitest run <relevant-test>`
+- [x] For each file with direct `isOpen` + `onClose` props: replace the manual `useLayerStack` + `useRef` + `useEffect` block with `useModalLayer({ isOpen, priority, onEscape: onClose })`
+  - Extended `useModalLayer` with `isOpen?: boolean` option (defaults to true) to gate registration without breaking React hook rules
+  - Added 5 new tests for isOpen behavior (transitions true/false, defaults)
+  - Migrated 36 component files across 5 parallel batches:
+    - Batch 1 (6 files): isOpen-guarded modals (AgentCreationDialog, CreateWorktreeModal, CreatePRModal, ExecutionQueueBrowser, UsageDashboardModal, WorktreeConfigModal)
+    - Batch 2 (8 files): Always-mounted simple modals (GitLogViewer, GitDiffViewer, FileSearchModal, MergeSessionModal, SendToAgentModal, TabSwitcherModal, HistoryDetailModal, PlaygroundPanel)
+    - Batch 3 (8 files): Wizard/confirm modals (ExistingAutoRunDocsModal, ExistingDocsModal, WizardExitConfirmModal, WizardExitConfirmDialog, WizardResumeModal, QuitConfirmModal, TourOverlay, MaestroWizard)
+    - Batch 4 (10 files): Celebrations and misc (FirstRunCelebration, KeyboardMasteryCelebration, StandingOvationOverlay, LeaderboardRegistrationModal, AutoRunExpandedModal, AutoRunLightbox, LightboxModal, TransferProgressModal, ProcessMonitor, QuickActionsModal)
+    - Batch 5 (4 files): Panels/overlays (DocumentsPanel, AutoRunSearchBar, TerminalSearchBar, TerminalOutput)
+- [x] Remove now-unused imports of `useLayerStack`, `useRef` (if no longer needed), and `useEffect` (if no longer needed)
+  - All unused imports cleaned up in each migrated file
+- [x] Run targeted tests after each batch: `CI=1 rtk vitest run <relevant-test>`
+  - Fixed 5 test files with incomplete `useLayerStack` mocks (missing `updateLayerHandler`)
+  - Fixed 2 ExecutionQueueBrowser tests that checked exact registerLayer args (now uses `expect.objectContaining`) and ref-based handler update (now verifies via `updateLayerHandler`)
+  - All 22 useModalLayer tests pass, all 73 ExecutionQueueBrowser tests pass
+  - Lint passes, zero new test failures from migration
 
 ### 5. Migrate complex modals (~15 files)
 

@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FileText, Trash2, ArrowRight } from 'lucide-react';
 import type { Theme } from '../../types';
-import { useLayerStack } from '../../contexts/LayerStackContext';
+import { useModalLayer } from '../../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
 
 interface ExistingDocsModalProps {
@@ -38,11 +38,13 @@ export function ExistingDocsModal({
 	onContinue,
 	onCancel,
 }: ExistingDocsModalProps): JSX.Element {
-	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
-	const layerIdRef = useRef<string>();
+	useModalLayer(
+		MODAL_PRIORITIES.EXISTING_AUTORUN_DOCS,
+		'Existing Playbook Documents Found',
+		onCancel
+	);
+
 	const continueButtonRef = useRef<HTMLButtonElement>(null);
-	const onCancelRef = useRef(onCancel);
-	onCancelRef.current = onCancel;
 
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -51,32 +53,6 @@ export function ExistingDocsModal({
 	useEffect(() => {
 		continueButtonRef.current?.focus();
 	}, []);
-
-	// Register with layer stack
-	useEffect(() => {
-		const id = registerLayer({
-			type: 'modal',
-			priority: MODAL_PRIORITIES.EXISTING_AUTORUN_DOCS,
-			blocksLowerLayers: true,
-			capturesFocus: true,
-			focusTrap: 'strict',
-			ariaLabel: 'Existing Playbook Documents Found',
-			onEscape: () => onCancelRef.current(),
-		});
-		layerIdRef.current = id;
-		return () => {
-			if (layerIdRef.current) {
-				unregisterLayer(layerIdRef.current);
-			}
-		};
-	}, [registerLayer, unregisterLayer]);
-
-	// Update escape handler when onCancel changes
-	useEffect(() => {
-		if (layerIdRef.current) {
-			updateLayerHandler(layerIdRef.current, () => onCancelRef.current());
-		}
-	}, [onCancel, updateLayerHandler]);
 
 	// Handle keyboard navigation
 	const handleKeyDown = (e: React.KeyboardEvent) => {

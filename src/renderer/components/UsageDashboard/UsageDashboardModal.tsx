@@ -35,7 +35,7 @@ import { DashboardSkeleton } from './ChartSkeletons';
 import { ChartErrorBoundary } from './ChartErrorBoundary';
 import type { Theme, Session } from '../../types';
 import type { StatsAggregation, StatsTimeRange } from '../../../shared/stats-types';
-import { useLayerStack } from '../../contexts/LayerStackContext';
+import { useModalLayer } from '../../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
 import { getRendererPerfMetrics } from '../../utils/logger';
 import { PERFORMANCE_THRESHOLDS } from '../../../shared/performance-metrics';
@@ -143,9 +143,10 @@ export function UsageDashboardModal({
 	const contentRef = useRef<HTMLDivElement>(null);
 	const tabsRef = useRef<HTMLDivElement>(null);
 	const sectionRefs = useRef<Map<SectionId, HTMLDivElement>>(new Map());
-	const { registerLayer, unregisterLayer } = useLayerStack();
-	const onCloseRef = useRef(onClose);
-	onCloseRef.current = onClose;
+	useModalLayer(MODAL_PRIORITIES.USAGE_DASHBOARD, 'Usage Dashboard', onClose, {
+		isOpen,
+		focusTrap: 'lenient',
+	});
 	const viewModeRef = useRef(viewMode);
 	viewModeRef.current = viewMode;
 
@@ -155,21 +156,6 @@ export function UsageDashboardModal({
 			setTimeRange(defaultTimeRange);
 		}
 	}, [isOpen, defaultTimeRange]);
-
-	// Register with layer stack for proper Escape handling
-	useEffect(() => {
-		if (isOpen) {
-			const id = registerLayer({
-				type: 'modal',
-				priority: MODAL_PRIORITIES.USAGE_DASHBOARD,
-				blocksLowerLayers: true,
-				capturesFocus: true,
-				focusTrap: 'lenient',
-				onEscape: () => onCloseRef.current(),
-			});
-			return () => unregisterLayer(id);
-		}
-	}, [isOpen, registerLayer, unregisterLayer]);
 
 	// Fetch stats data when range changes
 	const fetchStats = useCallback(

@@ -15,7 +15,7 @@ import {
 import confetti from 'canvas-confetti';
 import type { Theme, AutoRunStats, ThemeMode } from '../types';
 import { GhostIconButton } from './ui/GhostIconButton';
-import { useLayerStack } from '../contexts/LayerStackContext';
+import { useModalLayer } from '../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { AchievementCard } from './AchievementCard';
 import { StandingOvationOverlay } from './StandingOvationOverlay';
@@ -107,13 +107,9 @@ const DEFAULT_CONFETTI_COLORS = [
 ];
 
 export function PlaygroundPanel({ theme, themeMode, onClose }: PlaygroundPanelProps) {
-	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
-	const layerIdRef = useRef<string>();
 	const containerRef = useRef<HTMLDivElement>(null);
-	const onCloseRef = useRef(onClose);
 
-	// Keep ref up to date
-	onCloseRef.current = onClose;
+	useModalLayer(MODAL_PRIORITIES.STANDING_OVATION - 1, 'Developer Playground', onClose);
 
 	const [activeTab, setActiveTab] = useState<TabId>('achievements');
 
@@ -181,33 +177,10 @@ export function PlaygroundPanel({ theme, themeMode, onClose }: PlaygroundPanelPr
 		}
 	});
 
-	// Register layer on mount
+	// Focus container on mount
 	useEffect(() => {
-		const id = registerLayer({
-			type: 'modal',
-			priority: MODAL_PRIORITIES.STANDING_OVATION - 1, // Just below standing ovation
-			blocksLowerLayers: true,
-			capturesFocus: true,
-			focusTrap: 'strict',
-			ariaLabel: 'Developer Playground',
-			onEscape: () => onCloseRef.current(),
-		});
-		layerIdRef.current = id;
 		containerRef.current?.focus();
-
-		return () => {
-			if (layerIdRef.current) {
-				unregisterLayer(layerIdRef.current);
-			}
-		};
-	}, [registerLayer, unregisterLayer]);
-
-	// Update handler when dependencies change
-	useEffect(() => {
-		if (layerIdRef.current) {
-			updateLayerHandler(layerIdRef.current, () => onCloseRef.current());
-		}
-	}, [updateLayerHandler]);
+	}, []);
 
 	// Build mock AutoRunStats
 	const mockAutoRunStats: AutoRunStats = {

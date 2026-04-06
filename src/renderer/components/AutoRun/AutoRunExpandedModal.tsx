@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { Spinner } from '../ui';
 import type { Theme, BatchRunState, SessionState, Shortcut } from '../../types';
-import { useLayerStack } from '../../contexts/LayerStackContext';
+import { useModalLayer } from '../../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
 import { AutoRun } from './AutoRun';
 import type { AutoRunHandle } from './types';
@@ -94,13 +94,8 @@ export function AutoRunExpandedModal({
 	onOpenMarketplace,
 	...autoRunProps
 }: AutoRunExpandedModalProps) {
-	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
-	const layerIdRef = useRef<string>();
-	const onCloseRef = useRef(onClose);
-	const handleCloseRef = useRef<() => void>(() => {});
 	const autoRunRef = useRef<AutoRunHandle>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
-	onCloseRef.current = onClose;
 
 	// Local mode state - independent from the right panel behind the modal
 	const [localMode, setLocalMode] = useState<'edit' | 'preview'>(initialMode);
@@ -169,7 +164,9 @@ export function AutoRunExpandedModal({
 			onClose();
 		}
 	}, [isDirty, onClose]);
-	handleCloseRef.current = handleClose;
+
+	// Register layer on mount
+	useModalLayer(MODAL_PRIORITIES.AUTORUN_EXPANDED, 'Auto Run Expanded', handleClose);
 
 	// Discard changes and close
 	const handleDiscardAndClose = useCallback(() => {
@@ -177,36 +174,6 @@ export function AutoRunExpandedModal({
 		setShowUnsavedConfirm(false);
 		onClose();
 	}, [handleRevert, onClose]);
-
-	// Register layer on mount
-	useEffect(() => {
-		const id = registerLayer({
-			type: 'modal',
-			priority: MODAL_PRIORITIES.AUTORUN_EXPANDED,
-			blocksLowerLayers: true,
-			capturesFocus: true,
-			focusTrap: 'strict',
-			onEscape: () => {
-				handleCloseRef.current();
-			},
-		});
-		layerIdRef.current = id;
-
-		return () => {
-			if (layerIdRef.current) {
-				unregisterLayer(layerIdRef.current);
-			}
-		};
-	}, [registerLayer, unregisterLayer]);
-
-	// Keep escape handler up to date
-	useEffect(() => {
-		if (layerIdRef.current) {
-			updateLayerHandler(layerIdRef.current, () => {
-				handleCloseRef.current();
-			});
-		}
-	}, [handleClose, updateLayerHandler]);
 
 	// Focus the AutoRun component on mount
 	useEffect(() => {

@@ -262,4 +262,188 @@ describe('useModalLayer', () => {
 			expect(onEscape).toHaveBeenCalledTimes(1);
 		});
 	});
+
+	describe('overlay layer support', () => {
+		it('should register an overlay layer when type is overlay', () => {
+			const onEscape = vi.fn();
+
+			const useTestHook = () => {
+				const layerStack = useLayerStack();
+				useModalLayer(100, 'Test Overlay', onEscape, { type: 'overlay' });
+				return layerStack;
+			};
+
+			const { result } = renderHook(() => useTestHook(), { wrapper });
+
+			expect(result.current.layerCount).toBe(1);
+			expect(result.current.getTopLayer()?.type).toBe('overlay');
+			expect(result.current.getTopLayer()?.ariaLabel).toBe('Test Overlay');
+		});
+
+		it('should use overlay-appropriate defaults', () => {
+			const onEscape = vi.fn();
+
+			const useTestHook = () => {
+				const layerStack = useLayerStack();
+				useModalLayer(100, 'Test Overlay', onEscape, { type: 'overlay' });
+				return layerStack;
+			};
+
+			const { result } = renderHook(() => useTestHook(), { wrapper });
+
+			const layer = result.current.getTopLayer();
+			expect(layer?.blocksLowerLayers).toBe(false);
+			expect(layer?.capturesFocus).toBe(false);
+			expect(layer?.focusTrap).toBe('none');
+		});
+
+		it('should allow overriding overlay defaults', () => {
+			const onEscape = vi.fn();
+
+			const useTestHook = () => {
+				const layerStack = useLayerStack();
+				useModalLayer(100, 'Test Overlay', onEscape, {
+					type: 'overlay',
+					capturesFocus: true,
+					focusTrap: 'lenient',
+					blocksLowerLayers: true,
+				});
+				return layerStack;
+			};
+
+			const { result } = renderHook(() => useTestHook(), { wrapper });
+
+			const layer = result.current.getTopLayer();
+			expect(layer?.blocksLowerLayers).toBe(true);
+			expect(layer?.capturesFocus).toBe(true);
+			expect(layer?.focusTrap).toBe('lenient');
+		});
+
+		it('should not report overlay as open modal', () => {
+			const onEscape = vi.fn();
+
+			const useTestHook = () => {
+				const layerStack = useLayerStack();
+				useModalLayer(100, 'Test Overlay', onEscape, { type: 'overlay' });
+				return layerStack;
+			};
+
+			const { result } = renderHook(() => useTestHook(), { wrapper });
+
+			expect(result.current.hasOpenLayers()).toBe(true);
+			expect(result.current.hasOpenModal()).toBe(false);
+		});
+
+		it('should call escape handler for overlay layers', async () => {
+			const onEscape = vi.fn();
+
+			const useTestHook = () => {
+				const layerStack = useLayerStack();
+				useModalLayer(100, 'Test Overlay', onEscape, { type: 'overlay' });
+				return layerStack;
+			};
+
+			const { result } = renderHook(() => useTestHook(), { wrapper });
+
+			await act(async () => {
+				await result.current.closeTopLayer();
+			});
+
+			expect(onEscape).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	describe('isOpen option', () => {
+		it('should not register a layer when isOpen is false', () => {
+			const onEscape = vi.fn();
+
+			const useTestHook = (isOpen: boolean) => {
+				const layerStack = useLayerStack();
+				useModalLayer(100, 'Test Modal', onEscape, { isOpen });
+				return layerStack;
+			};
+
+			const { result } = renderHook(({ isOpen }) => useTestHook(isOpen), {
+				wrapper,
+				initialProps: { isOpen: false },
+			});
+
+			expect(result.current.layerCount).toBe(0);
+		});
+
+		it('should register a layer when isOpen is true', () => {
+			const onEscape = vi.fn();
+
+			const useTestHook = (isOpen: boolean) => {
+				const layerStack = useLayerStack();
+				useModalLayer(100, 'Test Modal', onEscape, { isOpen });
+				return layerStack;
+			};
+
+			const { result } = renderHook(({ isOpen }) => useTestHook(isOpen), {
+				wrapper,
+				initialProps: { isOpen: true },
+			});
+
+			expect(result.current.layerCount).toBe(1);
+			expect(result.current.getTopLayer()?.ariaLabel).toBe('Test Modal');
+		});
+
+		it('should register layer when isOpen transitions from false to true', () => {
+			const onEscape = vi.fn();
+
+			const useTestHook = (isOpen: boolean) => {
+				const layerStack = useLayerStack();
+				useModalLayer(100, 'Test Modal', onEscape, { isOpen });
+				return layerStack;
+			};
+
+			const { result, rerender } = renderHook(({ isOpen }) => useTestHook(isOpen), {
+				wrapper,
+				initialProps: { isOpen: false },
+			});
+
+			expect(result.current.layerCount).toBe(0);
+
+			rerender({ isOpen: true });
+
+			expect(result.current.layerCount).toBe(1);
+			expect(result.current.getTopLayer()?.ariaLabel).toBe('Test Modal');
+		});
+
+		it('should unregister layer when isOpen transitions from true to false', () => {
+			const onEscape = vi.fn();
+
+			const useTestHook = (isOpen: boolean) => {
+				const layerStack = useLayerStack();
+				useModalLayer(100, 'Test Modal', onEscape, { isOpen });
+				return layerStack;
+			};
+
+			const { result, rerender } = renderHook(({ isOpen }) => useTestHook(isOpen), {
+				wrapper,
+				initialProps: { isOpen: true },
+			});
+
+			expect(result.current.layerCount).toBe(1);
+
+			rerender({ isOpen: false });
+
+			expect(result.current.layerCount).toBe(0);
+		});
+
+		it('should default isOpen to true when not specified', () => {
+			const onEscape = vi.fn();
+
+			const useTestHook = () => {
+				const layerStack = useLayerStack();
+				useModalLayer(100, 'Test Modal', onEscape);
+				return layerStack;
+			};
+
+			const { result } = renderHook(() => useTestHook(), { wrapper });
+
+			expect(result.current.layerCount).toBe(1);
+		});
+	});
 });

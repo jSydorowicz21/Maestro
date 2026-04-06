@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Trash2, BookOpen, FolderOpen, AlertTriangle, FileText } from 'lucide-react';
 import type { Theme } from '../../types';
-import { useLayerStack } from '../../contexts/LayerStackContext';
+import { useModalLayer } from '../../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
 
 interface ExistingAutoRunDocsModalProps {
@@ -30,8 +30,12 @@ export function ExistingAutoRunDocsModal({
 	onContinuePlanning,
 	onCancel,
 }: ExistingAutoRunDocsModalProps) {
-	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
-	const layerIdRef = useRef<string>();
+	useModalLayer(
+		MODAL_PRIORITIES.EXISTING_AUTORUN_DOCS,
+		'Existing Playbook Documents Detected',
+		onCancel
+	);
+
 	const continueButtonRef = useRef<HTMLButtonElement>(null);
 	const [focusedButton, setFocusedButton] = useState<'continue' | 'fresh'>('continue');
 	const [isDeleting, setIsDeleting] = useState(false);
@@ -40,32 +44,6 @@ export function ExistingAutoRunDocsModal({
 	useEffect(() => {
 		continueButtonRef.current?.focus();
 	}, []);
-
-	// Register layer on mount
-	useEffect(() => {
-		const id = registerLayer({
-			type: 'modal',
-			priority: MODAL_PRIORITIES.EXISTING_AUTORUN_DOCS,
-			blocksLowerLayers: true,
-			capturesFocus: true,
-			focusTrap: 'strict',
-			ariaLabel: 'Existing Playbook Documents Detected',
-			onEscape: onCancel,
-		});
-		layerIdRef.current = id;
-		return () => {
-			if (layerIdRef.current) {
-				unregisterLayer(layerIdRef.current);
-			}
-		};
-	}, [registerLayer, unregisterLayer]);
-
-	// Update handler when dependencies change
-	useEffect(() => {
-		if (layerIdRef.current) {
-			updateLayerHandler(layerIdRef.current, onCancel);
-		}
-	}, [onCancel, updateLayerHandler]);
 
 	// Handle keyboard navigation between buttons
 	const handleKeyDown = (e: React.KeyboardEvent) => {

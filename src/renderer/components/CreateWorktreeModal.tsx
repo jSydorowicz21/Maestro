@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { X, GitBranch, AlertTriangle } from 'lucide-react';
 import type { Theme, Session, GhCliStatus } from '../types';
-import { useLayerStack } from '../contexts/LayerStackContext';
+import { useModalLayer } from '../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { GhostIconButton } from './ui/GhostIconButton';
 import { Spinner } from './ui';
@@ -28,9 +28,10 @@ export function CreateWorktreeModal({
 	session,
 	onCreateWorktree,
 }: CreateWorktreeModalProps) {
-	const { registerLayer, unregisterLayer } = useLayerStack();
-	const onCloseRef = useRef(onClose);
-	onCloseRef.current = onClose;
+	useModalLayer(MODAL_PRIORITIES.CREATE_WORKTREE, 'Create Worktree', onClose, {
+		isOpen,
+		focusTrap: 'lenient',
+	});
 
 	// Form state
 	const [branchName, setBranchName] = useState('');
@@ -42,21 +43,6 @@ export function CreateWorktreeModal({
 
 	// Input ref for auto-focus
 	const inputRef = useRef<HTMLInputElement>(null);
-
-	// Register with layer stack for Escape handling
-	useEffect(() => {
-		if (isOpen) {
-			const id = registerLayer({
-				type: 'modal',
-				priority: MODAL_PRIORITIES.CREATE_WORKTREE,
-				onEscape: () => onCloseRef.current(),
-				blocksLowerLayers: true,
-				capturesFocus: true,
-				focusTrap: 'lenient',
-			});
-			return () => unregisterLayer(id);
-		}
-	}, [isOpen, registerLayer, unregisterLayer]);
 
 	// Auto-focus the input when modal opens
 	useFocusAfterRender(inputRef, isOpen, 50);

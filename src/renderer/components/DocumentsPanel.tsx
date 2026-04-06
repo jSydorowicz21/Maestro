@@ -16,7 +16,7 @@ import { GhostIconButton } from './ui/GhostIconButton';
 import { EmptyState } from './ui';
 import type { Theme, BatchDocumentEntry } from '../types';
 import { generateId } from '../utils/ids';
-import { useLayerStack } from '../contexts/LayerStackContext';
+import { useModalLayer } from '../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { formatMetaKey } from '../utils/shortcutFormatter';
 
@@ -67,26 +67,8 @@ function DocumentSelectorModal({
 	onAdd,
 	onRefresh,
 }: DocumentSelectorModalProps) {
-	// Layer stack for escape handling
-	const { registerLayer, unregisterLayer } = useLayerStack();
-	const onCloseRef = useRef(onClose);
-	onCloseRef.current = onClose;
-
 	// Register with layer stack for escape handling
-	useEffect(() => {
-		const id = registerLayer({
-			type: 'modal',
-			priority: MODAL_PRIORITIES.DOCUMENT_SELECTOR,
-			blocksLowerLayers: true,
-			capturesFocus: true,
-			focusTrap: 'strict',
-			ariaLabel: 'Select Documents',
-			onEscape: () => {
-				onCloseRef.current();
-			},
-		});
-		return () => unregisterLayer(id);
-	}, [registerLayer, unregisterLayer]);
+	useModalLayer(MODAL_PRIORITIES.DOCUMENT_SELECTOR, 'Select Documents', onClose);
 
 	// Pre-select currently added documents
 	const [selectedDocs, setSelectedDocs] = useState<Set<string>>(() => {
