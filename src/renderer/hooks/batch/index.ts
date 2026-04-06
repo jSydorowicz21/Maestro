@@ -172,5 +172,12 @@ export type {
 	UseAutoRunScrollSyncReturn,
 } from './useAutoRunScrollSync';
 
+// Auto Run coordination (Phase 13A, Task 6)
+export { useAutoRunCoordination } from './useAutoRunCoordination';
+export type {
+	UseAutoRunCoordinationDeps,
+	UseAutoRunCoordinationReturn,
+} from './useAutoRunCoordination';
+
 // Re-export ExistingDocument type from existingDocsDetector for convenience
 export type { ExistingDocument } from '../../utils/existingDocsDetector';

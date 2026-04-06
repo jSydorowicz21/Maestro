@@ -85,34 +85,42 @@ Break down `App.tsx` from 4,034 lines into focused modules. This is the single l
 
 ### 3. Extract IPC listener setup
 
-- [ ] Create `src/renderer/hooks/useAppIpcListeners.ts`
-- [ ] Move all `window.maestro.on(...)` listener registrations from App.tsx into the hook
-- [ ] Define a `AppIpcDeps` interface for any dependencies the listeners need
-- [ ] Return cleanup function from the useEffect
-- [ ] Import and call from App.tsx
-- [ ] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+- [x] Create `src/renderer/hooks/useAppIpcListeners.ts`
+- [x] Move all `window.maestro.on(...)` listener registrations from App.tsx into the hook
+- [x] Define a `AppIpcDeps` interface for any dependencies the listeners need
+- [x] Return cleanup function from the useEffect
+- [x] Import and call from App.tsx
+- [x] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+
+**Result:** Created `src/renderer/hooks/remote/useAppRemoteEventListeners.ts` (569 lines) containing all 15 `useEventListener('maestro:...')` CustomEvent handlers from the "Remote Event Listeners" section (lines 1795-2288). Named `useAppRemoteEventListeners` instead of `useAppIpcListeners` because these are CustomEvent-based remote listeners (not `window.maestro.on()` IPC listeners, which were already extracted to `useAgentListeners`). Defined `UseAppRemoteEventListenersDeps` interface with 10 dependencies. Uses `useEventListener` internally (each handler registers its own cleanup via the hook), so no manual cleanup function needed. App.tsx reduced from ~3,934 to 3,450 lines (-484 lines). Also removed 3 now-unused imports from App.tsx (`useEventListener`, `PLAYBOOKS_DIR`, `useSettingsStore`). Exported from `hooks/remote/index.ts`. Lint passes, tests match baseline (23,659 passed, 55 pre-existing failures).
 
 ### 4. Extract modal orchestration
 
-- [ ] Create `src/renderer/components/AppModals.tsx`
-- [ ] Move all conditional modal rendering (`{isOpen && <Modal />}` blocks) from App.tsx into AppModals
-- [ ] Define `AppModalsProps` interface with all modal open states and handlers
-- [ ] Import and render `<AppModals>` from App.tsx
-- [ ] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+- [x] Create `src/renderer/components/AppModals.tsx`
+- [x] Move all conditional modal rendering (`{isOpen && <Modal />}` blocks) from App.tsx into AppModals
+- [x] Define `AppModalsProps` interface with all modal open states and handlers
+- [x] Import and render `<AppModals>` from App.tsx
+- [x] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+
+**Result:** Integrated the previously-created `AppStandaloneModals.tsx` (608 lines) into App.tsx, replacing ~500 lines of inline standalone modal rendering (18 modals: DebugPackage, WindowsWarning, AppOverlays, Playground, DebugWizard, Marketplace, Symphony, DirectorNotes, CueModal, CueYamlEditor, GistPublish, DocumentGraph, DeleteAgent, Settings, WizardResume, MaestroWizard, TourOverlay, flash notifications). The component self-sources modal open/close state from modalStore, sessionStore, fileExplorerStore, and tabStore - App.tsx only passes handler callbacks and computed values. Also fixed 7 type mismatches in `AppStandaloneModalsProps` (SymphonyContributionData, MindMapLayoutType, wizard/tour handler signatures, DirectorNotesResumeSession arity), replaced broken `updateSessionWith` import with `useSessionStore.getState().setSessions()` pattern, and removed 7 lazy imports + 15 unused destructured variables from App.tsx. This is the second major modal extraction layer: `AppModals/` directory handles info, confirm, session, group, worktree, utility, and agent modals; `AppStandaloneModals` handles debug, marketplace, wizard, settings, tour, gist, document graph, and celebration overlays. App.tsx reduced from 3,470 to 3,137 lines (-333 lines). Lint passes (no new errors), tests match baseline (24,537 passed, 42 pre-existing failures, 107 pending - improved from 55 baseline failures).
 
 ### 5. Extract session management effects
 
-- [ ] Create `src/renderer/hooks/useSessionLifecycle.ts`
-- [ ] Move effects that manage session lifecycle (creation, deletion, status updates) from App.tsx
-- [ ] Import and call from App.tsx
-- [ ] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+- [x] Create `src/renderer/hooks/useSessionLifecycle.ts`
+- [x] Move effects that manage session lifecycle (creation, deletion, status updates) from App.tsx
+- [x] Import and call from App.tsx
+- [x] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+
+**Result:** The core `useSessionLifecycle` hook already existed at `src/renderer/hooks/session/useSessionLifecycle.ts` (640 lines, created in Phase 2H) containing: `handleSaveEditAgent`, `handleRenameTab`, `handleAutoNameTab`, `performDeleteSession`, `showConfirmation`, `toggleTabStar`, `toggleTabUnread`, `toggleUnreadFilter`, plus effects for groups persistence and navigation history tracking. Additionally, `useSessionCrud` (also previously extracted) handles session creation, deletion confirmation, rename, bookmark, and drag-drop operations. To further reduce App.tsx, created new `useSessionSwitchCallbacks` hook (229 lines) at `src/renderer/hooks/session/useSessionSwitchCallbacks.ts` extracting 5 session navigation callbacks and the deep link effect: `handleProcessMonitorNavigateToSession`, `handleToastSessionClick`, `handleNamedSessionSelect`, `handleUtilityTabSelect`, `handleUtilityFileTabSelect`, plus the `maestro://` deep link `useEffect`. The hook self-sources from sessionStore and uiStore, taking only 3 external deps (setActiveSessionId wrapper, handleResumeSession, inputRef). App.tsx reduced from 3,137 to 3,038 lines (-99 lines). Lint passes (0 new errors; 21 pre-existing errors in App.tsx/MainPanel.tsx/SpecCommandsPanel.tsx from broken `updateSessionWith`/`updateAiTab` imports and missing `setSessions` in hook dep interfaces). Tests match baseline (24,537 passed, 42 pre-existing failures, 107 pending).
 
 ### 6. Extract auto-run / batch processing coordination
 
-- [ ] Create `src/renderer/hooks/useAutoRunCoordination.ts`
-- [ ] Move auto-run state management and batch processing coordination from App.tsx
-- [ ] Import and call from App.tsx
-- [ ] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+- [x] Create `src/renderer/hooks/useAutoRunCoordination.ts`
+- [x] Move auto-run state management and batch processing coordination from App.tsx
+- [x] Import and call from App.tsx
+- [x] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+
+**Result:** Created `src/renderer/hooks/batch/useAutoRunCoordination.ts` (163 lines) that consolidates all Auto Run / batch processing coordination that was inline in App.tsx. The hook self-sources from sessionStore, batchStore, modalStore, and uiStore, taking only 3 external deps: `startBatchRun`, `activeBatchSessionIds` (from useBatchHandlers), and `handleAutoRunRefreshRef` (for circular dep resolution with useWizardHandlers). Internally calls `useAutoRunHandlers`, `useAutoRunAchievements`, and `useAutoRunDocumentLoader`. Contains `handleSetActiveRightTab` (auto-run setup modal gating), `handleMarketplaceImportComplete` (refresh docs on import), and `handleSaveBatchPrompt` (persist batch prompt to session). Also fixed pre-existing issue where `useAutoRunHandlers` was missing `setSessions` in its deps - now properly self-sourced from sessionStore. Removed `useBatchStore` import, `setBatchRunnerModalOpen`/`setAutoRunSetupModalOpen` destructuring from modalActions, and 3 standalone hook calls from App.tsx. App.tsx reduced from 3,038 to 2,974 lines (-64 lines). Lint passes (0 new errors; 19 pre-existing errors unchanged). Tests match baseline (24,537 passed, 42 pre-existing failures, 107 pending).
 
 ### 7. Extract Encore Feature gating logic
 
