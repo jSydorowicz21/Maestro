@@ -205,6 +205,8 @@ Lint: 18 pre-existing errors (down from 19 - removed broken `updateAiTab` import
 
 **Assessment:** The file cannot be meaningfully reduced below ~2,500 lines without either (a) splitting the JSX tree into sub-coordinators (risk: obscuring the composition), (b) eliminating prop threading via direct store access in child components (risk: coupling children to store internals), or (c) auto-generating the keyboardHandlerRef population (premature abstraction). App.tsx is now a clean coordinator - no inline effects, no inline handlers >3 lines, no business logic. Further extraction would trade readability for line-count vanity.
 
+**Push status:** Commits created locally. Push blocked by pre-push hook (`validate:push`) which runs `tsc` on the full codebase and fails on 18 pre-existing type errors (all `setSessions` missing property, `updateSessionWith` broken import, `Spinner`/`EditingCommand` missing exports from prior phases). Prettier issues from prior phases were fixed and committed. The type errors are outside the scope of this phase and must be resolved before any branch can push.
+
 ---
 
 ## Verification
