@@ -442,19 +442,20 @@ export function registerGroupChatHandlers(deps: GroupChatHandlerDependencies): v
 		withIpcErrorLogging(
 			handlerOpts('sendToModerator'),
 			async (id: string, message: string, images?: string[], readOnly?: boolean): Promise<void> => {
-				console.log(`[GroupChat:Debug] ========== USER MESSAGE RECEIVED ==========`);
-				console.log(`[GroupChat:Debug] Group Chat ID: ${id}`);
-				console.log(
-					`[GroupChat:Debug] Message: "${message.substring(0, 200)}${message.length > 200 ? '...' : ''}"`
-				);
-				console.log(`[GroupChat:Debug] Read-only: ${readOnly ?? false}`);
-				console.log(`[GroupChat:Debug] Images: ${images?.length ?? 0}`);
+				logger.debug('User message received', LOG_CONTEXT, {
+					groupChatId: id,
+					messagePreview: `${message.substring(0, 200)}${message.length > 200 ? '...' : ''}`,
+					readOnly: readOnly ?? false,
+					imageCount: images?.length ?? 0,
+				});
 
 				const processManager = getProcessManager();
 				const agentDetector = getAgentDetector();
 
-				console.log(`[GroupChat:Debug] Process manager available: ${!!processManager}`);
-				console.log(`[GroupChat:Debug] Agent detector available: ${!!agentDetector}`);
+				logger.debug('Dependencies resolved', LOG_CONTEXT, {
+					processManagerAvailable: !!processManager,
+					agentDetectorAvailable: !!agentDetector,
+				});
 
 				// Route through the user message router which handles logging and forwarding
 				await routeUserMessage(
@@ -466,8 +467,7 @@ export function registerGroupChatHandlers(deps: GroupChatHandlerDependencies): v
 					images
 				);
 
-				console.log(`[GroupChat:Debug] User message routed to moderator`);
-				console.log(`[GroupChat:Debug] ===========================================`);
+				logger.debug('User message routed to moderator', LOG_CONTEXT);
 
 				logger.debug(`Sent message to moderator in ${id}`, LOG_CONTEXT, {
 					messageLength: message.length,
@@ -863,8 +863,9 @@ Respond with ONLY the summary text, no additional commentary.`;
 		participantName: string,
 		state: ParticipantState
 	): void => {
-		console.log(
-			`[GroupChat:IPC] emitParticipantState: chatId=${groupChatId}, participant=${participantName}, state=${state}`
+		logger.debug(
+			`emitParticipantState: chatId=${groupChatId}, participant=${participantName}, state=${state}`,
+			LOG_CONTEXT
 		);
 		const mainWindow = getMainWindow();
 		if (isWebContentsAvailable(mainWindow)) {
@@ -874,11 +875,9 @@ Respond with ONLY the summary text, no additional commentary.`;
 				participantName,
 				state
 			);
-			console.log(`[GroupChat:IPC] Sent 'groupChat:participantState' event`);
+			logger.debug('Sent groupChat:participantState event', LOG_CONTEXT);
 		} else {
-			console.warn(
-				`[GroupChat:IPC] WARNING: mainWindow not available, cannot send participant state`
-			);
+			logger.warn('mainWindow not available, cannot send participant state', LOG_CONTEXT);
 		}
 	};
 

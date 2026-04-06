@@ -120,7 +120,7 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 		}>;
 		const { sessionId, command, inputMode: webInputMode } = customEvent.detail;
 
-		console.log('[Remote] Processing remote command via event:', {
+		console.debug('[Remote] Processing remote command via event:', {
 			sessionId,
 			command: command.substring(0, 50),
 			webInputMode,
@@ -129,14 +129,14 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 		// Find the session directly from sessionsRef (not from React state which may be stale)
 		const session = sessionsRef.current.find((s) => s.id === sessionId);
 		if (!session) {
-			console.log('[Remote] ERROR: Session not found in sessionsRef:', sessionId);
+			console.error('[Remote] Session not found in sessionsRef:', sessionId);
 			return;
 		}
 
 		// Use web's inputMode if provided, otherwise fall back to session state
 		const effectiveInputMode = webInputMode || session.inputMode;
 
-		console.log('[Remote] Found session:', {
+		console.debug('[Remote] Found session:', {
 			id: session.id,
 			agentSessionId: session.agentSessionId || 'none',
 			state: session.state,
@@ -147,7 +147,7 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 
 		// Handle terminal mode commands
 		if (effectiveInputMode === 'terminal') {
-			console.log('[Remote] Terminal mode - using runCommand for clean output');
+			console.debug('[Remote] Terminal mode - using runCommand for clean output');
 
 			// Add user message to shell logs and set state to busy
 			updateSessionWith(sessionId, (s) => ({
@@ -181,7 +181,7 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 					cwd: commandCwd,
 					sessionSshRemoteConfig: session.sessionSshRemoteConfig,
 				});
-				console.log('[Remote] Terminal command completed successfully');
+				console.debug('[Remote] Terminal command completed successfully');
 			} catch (error: unknown) {
 				captureException(error, {
 					extra: {
@@ -216,13 +216,13 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 
 		// Handle AI mode for batch-mode agents
 		if (!hasCapabilityCached(session.toolType, 'supportsBatchMode')) {
-			console.log('[Remote] Not a batch-mode agent, skipping');
+			console.debug('[Remote] Not a batch-mode agent, skipping');
 			return;
 		}
 
 		// Check if session is busy
 		if (session.state === 'busy') {
-			console.log('[Remote] Session is busy, cannot process command');
+			console.debug('[Remote] Session is busy, cannot process command');
 			return;
 		}
 
@@ -233,7 +233,7 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 		// Handle slash commands (custom AI commands only)
 		if (command.trim().startsWith('/')) {
 			const commandText = command.trim();
-			console.log('[Remote] Detected slash command:', commandText);
+			console.debug('[Remote] Detected slash command:', commandText);
 
 			const matchingCustomCommand = customAICommandsRef.current.find(
 				(cmd) => cmd.command === commandText
@@ -255,7 +255,7 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 				matchingBmadCommand;
 
 			if (matchingCommand) {
-				console.log(
+				console.debug(
 					'[Remote] Found matching command:',
 					matchingCommand.command,
 					matchingSpeckitCommand
@@ -301,13 +301,13 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 					description: matchingCommand.description,
 				};
 
-				console.log(
+				console.debug(
 					'[Remote] Substituted prompt (first 100 chars):',
 					promptToSend.substring(0, 100)
 				);
 			} else {
 				// Unknown slash command
-				console.log('[Remote] Unknown slash command:', commandText);
+				console.debug('[Remote] Unknown slash command:', commandText);
 				addLogToActiveTab(sessionId, {
 					source: 'system',
 					text: `Unknown command: ${commandText}`,
@@ -320,7 +320,7 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 			// Get agent configuration for this session's tool type
 			const agent = await window.maestro.agents.get(session.toolType);
 			if (!agent) {
-				console.log(`[Remote] ERROR: Agent not found for toolType: ${session.toolType}`);
+				console.error(`[Remote] Agent not found for toolType: ${session.toolType}`);
 				return;
 			}
 
@@ -337,7 +337,7 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 			const targetSessionId = `${sessionId}-ai-${activeTab?.id || 'default'}`;
 			const commandToUse = agent.path ?? agent.command;
 
-			console.log('[Remote] Spawning agent:', {
+			console.debug('[Remote] Spawning agent:', {
 				maestroSessionId: sessionId,
 				targetSessionId,
 				activeTabId: activeTab?.id,
@@ -413,7 +413,7 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 				sessionSshRemoteConfig: session.sessionSshRemoteConfig,
 			});
 
-			console.log(`[Remote] ${session.toolType} spawn initiated successfully`);
+			console.debug(`[Remote] ${session.toolType} spawn initiated successfully`);
 		} catch (error: unknown) {
 			captureException(error, {
 				extra: { sessionId, toolType: session.toolType, mode: 'ai', operation: 'remote-spawn' },

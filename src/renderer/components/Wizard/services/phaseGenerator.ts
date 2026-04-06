@@ -727,7 +727,7 @@ class PhaseGenerator {
 					: `${config.directoryPath}/${AUTO_RUN_FOLDER_NAME}`;
 				const diskDocs = await this.readDocumentsFromDisk(autoRunPath, sshRemoteId);
 				if (diskDocs.length > 0) {
-					console.log('[PhaseGenerator] Found documents on disk:', diskDocs.length);
+					console.debug('[PhaseGenerator] Found documents on disk:', diskDocs.length);
 					wizardDebugLogger.log('info', 'Found documents on disk', {
 						count: diskDocs.length,
 						documentNames: diskDocs.map((d) => d.filename),
@@ -827,7 +827,7 @@ class PhaseGenerator {
 		const sessionId = `wizard-gen-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 		const startTime = Date.now();
 
-		console.log('[PhaseGenerator] Starting agent run:', {
+		console.debug('[PhaseGenerator] Starting agent run:', {
 			sessionId,
 			agentType: config.agentType,
 			cwd: config.directoryPath,
@@ -912,7 +912,7 @@ class PhaseGenerator {
 
 					// Log progress every 10 chunks
 					if (dataChunks % 10 === 0) {
-						console.log('[PhaseGenerator] Progress:', {
+						console.debug('[PhaseGenerator] Progress:', {
 							chunks: dataChunks,
 							bufferSize: this.outputBuffer.length,
 							elapsedMs: Date.now() - startTime,
@@ -932,7 +932,7 @@ class PhaseGenerator {
 					}
 
 					const elapsed = Date.now() - startTime;
-					console.log('[PhaseGenerator] Agent exited:', {
+					console.debug('[PhaseGenerator] Agent exited:', {
 						sessionId,
 						exitCode: code,
 						elapsedMs: elapsed,
@@ -952,7 +952,7 @@ class PhaseGenerator {
 						const extracted = extractResultFromStreamJson(this.outputBuffer);
 						const output = extracted || this.outputBuffer;
 
-						console.log('[PhaseGenerator] Extraction result:', {
+						console.debug('[PhaseGenerator] Extraction result:', {
 							hadExtraction: !!extracted,
 							outputLength: output.length,
 						});
@@ -1005,14 +1005,14 @@ class PhaseGenerator {
 				.watchFolder(autoRunPath, sshRemoteId)
 				.then((result) => {
 					if (result.success) {
-						console.log('[PhaseGenerator] Started watching folder:', autoRunPath);
+						console.debug('[PhaseGenerator] Started watching folder:', autoRunPath);
 						wizardDebugLogger.log('info', 'File watcher started successfully', { autoRunPath });
 						this.currentWatchPath = autoRunPath;
 
 						// Set up file change listener
 						fileWatcherCleanup = window.maestro.autorun.onFileChanged((data) => {
 							if (data.folderPath === autoRunPath) {
-								console.log(
+								console.debug(
 									'[PhaseGenerator] File system activity:',
 									data.filename,
 									data.eventType
@@ -1043,7 +1043,7 @@ class PhaseGenerator {
 											try {
 												const content = await window.maestro.fs.readFile(fullPath, sshRemoteId);
 												if (content && typeof content === 'string' && content.length > 0) {
-													console.log(
+													console.debug(
 														'[PhaseGenerator] File read successful:',
 														filenameWithExt,
 														'size:',
@@ -1060,7 +1060,7 @@ class PhaseGenerator {
 													return;
 												}
 											} catch (err) {
-												console.log(
+												console.warn(
 													`[PhaseGenerator] File read attempt ${attempt}/${retries} failed for ${filenameWithExt}:`,
 													err
 												);
@@ -1072,7 +1072,7 @@ class PhaseGenerator {
 
 										// Even if we couldn't read content, still notify that file exists
 										// This provides feedback to user that files are being created
-										console.log(
+										console.debug(
 											'[PhaseGenerator] Notifying file creation (without size):',
 											filenameWithExt
 										);
@@ -1103,7 +1103,7 @@ class PhaseGenerator {
 			wizardDebugLogger.log('info', 'Timeout initialized', { timeoutMs: GENERATION_TIMEOUT });
 
 			// Spawn the agent using the secure IPC channel
-			console.log('[PhaseGenerator] Spawning agent...');
+			console.debug('[PhaseGenerator] Spawning agent...');
 
 			// Build args for document generation
 			// The agent can write files ONLY to the Auto Run folder (enforced via prompt)
@@ -1148,7 +1148,7 @@ class PhaseGenerator {
 					sessionSshRemoteConfig: config.sshRemoteConfig,
 				})
 				.then(() => {
-					console.log('[PhaseGenerator] Agent spawned successfully');
+					console.debug('[PhaseGenerator] Agent spawned successfully');
 					wizardDebugLogger.log('spawn', 'Agent spawned successfully', { sessionId });
 				})
 				.catch((error: Error) => {
@@ -1276,7 +1276,7 @@ class PhaseGenerator {
 				// Ensure filename has .md extension
 				const filename = sanitized.endsWith('.md') ? sanitized : `${sanitized}.md`;
 
-				console.log('[PhaseGenerator] Saving document:', filename);
+				console.debug('[PhaseGenerator] Saving document:', filename);
 
 				// Write the document (autorun:writeDoc creates the folder if needed)
 				const result = await window.maestro.autorun.writeDoc(
@@ -1305,7 +1305,7 @@ class PhaseGenerator {
 						});
 					}
 
-					console.log('[PhaseGenerator] Saved:', fullPath, 'size:', doc.content.length);
+					console.debug('[PhaseGenerator] Saved:', fullPath, 'size:', doc.content.length);
 				} else {
 					throw new Error(result.error || `Failed to save ${filename}`);
 				}

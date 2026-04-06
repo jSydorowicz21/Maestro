@@ -64,11 +64,16 @@ Replace 130+ `console.log` calls in the group chat router (and 26 in group-chat-
 
 ### 5. Migrate other high-frequency files
 
-- [ ] Migrate `useRemoteHandlers.ts` (14 calls) - use `console.debug` or renderer-side logger
-- [ ] Migrate `phaseGenerator.ts` (14 calls)
-- [ ] Migrate `graphDataBuilder.ts` (11 calls)
-- [ ] Migrate `groupChat.ts` IPC handler (11 calls)
-- [ ] Run targeted tests after each file
+- [x] Migrate `useRemoteHandlers.ts` (14 calls) - use `console.debug` or renderer-side logger
+  - Migrated 14 `console.log` calls: 11 to `console.debug` (trace/diagnostic), 2 to `console.error` (session/agent not found), 1 already `console.error` retained. Zero `console.log` remaining.
+- [x] Migrate `phaseGenerator.ts` (14 calls)
+  - Migrated 14 `console.log` calls: 13 to `console.debug` (trace/diagnostic), 1 to `console.warn` (file read retry failure). Zero `console.log` remaining.
+- [x] Migrate `graphDataBuilder.ts` (11 calls)
+  - Migrated all 11 `console.log` calls to `console.debug` (all trace/diagnostic). Zero `console.log` remaining.
+- [x] Migrate `groupChat.ts` IPC handler (11 calls)
+  - Migrated 11 calls: 9 `console.log` consolidated into 3 structured `logger.debug` calls with data objects, 1 `console.log` to `logger.debug`, 1 `console.warn` to `logger.warn`. File already had `logger` import and `LOG_CONTEXT`. Zero `console.*` remaining.
+- [x] Run targeted tests after each file
+  - All 5 test files pass (171 tests total): useRemoteHandlers.test.ts (51), phaseGenerator.test.ts (21), phaseGenerator_ssh.test.ts, graphDataBuilder.test.ts, groupChat.test.ts. Zero failures.
 
 ### 6. Verify full build
 
