@@ -76,10 +76,12 @@ Break down `App.tsx` from 4,034 lines into focused modules. This is the single l
 
 ### 2. Extract keyboard handler logic
 
-- [ ] Check if `useMainKeyboardHandler` already exists: `rtk grep "useMainKeyboardHandler" src/renderer/ --glob "*.{ts,tsx}"`
-- [ ] If App.tsx still has inline keyboard handling: extract to `src/renderer/hooks/useAppKeyboardHandler.ts`
-- [ ] Import and call the hook from App.tsx
-- [ ] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+- [x] Check if `useMainKeyboardHandler` already exists: `rtk grep "useMainKeyboardHandler" src/renderer/ --glob "*.{ts,tsx}"`
+- [x] If App.tsx still has inline keyboard handling: extract to `src/renderer/hooks/useAppKeyboardHandler.ts`
+- [x] Import and call the hook from App.tsx
+- [x] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+
+**Result:** Already fully extracted. `useMainKeyboardHandler` exists at `src/renderer/hooks/keyboard/useMainKeyboardHandler.ts` (~500 lines) and contains all keydown event handling logic (shortcut matching, modal layer gating, terminal mode handling, navigation, etc.). App.tsx calls `useMainKeyboardHandler()` at line 1668 and populates `keyboardHandlerRef.current` (lines 2478-2650) with state/handler references. The ref population block (175 lines) is a necessary data-binding that cannot be meaningfully extracted - it needs access to ~100+ state variables and functions defined throughout App.tsx. No new extraction needed. Lint passes, tests match baseline (23,659 passed, 55 pre-existing failures, 107 skipped).
 
 ### 3. Extract IPC listener setup
 
