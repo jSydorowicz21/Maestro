@@ -33,27 +33,34 @@ Replace 130+ `console.log` calls in the group chat router (and 26 in group-chat-
 
 ### 1. Read the logger API
 
-- [ ] Read `src/main/utils/logger.ts` to understand available log levels
-- [ ] Note how to create a scoped logger (e.g., `createLogger('group-chat-router')`)
-- [ ] Note any structured data parameters (e.g., `logger.info('msg', { key: value })`)
+- [x] Read `src/main/utils/logger.ts` to understand available log levels
+  - Levels: `debug`, `info`, `warn`, `error`, `toast`, `autorun`, `cue`
+- [x] Note how to create a scoped logger (e.g., `createLogger('group-chat-router')`)
+  - No `createLogger` factory exists. Codebase pattern: singleton `logger` + context string constant (e.g., `const LOG_CONTEXT = 'group-chat-router'`; `logger.info('msg', LOG_CONTEXT)`)
+- [x] Note any structured data parameters (e.g., `logger.info('msg', { key: value })`)
+  - Signature: `logger.info(message: string, context?: string, data?: unknown)` - structured data is the third parameter
 
 ### 2. Create scoped loggers for group chat files
 
-- [ ] Add `import { createLogger } from '../utils/logger';` and `const logger = createLogger('group-chat-router');` at top of `group-chat-router.ts`
-- [ ] Add `const logger = createLogger('group-chat-agent');` at top of `group-chat-agent.ts`
+- [x] Add `import { createLogger } from '../utils/logger';` and `const logger = createLogger('group-chat-router');` at top of `group-chat-router.ts`
+  - **Already present:** `import { logger }` (line 37) and `const LOG_CONTEXT = '[GroupChatRouter]'` (line 48) were already in place. No `createLogger` factory exists - codebase uses singleton `logger` + `LOG_CONTEXT` pattern.
+- [x] Add `const logger = createLogger('group-chat-agent');` at top of `group-chat-agent.ts`
+  - Added `import { logger } from '../utils/logger'` and `const LOG_CONTEXT = '[GroupChatAgent]'` following codebase convention (no `createLogger` exists).
 
 ### 3. Migrate group-chat-router.ts (130 calls)
 
-- [ ] Work section by section through the file
-- [ ] Replace `console.log('[GroupChat] ...')` with `logger.info('...')` or `logger.debug('...')` based on message importance
-- [ ] For messages with data objects: use `logger.debug('msg', { data })` instead of `console.log('msg:', data)`
-- [ ] Preserve all existing log message content
-- [ ] Run targeted tests after completing: `CI=1 rtk vitest run` (filter for group-chat-router tests)
+- [x] Work section by section through the file
+- [x] Replace `console.log('[GroupChat] ...')` with `logger.info('...')` or `logger.debug('...')` based on message importance
+- [x] For messages with data objects: use `logger.debug('msg', { data })` instead of `console.log('msg:', data)`
+- [x] Preserve all existing log message content
+- [x] Run targeted tests after completing: `CI=1 rtk vitest run` (filter for group-chat-router tests)
+  - All 4 related test files pass (group-chat-router.test.ts, group-chat.integration.test.ts). Zero console.* calls remain in the file. Log levels assigned: debug for trace/diagnostic, info for significant actions (spawn success, history entries, auto-add, synthesis start), warn for recoverable warnings, error for failure cases.
 
 ### 4. Migrate group-chat-agent.ts (26 calls)
 
-- [ ] Apply same pattern as Task 3
-- [ ] Run targeted tests: `CI=1 rtk vitest run` (filter for group-chat-agent tests)
+- [x] Apply same pattern as Task 3
+- [x] Run targeted tests: `CI=1 rtk vitest run` (filter for group-chat-agent tests)
+  - All 71 tests pass across group-chat-agent.test.ts (22 tests) and groupChat.test.ts (49 tests). Zero console.* calls remain. Log levels: debug for trace/diagnostic messages, info for notable state (participant already exists, participant added), error for failure cases (chat not found, moderator not active, agent not available, spawn failed) with structured data context.
 
 ### 5. Migrate other high-frequency files
 

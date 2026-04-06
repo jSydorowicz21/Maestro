@@ -20,15 +20,13 @@ import {
 import { appendToLog } from './group-chat-log';
 import { IProcessManager, isModeratorActive } from './group-chat-moderator';
 import type { AgentDetector } from '../agents';
-import {
-	buildAgentArgs,
-	applyAgentConfigOverrides,
-	getContextWindowValue,
-} from '../utils/agent-args';
+import { buildAgentArgs, applyAgentConfigOverrides } from '../utils/agent-args';
 import { groupChatParticipantPrompt } from '../../prompts';
-import { wrapSpawnWithSsh } from '../utils/ssh-spawn-wrapper';
 import type { SshRemoteSettingsStore } from '../utils/ssh-remote-resolver';
-import { getWindowsSpawnConfig } from './group-chat-config';
+import { spawnGroupChatAgent } from './spawnGroupChatAgent';
+import { logger } from '../utils/logger';
+
+const LOG_CONTEXT = '[GroupChatAgent]';
 
 /**
  * In-memory store for active participant sessions.
@@ -47,7 +45,7 @@ function getParticipantKey(groupChatId: string, participantName: string): string
  * Generate the system prompt for a participant.
  * Uses template from src/prompts/group-chat-participant.md
  */
-export function getParticipantSystemPrompt(
+function getParticipantSystemPrompt(
 	participantName: string,
 	groupChatName: string,
 	logPath: string
@@ -102,34 +100,34 @@ export async function addParticipant(
 	sessionOverrides?: SessionOverrides,
 	sshStore?: SshRemoteSettingsStore
 ): Promise<GroupChatParticipant> {
-	console.log(`[GroupChat:Debug] ========== ADD PARTICIPANT ==========`);
-	console.log(`[GroupChat:Debug] Group Chat ID: ${groupChatId}`);
-	console.log(`[GroupChat:Debug] Participant Name: ${name}`);
-	console.log(`[GroupChat:Debug] Agent ID: ${agentId}`);
-	console.log(`[GroupChat:Debug] CWD: ${cwd}`);
+	logger.debug('========== ADD PARTICIPANT ==========', LOG_CONTEXT);
+	logger.debug(`Group Chat ID: ${groupChatId}`, LOG_CONTEXT);
+	logger.debug(`Participant Name: ${name}`, LOG_CONTEXT);
+	logger.debug(`Agent ID: ${agentId}`, LOG_CONTEXT);
+	logger.debug(`CWD: ${cwd}`, LOG_CONTEXT);
 
 	const chat = await loadGroupChat(groupChatId);
 	if (!chat) {
-		console.log(`[GroupChat:Debug] ERROR: Group chat not found!`);
+		logger.error('Group chat not found!', LOG_CONTEXT, { groupChatId });
 		throw new Error(`Group chat not found: ${groupChatId}`);
 	}
 
-	console.log(`[GroupChat:Debug] Chat loaded: "${chat.name}"`);
+	logger.debug(`Chat loaded: "${chat.name}"`, LOG_CONTEXT);
 
 	// Check if moderator is active
 	if (!isModeratorActive(groupChatId)) {
-		console.log(`[GroupChat:Debug] ERROR: Moderator not active!`);
+		logger.error('Moderator not active!', LOG_CONTEXT, { groupChatId });
 		throw new Error(
 			`Moderator must be active before adding participants to group chat: ${groupChatId}`
 		);
 	}
 
-	console.log(`[GroupChat:Debug] Moderator is active: true`);
+	logger.debug('Moderator is active: true', LOG_CONTEXT);
 
 	// Idempotent: if participant already exists, return it without spawning a new process
 	const existingParticipant = chat.participants.find((p) => p.name === name);
 	if (existingParticipant) {
-		console.log(`[GroupChat:Debug] Participant '${name}' already exists, returning existing`);
+		logger.info(`Participant '${name}' already exists, returning existing`, LOG_CONTEXT);
 		return existingParticipant;
 	}
 
@@ -140,11 +138,12 @@ export async function addParticipant(
 
 	if (agentDetector) {
 		agentConfig = await agentDetector.getAgent(agentId);
-		console.log(
-			`[GroupChat:Debug] Agent resolved: ${agentConfig?.command || 'null'}, available: ${agentConfig?.available ?? false}`
+		logger.debug(
+			`Agent resolved: ${agentConfig?.command || 'null'}, available: ${agentConfig?.available ?? false}`,
+			LOG_CONTEXT
 		);
 		if (!agentConfig || !agentConfig.available) {
-			console.log(`[GroupChat:Debug] ERROR: Agent not available!`);
+			logger.error('Agent not available!', LOG_CONTEXT, { agentId });
 			throw new Error(`Agent '${agentId}' is not available`);
 		}
 		command = agentConfig.path || agentConfig.command;
@@ -169,86 +168,36 @@ export async function addParticipant(
 		sessionCustomEnvVars: effectiveEnvVars,
 	});
 
-	console.log(`[GroupChat:Debug] Command: ${command}`);
-	console.log(`[GroupChat:Debug] Args: ${JSON.stringify(configResolution.args)}`);
+	logger.debug(`Command: ${command}`, LOG_CONTEXT);
+	logger.debug('Args', LOG_CONTEXT, configResolution.args);
 
 	// Generate session ID for this participant
 	const sessionId = `group-chat-${groupChatId}-participant-${name}-${uuidv4()}`;
-	console.log(`[GroupChat:Debug] Generated session ID: ${sessionId}`);
-
-	// Wrap spawn config with SSH if configured
-	let spawnCommand = command;
-	let spawnArgs = configResolution.args;
-	let spawnCwd = cwd;
-	let spawnPrompt: string | undefined = prompt;
-	let spawnEnvVars = configResolution.effectiveCustomEnvVars ?? effectiveEnvVars;
-	let spawnShell: string | undefined;
-	let spawnRunInShell = false;
-	let spawnSshStdinScript: string | undefined;
-
-	// Apply SSH wrapping if SSH is configured and store is available
-	if (sshStore && sessionOverrides?.sshRemoteConfig) {
-		console.log(`[GroupChat:Debug] Applying SSH wrapping for participant...`);
-		const sshWrapped = await wrapSpawnWithSsh(
-			{
-				command,
-				args: configResolution.args,
-				cwd,
-				prompt,
-				customEnvVars: configResolution.effectiveCustomEnvVars ?? effectiveEnvVars,
-				promptArgs: agentConfig?.promptArgs,
-				noPromptSeparator: agentConfig?.noPromptSeparator,
-				agentBinaryName: agentConfig?.binaryName,
-			},
-			sessionOverrides.sshRemoteConfig,
-			sshStore
-		);
-		spawnCommand = sshWrapped.command;
-		spawnArgs = sshWrapped.args;
-		spawnCwd = sshWrapped.cwd;
-		spawnPrompt = sshWrapped.prompt;
-		spawnEnvVars = sshWrapped.customEnvVars;
-		spawnSshStdinScript = sshWrapped.sshStdinScript;
-		if (sshWrapped.sshRemoteUsed) {
-			console.log(`[GroupChat:Debug] SSH remote used: ${sshWrapped.sshRemoteUsed.name}`);
-		}
-	}
-
-	// Get Windows-specific spawn config (shell, stdin mode) - handles SSH exclusion
-	const winConfig = getWindowsSpawnConfig(agentId, sessionOverrides?.sshRemoteConfig);
-	if (winConfig.shell) {
-		spawnShell = winConfig.shell;
-		spawnRunInShell = winConfig.runInShell;
-		console.log(`[GroupChat:Debug] Windows shell config for participant: ${winConfig.shell}`);
-	}
+	logger.debug(`Generated session ID: ${sessionId}`, LOG_CONTEXT);
 
 	// Spawn the participant agent
-	console.log(`[GroupChat:Debug] Spawning participant agent...`);
-	const result = processManager.spawn({
-		sessionId,
-		toolType: agentId,
-		cwd: spawnCwd,
-		command: spawnCommand,
-		args: spawnArgs,
-		readOnlyMode: false, // Participants can make changes
-		prompt: spawnPrompt,
-		contextWindow: getContextWindowValue(agentConfig, agentConfigValues || {}),
-		customEnvVars: spawnEnvVars,
-		promptArgs: agentConfig?.promptArgs,
-		noPromptSeparator: agentConfig?.noPromptSeparator,
-		shell: spawnShell,
-		runInShell: spawnRunInShell,
-		sendPromptViaStdin: winConfig.sendPromptViaStdin,
-		sendPromptViaStdinRaw: winConfig.sendPromptViaStdinRaw,
-		sshStdinScript: spawnSshStdinScript,
-	});
+	logger.debug('Spawning participant agent...', LOG_CONTEXT);
+	const result = await spawnGroupChatAgent(
+		{
+			agentId,
+			sessionId,
+			cwd,
+			command,
+			args: configResolution.args,
+			prompt,
+			readOnlyMode: false,
+			agent: agentConfig,
+			agentConfigValues: agentConfigValues || {},
+			customEnvVars: configResolution.effectiveCustomEnvVars ?? effectiveEnvVars,
+			sshRemoteConfig: sessionOverrides?.sshRemoteConfig,
+		},
+		{ processManager, sshStore }
+	);
 
-	console.log(`[GroupChat:Debug] Spawn result: ${JSON.stringify(result)}`);
-	console.log(`[GroupChat:Debug] promptArgs: ${agentConfig?.promptArgs ? 'defined' : 'undefined'}`);
-	console.log(`[GroupChat:Debug] noPromptSeparator: ${agentConfig?.noPromptSeparator ?? false}`);
+	logger.debug('Spawn result', LOG_CONTEXT, result);
 
 	if (!result.success) {
-		console.log(`[GroupChat:Debug] ERROR: Spawn failed!`);
+		logger.error('Spawn failed!', LOG_CONTEXT, { name, groupChatId });
 		throw new Error(`Failed to spawn participant '${name}' for group chat ${groupChatId}`);
 	}
 
@@ -263,12 +212,12 @@ export async function addParticipant(
 
 	// Store the session mapping
 	activeParticipantSessions.set(getParticipantKey(groupChatId, name), sessionId);
-	console.log(`[GroupChat:Debug] Session stored in active map`);
+	logger.debug('Session stored in active map', LOG_CONTEXT);
 
 	// Add participant to the group chat
 	await addParticipantToChat(groupChatId, participant);
-	console.log(`[GroupChat:Debug] Participant added to chat storage`);
-	console.log(`[GroupChat:Debug] =====================================`);
+	logger.info('Participant added to chat storage', LOG_CONTEXT);
+	logger.debug('========================================', LOG_CONTEXT);
 
 	return participant;
 }
@@ -353,50 +302,6 @@ export async function removeParticipant(
 }
 
 /**
- * Gets the session ID for a participant.
- *
- * @param groupChatId - The ID of the group chat
- * @param participantName - The name of the participant
- * @returns The session ID, or undefined if not active
- */
-export function getParticipantSessionId(
-	groupChatId: string,
-	participantName: string
-): string | undefined {
-	return activeParticipantSessions.get(getParticipantKey(groupChatId, participantName));
-}
-
-/**
- * Checks if a participant is currently active.
- *
- * @param groupChatId - The ID of the group chat
- * @param participantName - The name of the participant
- * @returns True if the participant is active
- */
-export function isParticipantActive(groupChatId: string, participantName: string): boolean {
-	return activeParticipantSessions.has(getParticipantKey(groupChatId, participantName));
-}
-
-/**
- * Gets all active participants for a group chat.
- *
- * @param groupChatId - The ID of the group chat
- * @returns Array of participant names that are currently active
- */
-export function getActiveParticipants(groupChatId: string): string[] {
-	const prefix = `${groupChatId}:`;
-	const participants: string[] = [];
-
-	for (const key of activeParticipantSessions.keys()) {
-		if (key.startsWith(prefix)) {
-			participants.push(key.slice(prefix.length));
-		}
-	}
-
-	return participants;
-}
-
-/**
  * Clears all active participant sessions for a group chat.
  *
  * @param groupChatId - The ID of the group chat
@@ -421,12 +326,4 @@ export async function clearAllParticipantSessions(
 	for (const key of keysToDelete) {
 		activeParticipantSessions.delete(key);
 	}
-}
-
-/**
- * Clears ALL active participant sessions (all group chats).
- * Useful for cleanup during shutdown or testing.
- */
-export function clearAllParticipantSessionsGlobal(): void {
-	activeParticipantSessions.clear();
 }
