@@ -353,6 +353,117 @@ describe('useModalLayer', () => {
 		});
 	});
 
+	describe('stacked modal escape behavior', () => {
+		it('should close only the topmost modal on Escape', async () => {
+			const lowHandler = vi.fn();
+			const highHandler = vi.fn();
+
+			const useTestHook = () => {
+				const layerStack = useLayerStack();
+				useModalLayer(100, 'Low Priority', lowHandler);
+				useModalLayer(200, 'High Priority', highHandler);
+				return layerStack;
+			};
+
+			const { result } = renderHook(() => useTestHook(), { wrapper });
+
+			expect(result.current.layerCount).toBe(2);
+			expect(result.current.getTopLayer()?.ariaLabel).toBe('High Priority');
+
+			await act(async () => {
+				await result.current.closeTopLayer();
+			});
+
+			expect(highHandler).toHaveBeenCalledTimes(1);
+			expect(lowHandler).not.toHaveBeenCalled();
+		});
+
+		it('should close stacked modals in correct order (highest priority first)', async () => {
+			const callOrder: string[] = [];
+			const handler1 = vi.fn(() => callOrder.push('low'));
+			const handler2 = vi.fn(() => callOrder.push('medium'));
+			const handler3 = vi.fn(() => callOrder.push('high'));
+
+			const useTestHook = () => {
+				const layerStack = useLayerStack();
+				useModalLayer(100, 'Low', handler1);
+				useModalLayer(200, 'Medium', handler2);
+				useModalLayer(300, 'High', handler3);
+				return layerStack;
+			};
+
+			const { result } = renderHook(() => useTestHook(), { wrapper });
+
+			expect(result.current.layerCount).toBe(3);
+
+			// First Escape - should close highest priority
+			await act(async () => {
+				await result.current.closeTopLayer();
+			});
+
+			expect(result.current.getTopLayer()?.ariaLabel).toBe('High');
+			expect(handler3).toHaveBeenCalledTimes(1);
+			expect(handler2).not.toHaveBeenCalled();
+			expect(handler1).not.toHaveBeenCalled();
+		});
+
+		it('should not close lower-priority modals when higher-priority modal is open', async () => {
+			const lowHandler = vi.fn();
+			const midHandler = vi.fn();
+			const highHandler = vi.fn();
+
+			const useTestHook = () => {
+				const layerStack = useLayerStack();
+				useModalLayer(50, 'Low', lowHandler);
+				useModalLayer(100, 'Mid', midHandler);
+				useModalLayer(200, 'High', highHandler);
+				return layerStack;
+			};
+
+			const { result } = renderHook(() => useTestHook(), { wrapper });
+
+			// Close top layer - only calls handler, does NOT unregister
+			// (unregistration happens when component unmounts in response to handler)
+			await act(async () => {
+				await result.current.closeTopLayer();
+			});
+
+			// Only the high handler fires - lower modals are untouched
+			expect(highHandler).toHaveBeenCalledTimes(1);
+			expect(midHandler).not.toHaveBeenCalled();
+			expect(lowHandler).not.toHaveBeenCalled();
+
+			// All 3 layers still registered (handler call != unregister)
+			expect(result.current.layerCount).toBe(3);
+		});
+
+		it('should handle mixed modal and overlay stacking correctly', async () => {
+			const modalHandler = vi.fn();
+			const overlayHandler = vi.fn();
+
+			const useTestHook = () => {
+				const layerStack = useLayerStack();
+				useModalLayer(100, 'Base Modal', modalHandler);
+				useModalLayer(150, 'Top Overlay', overlayHandler, { type: 'overlay' });
+				return layerStack;
+			};
+
+			const { result } = renderHook(() => useTestHook(), { wrapper });
+
+			expect(result.current.layerCount).toBe(2);
+			expect(result.current.getTopLayer()?.ariaLabel).toBe('Top Overlay');
+			expect(result.current.getTopLayer()?.type).toBe('overlay');
+
+			// Escape should close the overlay, not the modal behind it
+			await act(async () => {
+				await result.current.closeTopLayer();
+			});
+
+			expect(overlayHandler).toHaveBeenCalledTimes(1);
+			expect(modalHandler).not.toHaveBeenCalled();
+		});
+	});
+
 	describe('isOpen option', () => {
 		it('should not register a layer when isOpen is false', () => {
 			const onEscape = vi.fn();

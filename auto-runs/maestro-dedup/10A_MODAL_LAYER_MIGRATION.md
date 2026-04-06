@@ -104,16 +104,30 @@ Migrate 50+ files from manual `registerLayer`/`unregisterLayer` boilerplate to t
 
 ### 7. Handle DocumentGraphView.tsx (17 registerLayer calls)
 
-- [ ] Read the file to understand its multiple nested modal layers
-- [ ] Migrate each layer to its own `useModalLayer` call with the correct priority
-- [ ] Verify stacked modal Escape behavior works correctly
-- [ ] Run tests: `CI=1 rtk vitest run` (filter for DocumentGraphView tests)
+- [x] Read the file to understand its multiple nested modal layers
+  - 5 distinct layer registrations: main modal (isOpen-gated), depth slider overlay, layout dropdown overlay, legend overlay, preview panel overlay
+  - Close confirmation uses `<Modal>` component which handles its own layer registration internally
+  - Removed dead `onCloseRef` pattern (set but never read)
+- [x] Migrate each layer to its own `useModalLayer` call with the correct priority
+  - Main modal: `useModalLayer(DOCUMENT_GRAPH, 'Document Graph', handleEscapeRequest, { isOpen, focusTrap: 'lenient' })`
+  - 3 toolbar overlays (depth/layout/legend): overlay type, priority +1, `isOpen` gated by dropdown state
+  - Preview panel: overlay type with `capturesFocus: true`, `focusTrap: 'lenient'`, custom escape handler that closes preview and refocuses mind map
+  - Removed `useLayerStack` import, added `useModalLayer` import
+- [x] Verify stacked modal Escape behavior works correctly
+  - All escape paths preserved: main modal shows confirmation, overlays close individually, preview returns focus to graph
+- [x] Run tests: `CI=1 rtk vitest run` (filter for DocumentGraphView tests)
+  - Updated test mock to include `updateLayerHandler`
+  - 611 DocumentGraph tests pass, 22 useModalLayer tests pass, lint passes
 
 ### 8. Verify Escape key behavior across migrated modals
 
-- [ ] Escape closes the topmost modal
-- [ ] Stacked modals close in correct order (highest priority first)
-- [ ] Escape does NOT close modals that are behind other modals
+- [x] Escape closes the topmost modal
+  - Verified by new test "should close only the topmost modal on Escape" (useModalLayer) and existing "should only call the top layer handler" (useLayerStack)
+- [x] Stacked modals close in correct order (highest priority first)
+  - Verified by new test "should close stacked modals in correct order (highest priority first)" plus existing priority sort tests
+- [x] Escape does NOT close modals that are behind other modals
+  - Verified by new tests "should not close lower-priority modals when higher-priority modal is open" and "should handle mixed modal and overlay stacking correctly"
+  - Added 4 integration tests to `useModalLayer.test.ts` covering all three properties (26/26 pass)
 
 ### 9. Verify full build
 
