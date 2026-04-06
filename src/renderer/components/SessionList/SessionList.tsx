@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
+import { useEventListener } from '../../hooks/utils/useEventListener';
 import {
 	Wand2,
 	Plus,
@@ -350,21 +351,20 @@ function SessionListInner(props: SessionListProps) {
 	};
 
 	// Close menu when clicking outside
-	useEffect(() => {
-		const handleClickOutside = (e: MouseEvent) => {
+	useEventListener(
+		'mousedown',
+		(e: MouseEvent) => {
 			if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
 				setMenuOpen(false);
 			}
-		};
-		if (menuOpen) {
-			document.addEventListener('mousedown', handleClickOutside);
-			return () => document.removeEventListener('mousedown', handleClickOutside);
-		}
-	}, [menuOpen]);
+		},
+		menuOpen ? document : null
+	);
 
 	// Close overlays/menus with Escape key
-	useEffect(() => {
-		const handleEscKey = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			if (e.key === 'Escape') {
 				if (liveOverlayOpen) {
 					setLiveOverlayOpen(false);
@@ -374,34 +374,26 @@ function SessionListInner(props: SessionListProps) {
 					e.stopPropagation();
 				}
 			}
-		};
-		if (liveOverlayOpen || menuOpen) {
-			document.addEventListener('keydown', handleEscKey);
-			return () => document.removeEventListener('keydown', handleEscKey);
-		}
-	}, [liveOverlayOpen, menuOpen]);
+		},
+		liveOverlayOpen || menuOpen ? document : null
+	);
 
 	// Listen for tour UI actions to control hamburger menu state
-	useEffect(() => {
-		const handleTourAction = (event: Event) => {
-			const customEvent = event as CustomEvent<{ type: string; value?: string }>;
-			const { type } = customEvent.detail;
+	useEventListener('tour:action', (event: Event) => {
+		const customEvent = event as CustomEvent<{ type: string; value?: string }>;
+		const { type } = customEvent.detail;
 
-			switch (type) {
-				case 'openHamburgerMenu':
-					setMenuOpen(true);
-					break;
-				case 'closeHamburgerMenu':
-					setMenuOpen(false);
-					break;
-				default:
-					break;
-			}
-		};
-
-		window.addEventListener('tour:action', handleTourAction);
-		return () => window.removeEventListener('tour:action', handleTourAction);
-	}, []);
+		switch (type) {
+			case 'openHamburgerMenu':
+				setMenuOpen(true);
+				break;
+			case 'closeHamburgerMenu':
+				setMenuOpen(false);
+				break;
+			default:
+				break;
+		}
+	});
 
 	// Get git file change counts per session from focused context
 	// Using useGitFileStatus instead of full useGitStatus reduces re-renders

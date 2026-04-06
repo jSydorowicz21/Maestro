@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useCallback, useRef, useState } from 'react';
+import { useEventListener } from '../../../hooks/utils/useEventListener';
 import type { Theme, Shortcut } from '../../../types';
 import { useLayerStack } from '../../../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../../../constants/modalPriorities';
@@ -229,12 +230,7 @@ export function TourOverlay({
 	);
 
 	// Register keyboard handler
-	useEffect(() => {
-		if (isOpen) {
-			window.addEventListener('keydown', handleKeyDown);
-			return () => window.removeEventListener('keydown', handleKeyDown);
-		}
-	}, [isOpen, handleKeyDown]);
+	useEventListener('keydown', handleKeyDown, isOpen ? window : null);
 
 	// Register with layer stack for proper focus management
 	useEffect(() => {

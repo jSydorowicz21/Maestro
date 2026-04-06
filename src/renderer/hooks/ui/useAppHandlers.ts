@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { Session, FocusArea } from '../../types';
 import { shouldOpenExternally, getAllFolderPaths } from '../../utils/fileExplorer';
 import { useModalStore } from '../../stores/modalStore';
 import { useFileExplorerStore } from '../../stores/fileExplorerStore';
 import { updateSessionWith } from '../../stores/sessionStore';
+import { useEventListener } from '../utils/useEventListener';
 
 /** Loading state for file preview (shown while fetching remote files) */
 export interface FilePreviewLoading {
@@ -135,34 +136,38 @@ export function useAppHandlers(deps: UseAppHandlersDeps): UseAppHandlersReturn {
 	// dragover and drop at the document level, the browser can fall into a state
 	// where subsequent drag-and-drop operations are rejected after the first drop.
 	// Both events must have preventDefault() called to maintain a valid drop zone.
-	useEffect(() => {
-		const handleDragEnd = () => {
+
+	// dragend fires when the drag operation ends (drop or cancel)
+	useEventListener(
+		'dragend',
+		() => {
 			dragCounterRef.current = 0;
 			setIsDraggingImage(false);
-		};
+		},
+		document
+	);
 
-		const handleDocumentDragOver = (e: DragEvent) => {
+	// Use capture phase for dragover/drop so they fire BEFORE React handlers that call stopPropagation().
+	// This ensures preventDefault() is called at document level even when element handlers stop bubbling.
+	useEventListener(
+		'dragover',
+		(e: DragEvent) => {
 			e.preventDefault();
-		};
+		},
+		document,
+		{ capture: true }
+	);
 
-		const handleDocumentDrop = (e: DragEvent) => {
+	useEventListener(
+		'drop',
+		(e: DragEvent) => {
 			e.preventDefault();
-			handleDragEnd();
-		};
-
-		// dragend fires when the drag operation ends (drop or cancel)
-		document.addEventListener('dragend', handleDragEnd);
-		// Use capture phase for dragover/drop so they fire BEFORE React handlers that call stopPropagation().
-		// This ensures preventDefault() is called at document level even when element handlers stop bubbling.
-		document.addEventListener('dragover', handleDocumentDragOver, { capture: true });
-		document.addEventListener('drop', handleDocumentDrop, { capture: true });
-
-		return () => {
-			document.removeEventListener('dragend', handleDragEnd);
-			document.removeEventListener('dragover', handleDocumentDragOver, { capture: true });
-			document.removeEventListener('drop', handleDocumentDrop, { capture: true });
-		};
-	}, []);
+			dragCounterRef.current = 0;
+			setIsDraggingImage(false);
+		},
+		document,
+		{ capture: true }
+	);
 
 	// --- FILE HANDLERS ---
 

@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
+import { useEventListener } from '../hooks/utils/useEventListener';
 import {
 	Wand2,
 	Bot,
@@ -48,19 +49,17 @@ export function EmptyStateView({
 	useClickOutside(menuRef, () => setMenuOpen(false), menuOpen);
 
 	// Close menu on Escape
-	useEffect(() => {
-		const handleEscKey = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			if (e.key === 'Escape' && menuOpen) {
 				setMenuOpen(false);
 				e.preventDefault();
 				e.stopPropagation();
 			}
-		};
-		if (menuOpen) {
-			document.addEventListener('keydown', handleEscKey);
-			return () => document.removeEventListener('keydown', handleEscKey);
-		}
-	}, [menuOpen]);
+		},
+		menuOpen ? document : null
+	);
 
 	return (
 		<div className="flex-1 flex flex-col" style={{ backgroundColor: theme.colors.bgMain }}>

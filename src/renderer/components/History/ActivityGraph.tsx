@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
+import { useEventListener } from '../../hooks/utils/useEventListener';
 import { Check } from 'lucide-react';
 import type { Theme, HistoryEntry } from '../../types';
 import { LOOKBACK_OPTIONS, CUE_COLOR } from './historyConstants';
@@ -152,13 +153,7 @@ export const ActivityGraph: React.FC<ActivityGraphProps> = ({
 	};
 
 	// Close context menu when clicking elsewhere
-	useEffect(() => {
-		const handleClick = () => setContextMenu(null);
-		if (contextMenu) {
-			document.addEventListener('click', handleClick);
-			return () => document.removeEventListener('click', handleClick);
-		}
-	}, [contextMenu]);
+	useEventListener('click', () => setContextMenu(null), contextMenu ? document : null);
 
 	// Format the reference time for display (shows what time point we're viewing)
 	const formatReferenceTime = () => {

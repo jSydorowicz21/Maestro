@@ -17,9 +17,10 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useEventListener } from '../utils/useEventListener';
 import type { Session } from '../../types';
 import { getModalActions, useModalStore } from '../../stores/modalStore';
-import { useSessionStore } from '../../stores/sessionStore';
+import { useSessionStore, updateSessionWith } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { gitService } from '../../services/git';
 import { notifyToast } from '../../stores/notificationStore';
@@ -150,13 +151,10 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 	}, []);
 
 	const handleToggleWorktreeExpanded = useCallback((sessionId: string) => {
-		useSessionStore
-			.getState()
-			.setSessions((prev) =>
-				prev.map((s) =>
-					s.id === sessionId ? { ...s, worktreesExpanded: !(s.worktreesExpanded ?? true) } : s
-				)
-			);
+		updateSessionWith(sessionId, (s) => ({
+			...s,
+			worktreesExpanded: !(s.worktreesExpanded ?? true),
+		}));
 	}, []);
 
 	// ---------------------------------------------------------------------------
@@ -176,11 +174,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 				useSettingsStore.getState();
 
 			// Save the config first
-			useSessionStore
-				.getState()
-				.setSessions((prev) =>
-					prev.map((s) => (s.id === activeSession.id ? { ...s, worktreeConfig: config } : s))
-				);
+			updateSessionWith(activeSession.id, (s) => ({ ...s, worktreeConfig: config }));
 
 			// Scan for worktrees and create sub-agent sessions
 			const parentSshRemoteId = getSshRemoteId(activeSession);
@@ -230,11 +224,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 					if (newWorktreeSessions.length > 0) {
 						useSessionStore.getState().setSessions((prev) => [...prev, ...newWorktreeSessions]);
 						// Expand worktrees on parent
-						useSessionStore
-							.getState()
-							.setSessions((prev) =>
-								prev.map((s) => (s.id === activeSession.id ? { ...s, worktreesExpanded: true } : s))
-							);
+						updateSessionWith(activeSession.id, (s) => ({ ...s, worktreesExpanded: true }));
 						notifyToast({
 							type: 'success',
 							title: 'Worktrees Discovered',
@@ -577,11 +567,11 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 
 				// Expand worktrees on parent sessions
 				const parentIds = new Set(newWorktreeSessions.map((s) => s.parentSessionId));
-				useSessionStore
-					.getState()
-					.setSessions((prev) =>
-						prev.map((s) => (parentIds.has(s.id) ? { ...s, worktreesExpanded: true } : s))
-					);
+				for (const parentId of parentIds) {
+					if (parentId) {
+						updateSessionWith(parentId, (s) => ({ ...s, worktreesExpanded: true }));
+					}
+				}
 			}
 		};
 
@@ -666,11 +656,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 			});
 
 			// Expand parent's worktrees
-			useSessionStore
-				.getState()
-				.setSessions((prev) =>
-					prev.map((s) => (s.id === sessionId ? { ...s, worktreesExpanded: true } : s))
-				);
+			updateSessionWith(sessionId, (s) => ({ ...s, worktreesExpanded: true }));
 
 			notifyToast({
 				type: 'success',
@@ -696,131 +682,127 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 	// TODO: Remove after migration to new parent/child model (use worktreeConfig with file watchers instead)
 	// PERFORMANCE: Only scan on app focus (visibility change) instead of continuous polling
 	// This avoids blocking the main thread every 30 seconds during active use
+
+	// Track if we're currently scanning to avoid overlapping scans
+	const legacyScanningRef = useRef(false);
+
+	const scanWorktreeParents = useCallback(async () => {
+		if (legacyScanningRef.current) return;
+		legacyScanningRef.current = true;
+
+		try {
+			// Find sessions that have worktreeParentPath set (legacy model)
+			const latestSessions = useSessionStore.getState().sessions;
+			const { defaultSaveToHistory: savToHist, defaultShowThinking: showThink } =
+				useSettingsStore.getState();
+			const worktreeParentSessions = latestSessions.filter((s) => s.worktreeParentPath);
+			if (worktreeParentSessions.length === 0) return;
+
+			// Collect all new sessions to add in a single batch (avoids stale closure issues)
+			const newSessionsToAdd: Session[] = [];
+			// Track paths we're about to add to avoid duplicates within this scan
+			const pathsBeingAdded = new Set<string>();
+
+			for (const session of worktreeParentSessions) {
+				try {
+					// Get SSH remote ID for parent session (check both runtime and config)
+					const parentSshRemoteId = getSshRemoteId(session);
+					const result = await window.maestro.git.scanWorktreeDirectory(
+						session.worktreeParentPath!,
+						parentSshRemoteId
+					);
+					const { gitSubdirs } = result;
+
+					for (const subdir of gitSubdirs) {
+						// Skip if this path was manually removed by the user
+						const currentRemovedPaths = useSessionStore.getState().removedWorktreePaths;
+						if (currentRemovedPaths.has(subdir.path)) {
+							continue;
+						}
+
+						// Skip if session already exists (check current sessions)
+						const currentSessions2 = useSessionStore.getState().sessions;
+						const normalizedSubdirPath2 = normalizePath(subdir.path);
+						const existingSession = currentSessions2.find(
+							(s) =>
+								normalizePath(s.cwd) === normalizedSubdirPath2 ||
+								normalizePath(s.projectRoot || '') === normalizedSubdirPath2
+						);
+						if (existingSession) {
+							continue;
+						}
+
+						// Skip if we're already adding this path in this scan batch
+						if (pathsBeingAdded.has(subdir.path)) {
+							continue;
+						}
+
+						// Found a new worktree - prepare session creation
+						pathsBeingAdded.add(subdir.path);
+
+						const sessionName = subdir.branch ? `${subdir.name} (${subdir.branch})` : subdir.name;
+
+						// Fetch git info (with SSH support)
+						const gitInfo = await fetchGitInfo(subdir.path, parentSshRemoteId);
+
+						newSessionsToAdd.push(
+							buildWorktreeSession({
+								parentSession: session,
+								path: subdir.path,
+								branch: subdir.branch,
+								name: sessionName,
+								defaultSaveToHistory: savToHist,
+								defaultShowThinking: showThink,
+								worktreeParentPath: session.worktreeParentPath,
+								...gitInfo,
+							})
+						);
+					}
+				} catch (error) {
+					console.error(`[WorktreeScanner] Error scanning ${session.worktreeParentPath}:`, error);
+				}
+			}
+
+			// Add all new sessions in a single update (uses functional update to get fresh state)
+			if (newSessionsToAdd.length > 0) {
+				useSessionStore.getState().setSessions((prev) => {
+					// Double-check against current state to avoid duplicates
+					const currentPaths = new Set(prev.map((s) => normalizePath(s.cwd)));
+					const trulyNew = newSessionsToAdd.filter((s) => !currentPaths.has(normalizePath(s.cwd)));
+					if (trulyNew.length === 0) return prev;
+					return [...prev, ...trulyNew];
+				});
+
+				for (const session of newSessionsToAdd) {
+					notifyToast({
+						type: 'success',
+						title: 'New Worktree Discovered',
+						message: session.name,
+					});
+				}
+			}
+		} finally {
+			legacyScanningRef.current = false;
+		}
+	}, []);
+
+	// Scan once on mount when legacy worktree sessions exist
 	useEffect(() => {
 		if (!hasLegacyWorktreeSessions) return;
-
-		// Track if we're currently scanning to avoid overlapping scans
-		let isScanning = false;
-
-		const scanWorktreeParents = async () => {
-			if (isScanning) return;
-			isScanning = true;
-
-			try {
-				// Find sessions that have worktreeParentPath set (legacy model)
-				const latestSessions = useSessionStore.getState().sessions;
-				const { defaultSaveToHistory: savToHist, defaultShowThinking: showThink } =
-					useSettingsStore.getState();
-				const worktreeParentSessions = latestSessions.filter((s) => s.worktreeParentPath);
-				if (worktreeParentSessions.length === 0) return;
-
-				// Collect all new sessions to add in a single batch (avoids stale closure issues)
-				const newSessionsToAdd: Session[] = [];
-				// Track paths we're about to add to avoid duplicates within this scan
-				const pathsBeingAdded = new Set<string>();
-
-				for (const session of worktreeParentSessions) {
-					try {
-						// Get SSH remote ID for parent session (check both runtime and config)
-						const parentSshRemoteId = getSshRemoteId(session);
-						const result = await window.maestro.git.scanWorktreeDirectory(
-							session.worktreeParentPath!,
-							parentSshRemoteId
-						);
-						const { gitSubdirs } = result;
-
-						for (const subdir of gitSubdirs) {
-							// Skip if this path was manually removed by the user
-							const currentRemovedPaths = useSessionStore.getState().removedWorktreePaths;
-							if (currentRemovedPaths.has(subdir.path)) {
-								continue;
-							}
-
-							// Skip if session already exists (check current sessions)
-							const currentSessions2 = useSessionStore.getState().sessions;
-							const normalizedSubdirPath2 = normalizePath(subdir.path);
-							const existingSession = currentSessions2.find(
-								(s) =>
-									normalizePath(s.cwd) === normalizedSubdirPath2 ||
-									normalizePath(s.projectRoot || '') === normalizedSubdirPath2
-							);
-							if (existingSession) {
-								continue;
-							}
-
-							// Skip if we're already adding this path in this scan batch
-							if (pathsBeingAdded.has(subdir.path)) {
-								continue;
-							}
-
-							// Found a new worktree — prepare session creation
-							pathsBeingAdded.add(subdir.path);
-
-							const sessionName = subdir.branch ? `${subdir.name} (${subdir.branch})` : subdir.name;
-
-							// Fetch git info (with SSH support)
-							const gitInfo = await fetchGitInfo(subdir.path, parentSshRemoteId);
-
-							newSessionsToAdd.push(
-								buildWorktreeSession({
-									parentSession: session,
-									path: subdir.path,
-									branch: subdir.branch,
-									name: sessionName,
-									defaultSaveToHistory: savToHist,
-									defaultShowThinking: showThink,
-									worktreeParentPath: session.worktreeParentPath,
-									...gitInfo,
-								})
-							);
-						}
-					} catch (error) {
-						console.error(`[WorktreeScanner] Error scanning ${session.worktreeParentPath}:`, error);
-					}
-				}
-
-				// Add all new sessions in a single update (uses functional update to get fresh state)
-				if (newSessionsToAdd.length > 0) {
-					useSessionStore.getState().setSessions((prev) => {
-						// Double-check against current state to avoid duplicates
-						const currentPaths = new Set(prev.map((s) => normalizePath(s.cwd)));
-						const trulyNew = newSessionsToAdd.filter(
-							(s) => !currentPaths.has(normalizePath(s.cwd))
-						);
-						if (trulyNew.length === 0) return prev;
-						return [...prev, ...trulyNew];
-					});
-
-					for (const session of newSessionsToAdd) {
-						notifyToast({
-							type: 'success',
-							title: 'New Worktree Discovered',
-							message: session.name,
-						});
-					}
-				}
-			} finally {
-				isScanning = false;
-			}
-		};
-
-		// Scan once on mount
 		scanWorktreeParents();
+	}, [hasLegacyWorktreeSessions, defaultSaveToHistory, scanWorktreeParents]);
 
-		// Scan when app regains focus (visibility change) instead of polling
-		// This is much more efficient — only scans when user returns to app
-		const handleVisibilityChange = () => {
+	// Scan when app regains focus (visibility change) instead of polling
+	// This is much more efficient - only scans when user returns to app
+	useEventListener(
+		'visibilitychange',
+		() => {
 			if (!document.hidden) {
 				scanWorktreeParents();
 			}
-		};
-
-		document.addEventListener('visibilitychange', handleVisibilityChange);
-
-		return () => {
-			document.removeEventListener('visibilitychange', handleVisibilityChange);
-		};
-	}, [hasLegacyWorktreeSessions, defaultSaveToHistory]);
+		},
+		hasLegacyWorktreeSessions ? document : null
+	);
 
 	// ---------------------------------------------------------------------------
 	// Return

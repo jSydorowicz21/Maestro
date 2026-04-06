@@ -1047,15 +1047,15 @@ export function MindMap({
 		});
 	}, []); // No dependencies - stable callback
 
-	// Attach wheel event listener with passive: false to allow preventDefault
+	// Attach wheel event listener with passive: false to allow preventDefault.
+	// NOTE: Uses useEffect instead of useEventListener because canvasRef.current
+	// is null during render. The useEffect runs after mount when the ref is available.
 	useEffect(() => {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
 
 		canvas.addEventListener('wheel', handleWheel, { passive: false });
-		return () => {
-			canvas.removeEventListener('wheel', handleWheel);
-		};
+		return () => canvas.removeEventListener('wheel', handleWheel);
 	}, [handleWheel]);
 
 	// Keyboard navigation

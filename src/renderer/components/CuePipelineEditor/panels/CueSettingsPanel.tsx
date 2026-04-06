@@ -4,7 +4,8 @@
  * Configures: timeout, failure behavior, concurrency, queue size.
  */
 
-import { useRef, useEffect } from 'react';
+import { useRef } from 'react';
+import { useEventListener } from '../../../hooks/utils/useEventListener';
 import type { Theme } from '../../../types';
 import type { CueSettings } from '../../../../main/cue/cue-types';
 import { useClickOutside } from '../../../hooks/ui';
@@ -22,13 +23,13 @@ export function CueSettingsPanel({ settings, theme, onChange, onClose }: CueSett
 
 	useClickOutside(panelRef, onClose);
 
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			if (e.key === 'Escape') onClose();
-		};
-		document.addEventListener('keydown', handleKeyDown);
-		return () => document.removeEventListener('keydown', handleKeyDown);
-	}, [onClose]);
+		},
+		document
+	);
 
 	const inputStyle: React.CSSProperties = {
 		backgroundColor: theme.colors.bgActivity,

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
+import { useEventListener } from '../../hooks/utils/useEventListener';
 import { createPortal } from 'react-dom';
 import { X, History, Sparkles, Clapperboard, HelpCircle } from 'lucide-react';
 import { Spinner } from '../ui';
@@ -159,8 +160,9 @@ export function DirectorNotesModal({
 	);
 
 	// Global keyboard handler for Cmd+Shift+[/]
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			// Cmd+Shift+[ / Cmd+Shift+]
 			if (e.metaKey && e.shiftKey && (e.key === '[' || e.key === ']')) {
 				e.preventDefault();
@@ -168,11 +170,10 @@ export function DirectorNotesModal({
 				navigateTab(e.key === '[' ? -1 : 1);
 				return;
 			}
-		};
-
-		window.addEventListener('keydown', handleKeyDown, true);
-		return () => window.removeEventListener('keydown', handleKeyDown, true);
-	}, [navigateTab]);
+		},
+		window,
+		{ capture: true }
+	);
 
 	return createPortal(
 		<div

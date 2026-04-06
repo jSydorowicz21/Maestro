@@ -51,6 +51,11 @@ export function useThemeStyles(deps: UseThemeStylesDeps): UseThemeStylesReturn {
 
 	// Add scroll listeners to highlight scrollbars during active scrolling
 	// Uses passive listener and batched RAF updates to avoid blocking scroll
+	//
+	// NOTE: This listener uses { capture: true, passive: true } and has cleanup
+	// logic for timeouts/RAF that runs on unmount. Because useEventListener
+	// doesn't expose unmount hooks for non-listener cleanup, we keep this as
+	// a useEffect rather than migrating to useEventListener.
 	useEffect(() => {
 		const scrollTimeouts = new Map<Element, NodeJS.Timeout>();
 		const fadeTimeouts = new Map<Element, NodeJS.Timeout>();

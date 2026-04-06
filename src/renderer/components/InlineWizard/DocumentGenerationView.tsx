@@ -13,6 +13,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useEventListener } from '../../hooks/utils/useEventListener';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -87,20 +88,19 @@ export function DocumentSelector({
 	useClickOutside(dropdownRef, () => setIsOpen(false), isOpen);
 
 	// Close dropdown on Escape
-	useEffect(() => {
-		function handleKeyDown(event: KeyboardEvent) {
+	useEventListener(
+		'keydown',
+		(event: KeyboardEvent) => {
 			if (event.key === 'Escape' && isOpen) {
 				event.preventDefault();
 				event.stopPropagation();
 				setIsOpen(false);
 				buttonRef.current?.focus();
 			}
-		}
-		if (isOpen) {
-			document.addEventListener('keydown', handleKeyDown, true);
-			return () => document.removeEventListener('keydown', handleKeyDown, true);
-		}
-	}, [isOpen]);
+		},
+		isOpen ? document : null,
+		{ capture: true }
+	);
 
 	const selectedDoc = documents[selectedIndex];
 

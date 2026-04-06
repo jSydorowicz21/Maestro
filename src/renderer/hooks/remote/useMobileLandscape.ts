@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useEventListener } from '../utils/useEventListener';
 
 /**
  * Detects if the device is a mobile phone (not tablet/iPad) in landscape orientation.
@@ -12,35 +13,30 @@ import { useState, useEffect } from 'react';
 export function useMobileLandscape(): boolean {
 	const [isMobileLandscape, setIsMobileLandscape] = useState(false);
 
+	const checkMobileLandscape = () => {
+		const width = window.innerWidth;
+		const height = window.innerHeight;
+
+		// Check if it's a touch device
+		const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+		// Mobile phone in landscape: narrow height (<=500px), wider than tall, touch device
+		// This excludes iPads (which have height > 500px even in landscape)
+		// and desktops (which typically don't have touch)
+		const isLandscape = width > height;
+		const isMobileHeight = height <= 500;
+
+		setIsMobileLandscape(isTouchDevice && isLandscape && isMobileHeight);
+	};
+
+	// Check on mount
 	useEffect(() => {
-		const checkMobileLandscape = () => {
-			const width = window.innerWidth;
-			const height = window.innerHeight;
-
-			// Check if it's a touch device
-			const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-
-			// Mobile phone in landscape: narrow height (<=500px), wider than tall, touch device
-			// This excludes iPads (which have height > 500px even in landscape)
-			// and desktops (which typically don't have touch)
-			const isLandscape = width > height;
-			const isMobileHeight = height <= 500;
-
-			setIsMobileLandscape(isTouchDevice && isLandscape && isMobileHeight);
-		};
-
-		// Check on mount
 		checkMobileLandscape();
-
-		// Listen for resize and orientation changes
-		window.addEventListener('resize', checkMobileLandscape);
-		window.addEventListener('orientationchange', checkMobileLandscape);
-
-		return () => {
-			window.removeEventListener('resize', checkMobileLandscape);
-			window.removeEventListener('orientationchange', checkMobileLandscape);
-		};
 	}, []);
+
+	// Listen for resize and orientation changes
+	useEventListener('resize', checkMobileLandscape);
+	useEventListener('orientationchange', checkMobileLandscape);
 
 	return isMobileLandscape;
 }

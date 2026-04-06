@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEventListener } from '../hooks/utils/useEventListener';
 import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { FALLBACK_CONTEXT_WINDOW } from '../../shared/agentConstants';
 import {
@@ -705,10 +706,7 @@ export function AgentSessionsBrowser({
 	);
 
 	// Add global keyboard listener for Cmd+F
-	useEffect(() => {
-		document.addEventListener('keydown', handleGlobalKeyDown);
-		return () => document.removeEventListener('keydown', handleGlobalKeyDown);
-	}, [handleGlobalKeyDown]);
+	useEventListener('keydown', handleGlobalKeyDown, document);
 
 	return (
 		<div className="flex-1 flex flex-col h-full" style={{ backgroundColor: theme.colors.bgMain }}>

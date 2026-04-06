@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { subscribeToActivity } from '../../utils/activityBus';
 import { updateSessionWith } from '../../stores/sessionStore';
+import { useEventListener } from '../utils/useEventListener';
 
 const ACTIVITY_TIMEOUT_MS = 60000; // 1 minute of inactivity = idle
 const TICK_INTERVAL_MS = 1000; // Update every second
@@ -76,22 +77,18 @@ export function useActivityTracker(activeSessionId: string | null): UseActivityT
 	}, []);
 
 	// Handle visibility changes
-	useEffect(() => {
-		const handleVisibilityChange = () => {
+	useEventListener(
+		'visibilitychange',
+		() => {
 			if (document.hidden) {
 				stopInterval();
 			} else if (isActiveRef.current) {
 				// Only restart if user was active
 				startInterval();
 			}
-		};
-
-		document.addEventListener('visibilitychange', handleVisibilityChange);
-
-		return () => {
-			document.removeEventListener('visibilitychange', handleVisibilityChange);
-		};
-	}, [startInterval, stopInterval]);
+		},
+		document
+	);
 
 	// Cleanup on unmount or session change
 	useEffect(() => {

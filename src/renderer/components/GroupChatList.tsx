@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useEventListener } from '../hooks/utils/useEventListener';
 import {
 	MessageSquare,
 	ChevronDown,
@@ -53,15 +54,15 @@ function GroupChatContextMenu({
 	useClickOutside(menuRef, onClose);
 
 	// Close on Escape
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			if (e.key === 'Escape') {
 				onClose();
 			}
-		};
-		document.addEventListener('keydown', handleKeyDown);
-		return () => document.removeEventListener('keydown', handleKeyDown);
-	}, [onClose]);
+		},
+		document
+	);
 
 	// Measure menu and adjust position to stay within viewport
 	const { left, top, ready } = useContextMenuPosition(menuRef, x, y);

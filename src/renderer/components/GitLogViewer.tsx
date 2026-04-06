@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback, memo } from 'react';
+import { useEventListener } from '../hooks/utils/useEventListener';
 import { GitCommit, GitBranch, Tag } from 'lucide-react';
 import type { Theme } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
@@ -150,19 +151,8 @@ export const GitLogViewer = memo(function GitLogViewer({
 	}, [selectedIndex]);
 
 	// Handle keyboard navigation via global listener
-	// Store handleKeyDown in a ref to avoid stale closure issues
-	// The ref is updated synchronously on every render, before any events can fire
-	const handleKeyDownRef = useRef(handleKeyDown);
-	handleKeyDownRef.current = handleKeyDown;
-
-	useEffect(() => {
-		// Wrapper function that always calls the current handler from the ref
-		const handler = (e: KeyboardEvent) => {
-			handleKeyDownRef.current(e);
-		};
-		window.addEventListener('keydown', handler);
-		return () => window.removeEventListener('keydown', handler);
-	}, []); // Empty deps - handler wrapper never changes, but it reads current value from ref
+	// useEventListener stores the handler in a ref internally, so no stale closure issues
+	useEventListener('keydown', handleKeyDown);
 
 	// Format date for display - time for today, full date for older commits
 	const formatDate = (dateStr: string) => {

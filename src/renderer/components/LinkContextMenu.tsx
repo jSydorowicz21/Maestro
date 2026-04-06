@@ -4,7 +4,8 @@
  * Used by MarkdownRenderer (AI chat links) and XTerminal (command terminal links).
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useRef, useCallback } from 'react';
+import { useEventListener } from '../hooks/utils/useEventListener';
 import { Copy, ExternalLink } from 'lucide-react';
 import type { Theme } from '../types';
 import { useContextMenuPosition } from '../hooks/ui/useContextMenuPosition';
@@ -30,18 +31,14 @@ export function LinkContextMenu({ menu, theme, onDismiss }: LinkContextMenuProps
 	const { left, top, ready } = useContextMenuPosition(menuRef, menu.x, menu.y);
 
 	// Dismiss on click outside or Escape
-	useEffect(() => {
-		const handleMouseDown = () => onDismissRef.current();
-		const handleKey = (e: KeyboardEvent) => {
+	useEventListener('mousedown', () => onDismissRef.current(), document);
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			if (e.key === 'Escape') onDismissRef.current();
-		};
-		document.addEventListener('mousedown', handleMouseDown);
-		document.addEventListener('keydown', handleKey);
-		return () => {
-			document.removeEventListener('mousedown', handleMouseDown);
-			document.removeEventListener('keydown', handleKey);
-		};
-	}, []);
+		},
+		document
+	);
 
 	const handleCopy = useCallback(() => {
 		safeClipboardWrite(menu.url);

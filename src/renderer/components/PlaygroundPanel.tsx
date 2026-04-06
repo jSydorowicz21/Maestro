@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useEventListener } from '../hooks/utils/useEventListener';
 import {
 	X,
 	Trophy,
@@ -159,31 +160,26 @@ export function PlaygroundPanel({ theme, themeMode, onClose }: PlaygroundPanelPr
 	const batonStyleRef = useRef<HTMLStyleElement | null>(null);
 
 	// Handle keyboard shortcuts for tab switching
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			// Cmd+Shift+[ or Cmd+Shift+] to switch tabs
-			if (e.metaKey && e.shiftKey) {
-				if (e.key === '[' || e.key === '{') {
-					e.preventDefault();
-					setActiveTab((prev) => {
-						const currentIdx = TABS.findIndex((t) => t.id === prev);
-						const newIdx = currentIdx <= 0 ? TABS.length - 1 : currentIdx - 1;
-						return TABS[newIdx].id;
-					});
-				} else if (e.key === ']' || e.key === '}') {
-					e.preventDefault();
-					setActiveTab((prev) => {
-						const currentIdx = TABS.findIndex((t) => t.id === prev);
-						const newIdx = currentIdx >= TABS.length - 1 ? 0 : currentIdx + 1;
-						return TABS[newIdx].id;
-					});
-				}
+	useEventListener('keydown', (e: KeyboardEvent) => {
+		// Cmd+Shift+[ or Cmd+Shift+] to switch tabs
+		if (e.metaKey && e.shiftKey) {
+			if (e.key === '[' || e.key === '{') {
+				e.preventDefault();
+				setActiveTab((prev) => {
+					const currentIdx = TABS.findIndex((t) => t.id === prev);
+					const newIdx = currentIdx <= 0 ? TABS.length - 1 : currentIdx - 1;
+					return TABS[newIdx].id;
+				});
+			} else if (e.key === ']' || e.key === '}') {
+				e.preventDefault();
+				setActiveTab((prev) => {
+					const currentIdx = TABS.findIndex((t) => t.id === prev);
+					const newIdx = currentIdx >= TABS.length - 1 ? 0 : currentIdx + 1;
+					return TABS[newIdx].id;
+				});
 			}
-		};
-
-		window.addEventListener('keydown', handleKeyDown);
-		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, []);
+		}
+	});
 
 	// Register layer on mount
 	useEffect(() => {

@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useMemo, useCallback } from 'react';
+import { useEventListener } from '../utils/useEventListener';
 import type { Session } from '../../types';
 import type { FileNode } from '../../types/fileTree';
 import { useSessionStore, selectActiveSession, updateSessionWith } from '../../stores/sessionStore';
@@ -301,95 +302,79 @@ export function useFileExplorerEffects(
 	// Effect: File explorer keyboard navigation
 	// ====================================================================
 
-	useEffect(() => {
-		const handleFileExplorerKeys = (e: KeyboardEvent) => {
-			if (hasOpenModal()) return;
+	useEventListener('keydown', (e: KeyboardEvent) => {
+		if (hasOpenModal()) return;
 
-			if (activeFocus !== 'right' || activeRightTab !== 'files' || flatFileList.length === 0)
-				return;
+		if (activeFocus !== 'right' || activeRightTab !== 'files' || flatFileList.length === 0) return;
 
-			const expandedFolders = new Set(activeSession?.fileExplorerExpanded || []);
+		const expandedFolders = new Set(activeSession?.fileExplorerExpanded || []);
 
-			// Cmd+Arrow: jump to top/bottom
-			if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowUp') {
-				e.preventDefault();
-				fileTreeKeyboardNavRef.current = true;
-				setSelectedFileIndex(0);
-			} else if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowDown') {
-				e.preventDefault();
-				fileTreeKeyboardNavRef.current = true;
-				setSelectedFileIndex(flatFileList.length - 1);
-			}
-			// Option+Arrow: page up/down (10 items)
-			else if (e.altKey && e.key === 'ArrowUp') {
-				e.preventDefault();
-				fileTreeKeyboardNavRef.current = true;
-				setSelectedFileIndex((prev: number) => Math.max(0, prev - 10));
-			} else if (e.altKey && e.key === 'ArrowDown') {
-				e.preventDefault();
-				fileTreeKeyboardNavRef.current = true;
-				setSelectedFileIndex((prev: number) => Math.min(flatFileList.length - 1, prev + 10));
-			}
-			// Regular Arrow: move one item
-			else if (e.key === 'ArrowUp') {
-				e.preventDefault();
-				fileTreeKeyboardNavRef.current = true;
-				setSelectedFileIndex((prev: number) => Math.max(0, prev - 1));
-			} else if (e.key === 'ArrowDown') {
-				e.preventDefault();
-				fileTreeKeyboardNavRef.current = true;
-				setSelectedFileIndex((prev: number) => Math.min(flatFileList.length - 1, prev + 1));
-			} else if (e.key === 'ArrowLeft') {
-				e.preventDefault();
-				const selectedItem = flatFileList[selectedFileIndex];
-				if (selectedItem?.isFolder && expandedFolders.has(selectedItem.fullPath)) {
-					toggleFolder(selectedItem.fullPath, activeSessionId);
-				} else if (selectedItem) {
-					const parentPath = selectedItem.fullPath.substring(
-						0,
-						selectedItem.fullPath.lastIndexOf('/')
-					);
-					if (parentPath && expandedFolders.has(parentPath)) {
-						toggleFolder(parentPath, activeSessionId);
-						const parentIndex = flatFileList.findIndex((item) => item.fullPath === parentPath);
-						if (parentIndex >= 0) {
-							fileTreeKeyboardNavRef.current = true;
-							setSelectedFileIndex(parentIndex);
-						}
-					}
-				}
-			} else if (e.key === 'ArrowRight') {
-				e.preventDefault();
-				const selectedItem = flatFileList[selectedFileIndex];
-				if (selectedItem?.isFolder && !expandedFolders.has(selectedItem.fullPath)) {
-					toggleFolder(selectedItem.fullPath, activeSessionId);
-				}
-			} else if (e.key === 'Enter') {
-				e.preventDefault();
-				const selectedItem = flatFileList[selectedFileIndex];
-				if (selectedItem) {
-					if (selectedItem.isFolder) {
-						toggleFolder(selectedItem.fullPath, activeSessionId);
-					} else {
-						handleFileClick(selectedItem, selectedItem.fullPath);
+		// Cmd+Arrow: jump to top/bottom
+		if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowUp') {
+			e.preventDefault();
+			fileTreeKeyboardNavRef.current = true;
+			setSelectedFileIndex(0);
+		} else if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowDown') {
+			e.preventDefault();
+			fileTreeKeyboardNavRef.current = true;
+			setSelectedFileIndex(flatFileList.length - 1);
+		}
+		// Option+Arrow: page up/down (10 items)
+		else if (e.altKey && e.key === 'ArrowUp') {
+			e.preventDefault();
+			fileTreeKeyboardNavRef.current = true;
+			setSelectedFileIndex((prev: number) => Math.max(0, prev - 10));
+		} else if (e.altKey && e.key === 'ArrowDown') {
+			e.preventDefault();
+			fileTreeKeyboardNavRef.current = true;
+			setSelectedFileIndex((prev: number) => Math.min(flatFileList.length - 1, prev + 10));
+		}
+		// Regular Arrow: move one item
+		else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			fileTreeKeyboardNavRef.current = true;
+			setSelectedFileIndex((prev: number) => Math.max(0, prev - 1));
+		} else if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			fileTreeKeyboardNavRef.current = true;
+			setSelectedFileIndex((prev: number) => Math.min(flatFileList.length - 1, prev + 1));
+		} else if (e.key === 'ArrowLeft') {
+			e.preventDefault();
+			const selectedItem = flatFileList[selectedFileIndex];
+			if (selectedItem?.isFolder && expandedFolders.has(selectedItem.fullPath)) {
+				toggleFolder(selectedItem.fullPath, activeSessionId);
+			} else if (selectedItem) {
+				const parentPath = selectedItem.fullPath.substring(
+					0,
+					selectedItem.fullPath.lastIndexOf('/')
+				);
+				if (parentPath && expandedFolders.has(parentPath)) {
+					toggleFolder(parentPath, activeSessionId);
+					const parentIndex = flatFileList.findIndex((item) => item.fullPath === parentPath);
+					if (parentIndex >= 0) {
+						fileTreeKeyboardNavRef.current = true;
+						setSelectedFileIndex(parentIndex);
 					}
 				}
 			}
-		};
-
-		window.addEventListener('keydown', handleFileExplorerKeys);
-		return () => window.removeEventListener('keydown', handleFileExplorerKeys);
-	}, [
-		activeFocus,
-		activeRightTab,
-		flatFileList,
-		selectedFileIndex,
-		activeSession?.fileExplorerExpanded,
-		activeSessionId,
-		toggleFolder,
-		handleFileClick,
-		hasOpenModal,
-	]);
+		} else if (e.key === 'ArrowRight') {
+			e.preventDefault();
+			const selectedItem = flatFileList[selectedFileIndex];
+			if (selectedItem?.isFolder && !expandedFolders.has(selectedItem.fullPath)) {
+				toggleFolder(selectedItem.fullPath, activeSessionId);
+			}
+		} else if (e.key === 'Enter') {
+			e.preventDefault();
+			const selectedItem = flatFileList[selectedFileIndex];
+			if (selectedItem) {
+				if (selectedItem.isFolder) {
+					toggleFolder(selectedItem.fullPath, activeSessionId);
+				} else {
+					handleFileClick(selectedItem, selectedItem.fullPath);
+				}
+			}
+		}
+	});
 
 	// ====================================================================
 	// Return

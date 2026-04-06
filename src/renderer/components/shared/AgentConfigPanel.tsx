@@ -14,6 +14,7 @@
  */
 
 import { useState, useRef, useMemo, useEffect } from 'react';
+import { useEventListener } from '../../hooks/utils/useEventListener';
 import { RefreshCw, Plus, Trash2, HelpCircle, ChevronDown } from 'lucide-react';
 import type { Theme, AgentConfig, AgentConfigOption } from '../../types';
 import { GhostIconButton } from '../ui/GhostIconButton';
@@ -78,8 +79,9 @@ function ModelTextInput({
 	}, [availableModels, filterText]);
 
 	// Close dropdown when clicking outside
-	useEffect(() => {
-		const handleClickOutside = (e: MouseEvent) => {
+	useEventListener(
+		'mousedown',
+		(e: MouseEvent) => {
 			if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
 				setShowDropdown(false);
 				// Reset to committed value if we were filtering
@@ -88,12 +90,9 @@ function ModelTextInput({
 					setIsFiltering(false);
 				}
 			}
-		};
-		if (showDropdown) {
-			document.addEventListener('mousedown', handleClickOutside);
-			return () => document.removeEventListener('mousedown', handleClickOutside);
-		}
-	}, [showDropdown, isFiltering]);
+		},
+		showDropdown ? document : null
+	);
 
 	const isModelField = option.key === 'model';
 	const hasModels = availableModels.length > 0;

@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useEventListener } from '../../../hooks/utils/useEventListener';
 import { tourSteps } from './tourSteps';
 
 /**
@@ -335,16 +336,13 @@ export function useTour({
 	}, [isOpen, currentStepIndex, isTransitioning, updateSpotlight]);
 
 	// Handle window resize - reposition spotlight
-	useEffect(() => {
-		if (!isOpen) return;
-
-		const handleResize = () => {
+	useEventListener(
+		'resize',
+		() => {
 			updateSpotlight();
-		};
-
-		window.addEventListener('resize', handleResize);
-		return () => window.removeEventListener('resize', handleResize);
-	}, [isOpen, updateSpotlight]);
+		},
+		isOpen ? window : null
+	);
 
 	// Cleanup on unmount
 	useEffect(() => {

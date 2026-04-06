@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
+import { useEventListener } from '../hooks/utils/useEventListener';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -246,43 +247,38 @@ function PlaybookDetailView({
 
 	// Keyboard shortcuts for scrolling the document preview
 	// OPT+Up/Down: page up/down, CMD+Up/Down: home/end
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			const scrollContainer = previewScrollRef.current;
-			if (!scrollContainer) return;
+	useEventListener('keydown', (e) => {
+		const scrollContainer = previewScrollRef.current;
+		if (!scrollContainer) return;
 
-			// Don't handle if typing in an input
-			if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-				return;
+		// Don't handle if typing in an input
+		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+			return;
+		}
+
+		const pageHeight = scrollContainer.clientHeight * 0.9; // 90% of visible height
+
+		// CMD+Up/Down: Home/End
+		if (e.metaKey && !e.altKey && !e.shiftKey) {
+			if (e.key === 'ArrowUp') {
+				e.preventDefault();
+				scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+			} else if (e.key === 'ArrowDown') {
+				e.preventDefault();
+				scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
 			}
-
-			const pageHeight = scrollContainer.clientHeight * 0.9; // 90% of visible height
-
-			// CMD+Up/Down: Home/End
-			if (e.metaKey && !e.altKey && !e.shiftKey) {
-				if (e.key === 'ArrowUp') {
-					e.preventDefault();
-					scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
-				} else if (e.key === 'ArrowDown') {
-					e.preventDefault();
-					scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
-				}
+		}
+		// OPT+Up/Down: Page up/down
+		else if (e.altKey && !e.metaKey && !e.shiftKey) {
+			if (e.key === 'ArrowUp') {
+				e.preventDefault();
+				scrollContainer.scrollBy({ top: -pageHeight, behavior: 'smooth' });
+			} else if (e.key === 'ArrowDown') {
+				e.preventDefault();
+				scrollContainer.scrollBy({ top: pageHeight, behavior: 'smooth' });
 			}
-			// OPT+Up/Down: Page up/down
-			else if (e.altKey && !e.metaKey && !e.shiftKey) {
-				if (e.key === 'ArrowUp') {
-					e.preventDefault();
-					scrollContainer.scrollBy({ top: -pageHeight, behavior: 'smooth' });
-				} else if (e.key === 'ArrowDown') {
-					e.preventDefault();
-					scrollContainer.scrollBy({ top: pageHeight, behavior: 'smooth' });
-				}
-			}
-		};
-
-		window.addEventListener('keydown', handleKeyDown);
-		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, []);
+		}
+	});
 
 	// Generate prose styles scoped to marketplace panel
 	const proseStyles = useMemo(
@@ -312,17 +308,15 @@ function PlaybookDetailView({
 	);
 
 	// Close dropdown when clicking outside
-	useEffect(() => {
-		const handleClickOutside = (e: MouseEvent) => {
+	useEventListener(
+		'mousedown',
+		(e) => {
 			if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
 				setShowDocDropdown(false);
 			}
-		};
-		if (showDocDropdown) {
-			document.addEventListener('mousedown', handleClickOutside);
-			return () => document.removeEventListener('mousedown', handleClickOutside);
-		}
-	}, [showDocDropdown]);
+		},
+		showDocDropdown ? document : null
+	);
 
 	const handleDocumentSelect = (filename: string | null) => {
 		if (filename === null) {
@@ -934,25 +928,23 @@ export function MarketplaceModal({
 	}, [isRemoteSession]);
 
 	// Cmd+F to focus search input
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e) => {
 			// Cmd+F or Ctrl+F to focus search (only in list view)
 			if ((e.metaKey || e.ctrlKey) && e.key === 'f' && !showDetailView) {
 				e.preventDefault();
 				searchInputRef.current?.focus();
 				searchInputRef.current?.select();
 			}
-		};
-
-		if (isOpen) {
-			window.addEventListener('keydown', handleKeyDown);
-			return () => window.removeEventListener('keydown', handleKeyDown);
-		}
-	}, [isOpen, showDetailView]);
+		},
+		isOpen ? window : null
+	);
 
 	// Keyboard shortcuts for category tabs (list view) or document navigation (detail view): Cmd+Shift+[ and Cmd+Shift+]
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e) => {
 			if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
 				if (e.key === '[' || e.key === ']') {
 					e.preventDefault();
@@ -999,26 +991,14 @@ export function MarketplaceModal({
 					}
 				}
 			}
-		};
-
-		if (isOpen) {
-			window.addEventListener('keydown', handleKeyDown);
-			return () => window.removeEventListener('keydown', handleKeyDown);
-		}
-	}, [
-		isOpen,
-		categories,
-		selectedCategory,
-		showDetailView,
-		selectedPlaybook,
-		selectedDocFilename,
-		handleSelectDocument,
-		handleCategoryChange,
-	]);
+		},
+		isOpen ? window : null
+	);
 
 	// Arrow key navigation for tiles (list view only)
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e) => {
 			// Only handle in list view, not detail view
 			if (showDetailView) return;
 
@@ -1067,20 +1047,9 @@ export function MarketplaceModal({
 					}
 					break;
 			}
-		};
-
-		if (isOpen) {
-			window.addEventListener('keydown', handleKeyDown);
-			return () => window.removeEventListener('keydown', handleKeyDown);
-		}
-	}, [
-		isOpen,
-		showDetailView,
-		filteredPlaybooks,
-		selectedTileIndex,
-		gridColumns,
-		handleSelectPlaybook,
-	]);
+		},
+		isOpen ? window : null
+	);
 
 	// Don't render if not open
 	if (!isOpen) return null;

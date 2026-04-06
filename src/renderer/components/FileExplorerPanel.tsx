@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
+import { useEventListener } from '../hooks/utils/useEventListener';
 import { createPortal } from 'react-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
@@ -777,17 +778,15 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 	}, [deleteModal, session.id, session.fileTree, onShowFlash, sshRemoteId]);
 
 	// Close context menu on Escape key
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			if (e.key === 'Escape' && contextMenu) {
 				setContextMenu(null);
 			}
-		};
-		if (contextMenu) {
-			window.addEventListener('keydown', handleKeyDown);
-			return () => window.removeEventListener('keydown', handleKeyDown);
-		}
-	}, [contextMenu]);
+		},
+		contextMenu ? window : null
+	);
 
 	// Register layer when filter is open
 	useEffect(() => {

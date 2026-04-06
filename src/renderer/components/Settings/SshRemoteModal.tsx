@@ -23,6 +23,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useEventListener } from '../../hooks/utils/useEventListener';
 import { useFocusAfterRender } from '../../hooks/utils/useFocusAfterRender';
 import { Server, Plus, Trash2, CheckCircle, XCircle, FileCode, ChevronDown } from 'lucide-react';
 import type { Theme } from '../../types';
@@ -180,15 +181,15 @@ export function SshRemoteModal({
 	}, [isOpen, initialConfig]);
 
 	// Close dropdown when clicking outside
-	useEffect(() => {
-		const handleClickOutside = (event: MouseEvent) => {
+	useEventListener(
+		'mousedown',
+		(event: MouseEvent) => {
 			if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
 				setShowSshConfigDropdown(false);
 			}
-		};
-		document.addEventListener('mousedown', handleClickOutside);
-		return () => document.removeEventListener('mousedown', handleClickOutside);
-	}, []);
+		},
+		document
+	);
 
 	// Focus filter input when dropdown opens
 	useFocusAfterRender(filterInputRef, showSshConfigDropdown, 0);

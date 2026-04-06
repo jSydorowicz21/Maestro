@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
+import { useEventListener } from '../../hooks/utils/useEventListener';
 import {
 	X,
 	Key,
@@ -155,10 +156,9 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 	}, [isOpen, registerLayer, unregisterLayer]); // Removed onClose from deps
 
 	// Tab navigation with Cmd+Shift+[ and ]
-	useEffect(() => {
-		if (!isOpen) return;
-
-		const handleTabNavigation = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			const tabs: Array<
 				| 'general'
 				| 'display'
@@ -202,11 +202,9 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 				const nextIndex = (currentIndex + 1) % tabs.length;
 				setActiveTab(tabs[nextIndex]);
 			}
-		};
-
-		window.addEventListener('keydown', handleTabNavigation);
-		return () => window.removeEventListener('keydown', handleTabNavigation);
-	}, [isOpen, activeTab]);
+		},
+		isOpen ? window : null
+	);
 
 	const testLLMConnection = async () => {
 		setTestingLLM(true);

@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
+import { useEventListener } from '../hooks/utils/useEventListener';
 import { Keyboard, Trophy, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { Theme, Shortcut } from '../types';
@@ -167,17 +168,12 @@ export function KeyboardMasteryCelebration({
 	handleCloseRef.current = handleClose;
 
 	// Handle keyboard events - use ref to avoid stale closure
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if (e.key === 'Enter' || e.key === 'Escape') {
-				e.preventDefault();
-				handleCloseRef.current();
-			}
-		};
-
-		window.addEventListener('keydown', handleKeyDown);
-		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, []); // Empty deps - handler reads from ref
+	useEventListener('keydown', (e: KeyboardEvent) => {
+		if (e.key === 'Enter' || e.key === 'Escape') {
+			e.preventDefault();
+			handleCloseRef.current();
+		}
+	});
 
 	// Register with layer stack
 	useEffect(() => {

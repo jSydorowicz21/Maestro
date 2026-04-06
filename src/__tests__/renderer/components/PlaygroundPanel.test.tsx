@@ -1188,7 +1188,12 @@ describe('PlaygroundPanel', () => {
 
 			unmount();
 
-			expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
+			// useEventListener passes options (undefined) as 3rd arg
+			expect(removeEventListenerSpy).toHaveBeenCalledWith(
+				'keydown',
+				expect.any(Function),
+				undefined
+			);
 
 			removeEventListenerSpy.mockRestore();
 		});

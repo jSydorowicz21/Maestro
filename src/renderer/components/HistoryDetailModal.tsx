@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEventListener } from '../hooks/utils/useEventListener';
 import {
 	X,
 	Bot,
@@ -139,23 +140,18 @@ export function HistoryDetailModal({
 	}, [showDeleteConfirm]);
 
 	// Keyboard navigation for prev/next with arrow keys
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			// Don't handle if delete confirmation is showing
-			if (showDeleteConfirm) return;
+	useEventListener('keydown', (e: KeyboardEvent) => {
+		// Don't handle if delete confirmation is showing
+		if (showDeleteConfirm) return;
 
-			if (e.key === 'ArrowLeft') {
-				e.preventDefault();
-				goToPrev();
-			} else if (e.key === 'ArrowRight') {
-				e.preventDefault();
-				goToNext();
-			}
-		};
-
-		window.addEventListener('keydown', handleKeyDown);
-		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [goToPrev, goToNext, showDeleteConfirm]);
+		if (e.key === 'ArrowLeft') {
+			e.preventDefault();
+			goToPrev();
+		} else if (e.key === 'ArrowRight') {
+			e.preventDefault();
+			goToNext();
+		}
+	});
 
 	// Get pill color based on type
 	const getPillColor = () => {

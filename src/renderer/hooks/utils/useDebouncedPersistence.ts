@@ -14,6 +14,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { Session } from '../../types';
+import { useEventListener } from './useEventListener';
 
 // Maximum persisted logs per AI tab (matches session persistence limit)
 const MAX_PERSISTED_LOGS_PER_TAB = 100;
@@ -273,36 +274,24 @@ export function useDebouncedPersistence(
 	}, []);
 
 	// Flush on visibility change (user switching away from app)
-	useEffect(() => {
-		const handleVisibilityChange = () => {
+	useEventListener(
+		'visibilitychange',
+		() => {
 			if (document.hidden && isPending) {
 				flushNow();
 			}
-		};
-
-		document.addEventListener('visibilitychange', handleVisibilityChange);
-
-		return () => {
-			document.removeEventListener('visibilitychange', handleVisibilityChange);
-		};
-	}, [isPending, flushNow]);
+		},
+		document
+	);
 
 	// Flush on beforeunload (app closing)
-	useEffect(() => {
-		const handleBeforeUnload = () => {
-			if (isPending) {
-				// Synchronous flush for beforeunload
-				const sessionsForPersistence = sessionsRef.current.map(prepareSessionForPersistence);
-				window.maestro.sessions.setAll(sessionsForPersistence);
-			}
-		};
-
-		window.addEventListener('beforeunload', handleBeforeUnload);
-
-		return () => {
-			window.removeEventListener('beforeunload', handleBeforeUnload);
-		};
-	}, [isPending]);
+	useEventListener('beforeunload', () => {
+		if (isPending) {
+			// Synchronous flush for beforeunload
+			const sessionsForPersistence = sessionsRef.current.map(prepareSessionForPersistence);
+			window.maestro.sessions.setAll(sessionsForPersistence);
+		}
+	});
 
 	return { isPending, flushNow };
 }

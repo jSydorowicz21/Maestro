@@ -300,15 +300,25 @@ describe('useMobileLandscape', () => {
 
 			const { unmount } = renderHook(() => useMobileLandscape());
 
-			expect(addEventListenerSpy).toHaveBeenCalledWith('resize', expect.any(Function));
-			expect(addEventListenerSpy).toHaveBeenCalledWith('orientationchange', expect.any(Function));
+			// useEventListener passes options (undefined) as 3rd arg
+			expect(addEventListenerSpy).toHaveBeenCalledWith('resize', expect.any(Function), undefined);
+			expect(addEventListenerSpy).toHaveBeenCalledWith(
+				'orientationchange',
+				expect.any(Function),
+				undefined
+			);
 
 			unmount();
 
-			expect(removeEventListenerSpy).toHaveBeenCalledWith('resize', expect.any(Function));
+			expect(removeEventListenerSpy).toHaveBeenCalledWith(
+				'resize',
+				expect.any(Function),
+				undefined
+			);
 			expect(removeEventListenerSpy).toHaveBeenCalledWith(
 				'orientationchange',
-				expect.any(Function)
+				expect.any(Function),
+				undefined
 			);
 
 			addEventListenerSpy.mockRestore();

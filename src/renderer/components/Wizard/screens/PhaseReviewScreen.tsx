@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useCallback, useRef, useState } from 'react';
+import { useEventListener } from '../../../hooks/utils/useEventListener';
 import { Rocket, Compass, X } from 'lucide-react';
 import { Spinner } from '../../ui';
 import type { Theme } from '../../../types';
@@ -225,8 +226,9 @@ function DocumentReview({
 	// Global keyboard handler - attaches to window in capture phase to intercept
 	// events before the LayerStack (which also uses capture phase on window)
 	// We need to handle Escape here to close the dropdown before it closes the modal
-	useEffect(() => {
-		const handleGlobalKeyDown = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			// Handle Escape when dropdown is open - close dropdown instead of modal
 			if (e.key === 'Escape' && isDropdownOpen) {
 				e.preventDefault();
@@ -263,21 +265,10 @@ function DocumentReview({
 					return;
 				}
 			}
-		};
-
-		// Use capture phase at window level - this fires before LayerStackContext's handler
-		// since we register after it (registration order matters for same-phase handlers)
-		// Actually, we need to be first, so we'll attach directly to the modal element
-		window.addEventListener('keydown', handleGlobalKeyDown, true);
-		return () => window.removeEventListener('keydown', handleGlobalKeyDown, true);
-	}, [
-		mode,
-		handleModeChange,
-		currentDocumentIndex,
-		generatedDocuments.length,
-		handleDocumentSelect,
-		isDropdownOpen,
-	]);
+		},
+		window,
+		{ capture: true }
+	);
 
 	// Handle adding attachment
 	const handleAddAttachment = useCallback((filename: string, dataUrl: string) => {

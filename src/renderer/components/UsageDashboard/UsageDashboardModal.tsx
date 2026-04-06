@@ -14,6 +14,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEventListener } from '../../hooks/utils/useEventListener';
 import { X, BarChart3, Calendar, Download, Database } from 'lucide-react';
 import { SummaryCards } from './SummaryCards';
 import { ActivityHeatmap } from './ActivityHeatmap';
@@ -33,6 +34,7 @@ import { EmptyState } from './EmptyState';
 import { DashboardSkeleton } from './ChartSkeletons';
 import { ChartErrorBoundary } from './ChartErrorBoundary';
 import type { Theme, Session } from '../../types';
+import type { StatsAggregation, StatsTimeRange } from '../../../shared/stats-types';
 import { useLayerStack } from '../../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
 import { getRendererPerfMetrics } from '../../utils/logger';
@@ -65,30 +67,6 @@ type SectionId =
 
 // Performance metrics instance for dashboard
 const perfMetrics = getRendererPerfMetrics('UsageDashboard');
-
-// Stats time range type matching the backend API
-type StatsTimeRange = 'day' | 'week' | 'month' | 'quarter' | 'year' | 'all';
-
-// Aggregation data shape from the stats API
-interface StatsAggregation {
-	totalQueries: number;
-	totalDuration: number;
-	avgDuration: number;
-	byAgent: Record<string, { count: number; duration: number }>;
-	bySource: { user: number; auto: number };
-	byLocation: { local: number; remote: number };
-	byDay: Array<{ date: string; count: number; duration: number }>;
-	byHour: Array<{ hour: number; count: number; duration: number }>;
-	// Session lifecycle stats
-	totalSessions: number;
-	sessionsByAgent: Record<string, number>;
-	sessionsByDay: Array<{ date: string; count: number }>;
-	avgSessionDuration: number;
-	// Per-provider per-day breakdown for provider comparison
-	byAgentByDay: Record<string, Array<{ date: string; count: number; duration: number }>>;
-	// Per-session per-day breakdown for agent usage chart
-	bySessionByDay: Record<string, Array<{ date: string; count: number; duration: number }>>;
-}
 
 // View mode options for the dashboard
 type ViewMode = 'overview' | 'agents' | 'activity' | 'autorun';
@@ -277,10 +255,9 @@ export function UsageDashboardModal({
 	}, []);
 
 	// Handle Cmd+Shift+[ and Cmd+Shift+] for tab navigation
-	useEffect(() => {
-		if (!isOpen) return;
-
-		const handleKeyDown = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			// Check for Cmd+Shift+[ or Cmd+Shift+]
 			if (e.metaKey && e.shiftKey && (e.key === '[' || e.key === ']')) {
 				e.preventDefault();
@@ -298,11 +275,10 @@ export function UsageDashboardModal({
 					switchViewMode(VIEW_MODE_TABS[nextIndex].value);
 				}
 			}
-		};
-
-		window.addEventListener('keydown', handleKeyDown, true);
-		return () => window.removeEventListener('keydown', handleKeyDown, true);
-	}, [isOpen, switchViewMode]);
+		},
+		isOpen ? window : null,
+		{ capture: true }
+	);
 
 	// Track container width for responsive layout
 	useEffect(() => {

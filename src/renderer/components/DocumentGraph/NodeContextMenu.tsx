@@ -7,7 +7,8 @@
  * - Focus: Centers the view on the selected node
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useRef, useCallback } from 'react';
+import { useEventListener } from '../../hooks/utils/useEventListener';
 import { FileText, ExternalLink, Copy, Focus } from 'lucide-react';
 import type { Theme } from '../../types';
 import type { GraphNodeData } from './graphDataBuilder';
@@ -62,15 +63,15 @@ export function NodeContextMenu({
 	useClickOutside(menuRef, onDismiss);
 
 	// Close on Escape
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			if (e.key === 'Escape') {
 				onDismissRef.current();
 			}
-		};
-		document.addEventListener('keydown', handleKeyDown);
-		return () => document.removeEventListener('keydown', handleKeyDown);
-	}, []);
+		},
+		document
+	);
 
 	// Measure menu and adjust position to stay within viewport
 	const { left, top, ready } = useContextMenuPosition(menuRef, x, y);

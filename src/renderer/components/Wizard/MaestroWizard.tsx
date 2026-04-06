@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEventListener } from '../../hooks/utils/useEventListener';
 import {
 	useWizard,
 	WIZARD_TOTAL_STEPS,
@@ -292,13 +293,9 @@ export function MaestroWizard({
 
 	// Capture-phase handler for global shortcuts that should work anywhere in the modal
 	// This ensures Cmd+Shift+K (thinking toggle) works even when focus is on header elements
-	useEffect(() => {
-		if (!state.isOpen) return;
-
-		const modal = modalRef.current;
-		if (!modal) return;
-
-		const handleCaptureKeyDown = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			// Cmd+Shift+K to toggle thinking display (only on conversation step)
 			if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
 				if (state.currentStep === 'conversation') {
@@ -307,43 +304,35 @@ export function MaestroWizard({
 					setShowThinking((prev) => !prev);
 				}
 			}
-		};
-
-		// Use capture phase to intercept before any other handlers
-		modal.addEventListener('keydown', handleCaptureKeyDown, { capture: true });
-		return () => modal.removeEventListener('keydown', handleCaptureKeyDown, { capture: true });
-	}, [state.isOpen, state.currentStep]);
+		},
+		state.isOpen ? modalRef.current : null,
+		{ capture: true }
+	);
 
 	// Bubble-phase handler to stop Cmd+E from reaching the main app after wizard handles it
 	// This prevents the wizard's edit/preview toggle from leaking to the AutoRun component
-	useEffect(() => {
-		if (!state.isOpen) return;
-
-		const modal = modalRef.current;
-		if (!modal) return;
-
-		const handleBubbleKeyDown = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			// Stop Cmd+E from bubbling further after the wizard's internal handlers process it
 			if ((e.metaKey || e.ctrlKey) && e.key === 'e' && !e.shiftKey) {
 				// By the time this bubble-phase handler runs, the wizard's React handlers
 				// have already processed the event. Now we stop it from reaching the main app.
 				e.stopPropagation();
 			}
-		};
-
-		modal.addEventListener('keydown', handleBubbleKeyDown, false);
-		return () => modal.removeEventListener('keydown', handleBubbleKeyDown, false);
-	}, [state.isOpen]);
+		},
+		state.isOpen ? modalRef.current : null,
+		false
+	);
 
 	// Focus trap - keep Tab navigation within the modal
-	useEffect(() => {
-		if (!state.isOpen || showExitConfirm) return;
-
-		const modal = modalRef.current;
-		if (!modal) return;
-
-		const handleFocusTrap = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			if (e.key !== 'Tab') return;
+
+			const modal = modalRef.current;
+			if (!modal) return;
 
 			// Get all focusable elements within the modal
 			const focusableElements = modal.querySelectorAll(FOCUSABLE_SELECTOR);
@@ -371,12 +360,10 @@ export function MaestroWizard({
 					firstElement.focus();
 				}
 			}
-		};
-
-		// Use capture phase to intercept Tab before it reaches other handlers
-		document.addEventListener('keydown', handleFocusTrap, { capture: true });
-		return () => document.removeEventListener('keydown', handleFocusTrap, { capture: true });
-	}, [state.isOpen, showExitConfirm]);
+		},
+		state.isOpen && !showExitConfirm ? document : null,
+		{ capture: true }
+	);
 
 	// Focus the modal when it opens to ensure focus is trapped
 	useEffect(() => {

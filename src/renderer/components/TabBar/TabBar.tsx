@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, memo, useMemo } from 'react';
+import { useEventListener } from '../../hooks/utils/useEventListener';
 import { Search, Mail } from 'lucide-react';
 import type { AITab } from '../../types';
 import { hasDraft } from '../../utils/tabHelpers';
@@ -195,19 +196,24 @@ function TabBarInner({
 	);
 
 	// Overflow detection
+	const checkOverflow = useCallback(() => {
+		if (tabBarRef.current) {
+			setIsOverflowing(tabBarRef.current.scrollWidth > tabBarRef.current.clientWidth);
+		}
+	}, []);
+
+	useEventListener('resize', checkOverflow);
+
 	useEffect(() => {
-		const checkOverflow = () => {
-			if (tabBarRef.current) {
-				setIsOverflowing(tabBarRef.current.scrollWidth > tabBarRef.current.clientWidth);
-			}
-		};
 		const timeoutId = setTimeout(checkOverflow, 0);
-		window.addEventListener('resize', checkOverflow);
-		return () => {
-			clearTimeout(timeoutId);
-			window.removeEventListener('resize', checkOverflow);
-		};
-	}, [tabs.length, displayedTabs.length, unifiedTabs?.length, displayedUnifiedTabs?.length]);
+		return () => clearTimeout(timeoutId);
+	}, [
+		tabs.length,
+		displayedTabs.length,
+		unifiedTabs?.length,
+		displayedUnifiedTabs?.length,
+		checkOverflow,
+	]);
 
 	// Move-to-first/last handlers
 	const handleMoveToFirst = useCallback(

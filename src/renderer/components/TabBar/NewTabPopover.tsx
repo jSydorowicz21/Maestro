@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, memo } from 'react';
+import { useEventListener } from '../../hooks/utils/useEventListener';
 import { createPortal } from 'react-dom';
 import { Plus, Terminal } from 'lucide-react';
 import type { Theme } from '../../types';
@@ -35,16 +36,15 @@ export const NewTabPopover = memo(function NewTabPopover({
 	const popoverRef = useRef<HTMLDivElement>(null);
 
 	// Close popover on outside click
-	useEffect(() => {
-		if (!popoverOpen) return;
-		const handler = (e: MouseEvent) => {
+	useEventListener(
+		'mousedown',
+		(e: MouseEvent) => {
 			if (btnRef.current && btnRef.current.contains(e.target as Node)) return;
 			if (popoverRef.current && popoverRef.current.contains(e.target as Node)) return;
 			setPopoverOpen(false);
-		};
-		document.addEventListener('mousedown', handler);
-		return () => document.removeEventListener('mousedown', handler);
-	}, [popoverOpen]);
+		},
+		popoverOpen ? document : null
+	);
 
 	// Auto-focus popover when opened, restore focus to button when closed
 	useEffect(() => {

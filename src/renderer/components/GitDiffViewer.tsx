@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, memo } from 'react';
+import { useEventListener } from '../hooks/utils/useEventListener';
 import { Diff, Hunk } from 'react-diff-view';
 import { Plus, Minus, ImageIcon } from 'lucide-react';
 import type { Theme } from '../types';
@@ -75,23 +76,18 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 	}, [activeTab]);
 
 	// Handle keyboard shortcuts (tab navigation only)
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			// Cmd+[ or Cmd+Shift+[ - Previous tab
-			if ((e.metaKey || e.ctrlKey) && e.key === '[') {
-				e.preventDefault();
-				setActiveTab((prev) => (prev === 0 ? parsedFiles.length - 1 : prev - 1));
-			}
-			// Cmd+] or Cmd+Shift+] - Next tab
-			else if ((e.metaKey || e.ctrlKey) && e.key === ']') {
-				e.preventDefault();
-				setActiveTab((prev) => (prev + 1) % parsedFiles.length);
-			}
-		};
-
-		window.addEventListener('keydown', handleKeyDown);
-		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [parsedFiles.length]);
+	useEventListener('keydown', (e: KeyboardEvent) => {
+		// Cmd+[ or Cmd+Shift+[ - Previous tab
+		if ((e.metaKey || e.ctrlKey) && e.key === '[') {
+			e.preventDefault();
+			setActiveTab((prev) => (prev === 0 ? parsedFiles.length - 1 : prev - 1));
+		}
+		// Cmd+] or Cmd+Shift+] - Next tab
+		else if ((e.metaKey || e.ctrlKey) && e.key === ']') {
+			e.preventDefault();
+			setActiveTab((prev) => (prev + 1) % parsedFiles.length);
+		}
+	});
 
 	if (parsedFiles.length === 0) {
 		return (

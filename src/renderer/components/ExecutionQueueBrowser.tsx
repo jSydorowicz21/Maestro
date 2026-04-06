@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useEventListener } from '../hooks/utils/useEventListener';
 import { X, MessageSquare, Command, Trash2, Clock, Folder, FolderOpen } from 'lucide-react';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
@@ -418,24 +419,20 @@ function QueueItemRow({
 	}, []);
 
 	// Handle escape key to cancel drag
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			if (e.key === 'Escape' && isDragging) {
 				onDragCancel?.();
 				isDraggingRef.current = false;
 				setIsPressed(false);
 			}
-		};
+		},
+		isDragging ? window : null
+	);
 
-		if (isDragging) {
-			window.addEventListener('keydown', handleKeyDown);
-			window.addEventListener('mouseup', handleMouseUp);
-			return () => {
-				window.removeEventListener('keydown', handleKeyDown);
-				window.removeEventListener('mouseup', handleMouseUp);
-			};
-		}
-	}, [isDragging, onDragCancel]);
+	// Handle mouseup to end drag
+	useEventListener('mouseup', handleMouseUp, isDragging ? window : null);
 
 	// Visual states
 	const showDragReady = canDrag && isHovered && !isDragging && !isAnyDragging;

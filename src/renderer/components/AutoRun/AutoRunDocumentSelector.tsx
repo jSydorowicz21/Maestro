@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useEventListener } from '../../hooks/utils/useEventListener';
 import { ChevronDown, ChevronRight, RefreshCw, FolderOpen, Plus, Folder } from 'lucide-react';
 import type { Theme } from '../../types';
 import { useClickOutside } from '../../hooks';
@@ -88,19 +89,16 @@ export function AutoRunDocumentSelector({
 	useClickOutside(dropdownRef, () => setIsOpen(false), isOpen);
 
 	// Close dropdown on Escape
-	useEffect(() => {
-		function handleKeyDown(event: KeyboardEvent) {
+	useEventListener(
+		'keydown',
+		(event: KeyboardEvent) => {
 			if (event.key === 'Escape' && isOpen) {
 				setIsOpen(false);
 				buttonRef.current?.focus();
 			}
-		}
-
-		if (isOpen) {
-			document.addEventListener('keydown', handleKeyDown);
-			return () => document.removeEventListener('keydown', handleKeyDown);
-		}
-	}, [isOpen]);
+		},
+		isOpen ? document : null
+	);
 
 	// Focus input when create modal opens
 	useEffect(() => {

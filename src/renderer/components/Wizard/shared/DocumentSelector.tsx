@@ -12,7 +12,8 @@
  * - Dynamic width based on longest filename
  */
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo } from 'react';
+import { useEventListener } from '../../../hooks/utils/useEventListener';
 import { ChevronDown } from 'lucide-react';
 import type { Theme } from '../../../types';
 import type { GeneratedDocument } from '../WizardContext';
@@ -69,33 +70,30 @@ export function DocumentSelector({
 	const selectedDoc = documents[selectedIndex];
 
 	// Handle click outside to close
-	useEffect(() => {
-		function handleClickOutside(event: MouseEvent) {
+	useEventListener(
+		'mousedown',
+		(event: MouseEvent) => {
 			if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
 				setIsOpen(false);
 			}
-		}
-		if (isOpen) {
-			document.addEventListener('mousedown', handleClickOutside);
-			return () => document.removeEventListener('mousedown', handleClickOutside);
-		}
-	}, [isOpen]);
+		},
+		isOpen ? document : null
+	);
 
 	// Handle Escape key to close
-	useEffect(() => {
-		function handleKeyDown(event: KeyboardEvent) {
+	useEventListener(
+		'keydown',
+		(event: KeyboardEvent) => {
 			if (event.key === 'Escape' && isOpen) {
 				event.preventDefault();
 				event.stopPropagation();
 				setIsOpen(false);
 				buttonRef.current?.focus();
 			}
-		}
-		if (isOpen) {
-			document.addEventListener('keydown', handleKeyDown, true);
-			return () => document.removeEventListener('keydown', handleKeyDown, true);
-		}
-	}, [isOpen]);
+		},
+		isOpen ? document : null,
+		{ capture: true }
+	);
 
 	// Calculate dropdown width based on longest filename
 	const longestFilename = useMemo(() => {

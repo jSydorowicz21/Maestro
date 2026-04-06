@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEventListener } from '../hooks/utils/useEventListener';
 import {
 	PartyPopper,
 	Rocket,
@@ -172,17 +173,12 @@ export function FirstRunCelebration({
 	}, [isClosing, fireConfetti]);
 
 	// Handle keyboard events
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if (e.key === 'Enter' || e.key === 'Escape') {
-				e.preventDefault();
-				handleClose();
-			}
-		};
-
-		window.addEventListener('keydown', handleKeyDown);
-		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [handleClose]);
+	useEventListener('keydown', (e: KeyboardEvent) => {
+		if (e.key === 'Enter' || e.key === 'Escape') {
+			e.preventDefault();
+			handleClose();
+		}
+	});
 
 	// Register with layer stack
 	useEffect(() => {

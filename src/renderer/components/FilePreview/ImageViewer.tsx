@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
+import { useEventListener } from '../../hooks/utils/useEventListener';
 import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { GhostIconButton } from '../ui/GhostIconButton';
 
@@ -90,12 +91,7 @@ export const ImageViewer = memo(function ImageViewer({ src, alt, theme }: ImageV
 	}, []);
 
 	// Release drag if mouse leaves the container
-	useEffect(() => {
-		if (!dragging) return;
-		const up = () => setDragging(false);
-		window.addEventListener('mouseup', up);
-		return () => window.removeEventListener('mouseup', up);
-	}, [dragging]);
+	useEventListener('mouseup', () => setDragging(false), dragging ? window : null);
 
 	const fitToView = useCallback(() => {
 		setZoom(1);

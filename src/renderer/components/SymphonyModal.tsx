@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEventListener } from '../hooks/utils/useEventListener';
 import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
@@ -498,15 +499,15 @@ function RepositoryDetailView({
 	);
 
 	// Close dropdown when clicking outside
-	useEffect(() => {
-		const handleClickOutside = (e: MouseEvent) => {
+	useEventListener(
+		'mousedown',
+		(e: MouseEvent) => {
 			if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
 				setShowDocDropdown(false);
 			}
-		};
-		document.addEventListener('mousedown', handleClickOutside);
-		return () => document.removeEventListener('mousedown', handleClickOutside);
-	}, []);
+		},
+		document
+	);
 
 	// Auto-load first document when issue is selected
 	useEffect(() => {
@@ -518,33 +519,28 @@ function RepositoryDetailView({
 	}, [selectedIssue, onPreviewDocument]);
 
 	// Keyboard shortcuts for document navigation: Cmd+Shift+[ and Cmd+Shift+]
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if (!selectedIssue || selectedIssue.documentPaths.length === 0) return;
+	useEventListener('keydown', (e: KeyboardEvent) => {
+		if (!selectedIssue || selectedIssue.documentPaths.length === 0) return;
 
-			if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === '[' || e.key === ']')) {
-				e.preventDefault();
+		if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === '[' || e.key === ']')) {
+			e.preventDefault();
 
-				const docCount = selectedIssue.documentPaths.length;
-				let newIndex: number;
+			const docCount = selectedIssue.documentPaths.length;
+			let newIndex: number;
 
-				if (e.key === '[') {
-					// Go backwards, wrap around
-					newIndex = selectedDocIndex <= 0 ? docCount - 1 : selectedDocIndex - 1;
-				} else {
-					// Go forwards, wrap around
-					newIndex = selectedDocIndex >= docCount - 1 ? 0 : selectedDocIndex + 1;
-				}
-
-				const doc = selectedIssue.documentPaths[newIndex];
-				setSelectedDocIndex(newIndex);
-				onPreviewDocument(doc.path, doc.isExternal);
+			if (e.key === '[') {
+				// Go backwards, wrap around
+				newIndex = selectedDocIndex <= 0 ? docCount - 1 : selectedDocIndex - 1;
+			} else {
+				// Go forwards, wrap around
+				newIndex = selectedDocIndex >= docCount - 1 ? 0 : selectedDocIndex + 1;
 			}
-		};
 
-		window.addEventListener('keydown', handleKeyDown);
-		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [selectedIssue, selectedDocIndex, onPreviewDocument]);
+			const doc = selectedIssue.documentPaths[newIndex];
+			setSelectedDocIndex(newIndex);
+			onPreviewDocument(doc.path, doc.isExternal);
+		}
+	});
 
 	const handleSelectDoc = (index: number) => {
 		if (!selectedIssue) return;
@@ -1597,9 +1593,10 @@ export function SymphonyModal({
 	// Tab cycling with Cmd+Shift+[ and Cmd+Shift+]
 	const tabs: ModalTab[] = useMemo(() => ['projects', 'active', 'history', 'stats'], []);
 
-	useEffect(() => {
-		const handleTabCycle = (e: KeyboardEvent) => {
-			// Cmd+Shift+[ or Cmd+Shift+] to cycle tabs
+	// Tab cycling with Cmd+Shift+[ and Cmd+Shift+]
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === '[' || e.key === ']')) {
 				e.preventDefault();
 				e.stopPropagation();
@@ -1617,17 +1614,14 @@ export function SymphonyModal({
 
 				setActiveTab(tabs[newIndex]);
 			}
-		};
-
-		if (isOpen) {
-			window.addEventListener('keydown', handleTabCycle);
-			return () => window.removeEventListener('keydown', handleTabCycle);
-		}
-	}, [isOpen, activeTab, tabs]);
+		},
+		isOpen ? window : null
+	);
 
 	// Keyboard navigation
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			if (activeTab !== 'projects' || showDetailView) return;
 
 			// "/" to focus search (vim-style)
@@ -1680,20 +1674,9 @@ export function SymphonyModal({
 					break;
 				}
 			}
-		};
-
-		if (isOpen) {
-			window.addEventListener('keydown', handleKeyDown);
-			return () => window.removeEventListener('keydown', handleKeyDown);
-		}
-	}, [
-		isOpen,
-		activeTab,
-		showDetailView,
-		filteredRepositories,
-		selectedTileIndex,
-		handleSelectRepo,
-	]);
+		},
+		isOpen ? window : null
+	);
 
 	if (!isOpen) return null;
 

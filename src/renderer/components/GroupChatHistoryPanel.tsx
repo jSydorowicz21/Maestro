@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useEventListener } from '../hooks/utils/useEventListener';
 import { Check, Send, MessageSquare, Layers, AlertTriangle } from 'lucide-react';
 import { EmptyState } from './ui';
 import type { Theme } from '../types';
@@ -182,13 +183,7 @@ function GroupChatActivityGraph({
 	};
 
 	// Close context menu when clicking elsewhere
-	useEffect(() => {
-		const handleClick = () => setContextMenu(null);
-		if (contextMenu) {
-			document.addEventListener('click', handleClick);
-			return () => document.removeEventListener('click', handleClick);
-		}
-	}, [contextMenu]);
+	useEventListener('click', () => setContextMenu(null), contextMenu ? document : null);
 
 	// Generate labels for the x-axis
 	const getAxisLabels = () => {

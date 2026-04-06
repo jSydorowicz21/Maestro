@@ -8,6 +8,9 @@
 // Focus after render
 export { useFocusAfterRender } from './useFocusAfterRender';
 
+// Event listener management
+export { useEventListener } from './useEventListener';
+
 // Debounce and throttle utilities
 export { useDebouncedValue, useThrottledCallback, useDebouncedCallback } from './useThrottle';
 

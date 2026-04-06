@@ -343,16 +343,19 @@ describe('useRemoteHandlers', () => {
 		it('registers event listener on mount and removes on unmount', () => {
 			const { unmount } = renderHook(() => useRemoteHandlers(createMockDeps()));
 
+			// useEventListener passes options (undefined) as 3rd arg
 			expect(window.addEventListener).toHaveBeenCalledWith(
 				'maestro:remoteCommand',
-				expect.any(Function)
+				expect.any(Function),
+				undefined
 			);
 
 			unmount();
 
 			expect(window.removeEventListener).toHaveBeenCalledWith(
 				'maestro:remoteCommand',
-				expect.any(Function)
+				expect.any(Function),
+				undefined
 			);
 		});
 

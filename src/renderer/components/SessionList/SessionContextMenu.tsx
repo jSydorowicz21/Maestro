@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useEventListener } from '../../hooks/utils/useEventListener';
 import {
 	ChevronRight,
 	Settings,
@@ -73,15 +74,15 @@ export function SessionContextMenu({
 
 	useClickOutside(menuRef, onDismiss);
 
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
+	useEventListener(
+		'keydown',
+		(e: KeyboardEvent) => {
 			if (e.key === 'Escape') {
 				onDismissRef.current();
 			}
-		};
-		document.addEventListener('keydown', handleKeyDown);
-		return () => document.removeEventListener('keydown', handleKeyDown);
-	}, []);
+		},
+		document
+	);
 
 	// Cleanup submenu timeout on unmount
 	useEffect(() => {
