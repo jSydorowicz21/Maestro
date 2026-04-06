@@ -12,8 +12,8 @@ Replace 130+ `console.log` calls in the group chat router (and 26 in group-chat-
 
 ## Pre-flight Checks
 
-- [ ] Phase 10 (modal/spawn consolidation) is complete
-- [ ] `rtk npm run lint` passes
+- [x] Phase 10 (modal/spawn consolidation) is complete
+- [x] `rtk npm run lint` passes
 
 ---
 
@@ -48,12 +48,12 @@ Replace 130+ `console.log` calls in the group chat router (and 26 in group-chat-
 - [ ] Replace `console.log('[GroupChat] ...')` with `logger.info('...')` or `logger.debug('...')` based on message importance
 - [ ] For messages with data objects: use `logger.debug('msg', { data })` instead of `console.log('msg:', data)`
 - [ ] Preserve all existing log message content
-- [ ] Run targeted tests after completing: `rtk vitest run` (filter for group-chat-router tests)
+- [ ] Run targeted tests after completing: `CI=1 rtk vitest run` (filter for group-chat-router tests)
 
 ### 4. Migrate group-chat-agent.ts (26 calls)
 
 - [ ] Apply same pattern as Task 3
-- [ ] Run targeted tests: `rtk vitest run` (filter for group-chat-agent tests)
+- [ ] Run targeted tests: `CI=1 rtk vitest run` (filter for group-chat-agent tests)
 
 ### 5. Migrate other high-frequency files
 
@@ -66,7 +66,7 @@ Replace 130+ `console.log` calls in the group chat router (and 26 in group-chat-
 ### 6. Verify full build
 
 - [ ] Run lint: `rtk npm run lint`
-- [ ] Run tests: `rtk vitest run`
+- [ ] Run tests: `CI=1 rtk vitest run`
 - [ ] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
 
 ### 7. Count remaining raw console.log in group chat
@@ -81,7 +81,7 @@ Replace 130+ `console.log` calls in the group chat router (and 26 in group-chat-
 After completing changes, run targeted tests for the files you modified:
 
 ```bash
-rtk vitest run <path-to-relevant-test-files>
+CI=1 rtk vitest run <path-to-relevant-test-files>
 ```
 
 **Rule: Zero new test failures from your changes.** Pre-existing failures on the baseline are acceptable.
