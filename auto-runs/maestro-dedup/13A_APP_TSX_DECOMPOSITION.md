@@ -124,10 +124,12 @@ Break down `App.tsx` from 4,034 lines into focused modules. This is the single l
 
 ### 7. Extract Encore Feature gating logic
 
-- [ ] Create `src/renderer/hooks/useEncoreFeatures.ts`
-- [ ] Centralize all Encore Feature conditional logic from App.tsx
-- [ ] Import and call from App.tsx
-- [ ] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+- [x] Create `src/renderer/hooks/useEncoreFeatures.ts`
+- [x] Centralize all Encore Feature conditional logic from App.tsx
+- [x] Import and call from App.tsx
+- [x] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+
+**Result:** Created `src/renderer/hooks/settings/useEncoreFeatures.ts` (97 lines) centralizing all Encore Feature gating logic from App.tsx. The hook self-sources `encoreFeatures` from settingsStore, `sessions` from sessionStore, and modal actions via `getModalActions()`. Contains: (1) two modal-reset useEffects that close Symphony/UsageDashboard modals when their Encore Feature toggle is disabled, (2) the `useCueAutoDiscovery` call (gated by maestroCue flag), (3) five pre-gated callbacks (`gatedSetUsageDashboardOpen`, `gatedOnOpenSymphony`, `gatedOnOpenDirectorNotes`, `gatedOnOpenMaestroCue`, `gatedOnConfigureCue`) that return `undefined` when their feature is disabled. Takes only `handleConfigureCue` as external dep (from useModalHandlers). Removed `encoreFeatures` from settings destructuring, removed `useCueAutoDiscovery` import/call, and replaced 5 inline `encoreFeatures.xxx ? handler : undefined` ternary expressions in JSX with the pre-gated values. Exported from `hooks/settings/index.ts`. App.tsx reduced from 2,974 to 2,967 lines (-7 lines, but the primary value is centralization of scattered encore logic into one discoverable hook). Lint passes (0 new errors; 19 pre-existing errors unchanged). Tests match baseline (24,537 passed, 42 pre-existing failures, 107 pending).
 
 ### 8. Verify after each extraction
 

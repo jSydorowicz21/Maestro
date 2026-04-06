@@ -7,3 +7,5 @@
 
 export { useSettings } from './useSettings';
 export type { UseSettingsReturn } from './useSettings';
+export { useEncoreFeatures } from './useEncoreFeatures';
+export type { UseEncoreFeaturesDeps, UseEncorefeaturesReturn } from './useEncoreFeatures';

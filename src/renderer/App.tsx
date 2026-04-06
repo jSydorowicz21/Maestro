@@ -118,7 +118,7 @@ import {
 import { useMainPanelProps, useSessionListProps, useRightPanelProps } from './hooks/props';
 import { useAgentListeners } from './hooks/agent/useAgentListeners';
 import { useSymphonyContribution } from './hooks/symphony/useSymphonyContribution';
-import { useCueAutoDiscovery } from './hooks/useCueAutoDiscovery';
+import { useEncoreFeatures } from './hooks/settings/useEncoreFeatures';
 
 // Import contexts
 import { useLayerStack } from './contexts/LayerStackContext';
@@ -428,17 +428,7 @@ function MaestroConsoleInner() {
 		autoScrollAiMode,
 		setAutoScrollAiMode,
 		setSuppressWindowsWarning,
-		encoreFeatures,
 	} = settings;
-
-	// Reset modal-open flags when their Encore Feature toggle is disabled
-	useEffect(() => {
-		if (!encoreFeatures.symphony) setSymphonyModalOpen(false);
-	}, [encoreFeatures.symphony, setSymphonyModalOpen]);
-
-	useEffect(() => {
-		if (!encoreFeatures.usageStats) setUsageDashboardOpen(false);
-	}, [encoreFeatures.usageStats, setUsageDashboardOpen]);
 
 	// --- KEYBOARD SHORTCUT HELPERS ---
 	const { isShortcut, isTabShortcut } = useKeyboardShortcutHelpers({
@@ -755,9 +745,6 @@ function MaestroConsoleInner() {
 	// --- SESSION RESTORATION (extracted hook, Phase 2E) ---
 	const { initialLoadComplete } = useSessionRestoration();
 
-	// --- CUE AUTO-DISCOVERY (gated by Encore Feature) ---
-	useCueAutoDiscovery(sessions, encoreFeatures);
-
 	// --- TAB HANDLERS (extracted hook) ---
 	const {
 		activeTab,
@@ -945,6 +932,16 @@ function MaestroConsoleInner() {
 		handleConfirmDeleteWorktree,
 		handleConfirmAndDeleteWorktreeOnDisk,
 	} = useWorktreeHandlers();
+
+	// --- ENCORE FEATURE GATING (modal resets, cue auto-discovery, gated callbacks) ---
+	const {
+		encoreFeatures,
+		gatedSetUsageDashboardOpen,
+		gatedOnOpenSymphony,
+		gatedOnOpenDirectorNotes,
+		gatedOnOpenMaestroCue,
+		gatedOnConfigureCue,
+	} = useEncoreFeatures({ handleConfigureCue });
 
 	// --- APP HANDLERS (drag, file, folder operations) ---
 	const {
@@ -2517,7 +2514,7 @@ function MaestroConsoleInner() {
 					setFeedbackModalOpen={setFeedbackModalOpen}
 					setLogViewerOpen={setLogViewerOpen}
 					setProcessMonitorOpen={setProcessMonitorOpen}
-					setUsageDashboardOpen={encoreFeatures.usageStats ? setUsageDashboardOpen : undefined}
+					setUsageDashboardOpen={gatedSetUsageDashboardOpen}
 					setActiveRightTab={setActiveRightTab}
 					setAgentSessionsOpen={setAgentSessionsOpen}
 					setActiveAgentSessionId={setActiveAgentSessionId}
@@ -2593,12 +2590,10 @@ function MaestroConsoleInner() {
 					getDocumentTaskCount={getDocumentTaskCount}
 					onAutoRunRefresh={handleAutoRunRefresh}
 					onOpenMarketplace={handleOpenMarketplace}
-					onOpenSymphony={encoreFeatures.symphony ? () => setSymphonyModalOpen(true) : undefined}
-					onOpenDirectorNotes={
-						encoreFeatures.directorNotes ? () => setDirectorNotesOpen(true) : undefined
-					}
-					onOpenMaestroCue={encoreFeatures.maestroCue ? () => setCueModalOpen(true) : undefined}
-					onConfigureCue={encoreFeatures.maestroCue ? handleConfigureCue : undefined}
+					onOpenSymphony={gatedOnOpenSymphony}
+					onOpenDirectorNotes={gatedOnOpenDirectorNotes}
+					onOpenMaestroCue={gatedOnOpenMaestroCue}
+					onConfigureCue={gatedOnConfigureCue}
 					autoScrollAiMode={autoScrollAiMode}
 					setAutoScrollAiMode={setAutoScrollAiMode}
 					onCloseTabSwitcher={handleCloseTabSwitcher}
