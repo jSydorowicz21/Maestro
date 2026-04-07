@@ -3,60 +3,34 @@
  *
  * Each split test file must declare its own vi.mock() calls (Vitest hoisting requirement),
  * then import these shared helpers for theme and tab creation.
+ *
+ * Delegates to shared helpers in src/__tests__/helpers/ to avoid duplicating
+ * mock factories. Re-exports with TabBar-specific defaults.
  */
 
-import type { AITab, Theme, FilePreviewTab } from '../../../renderer/types';
+import type { AITab, FilePreviewTab } from '../../../renderer/types';
+import { mockTheme } from '../../helpers/mockTheme';
+import {
+	createMockAITab,
+	createMockFileTab as sharedCreateMockFileTab,
+} from '../../helpers/mockTab';
 
-/** Standard dark theme used across all TabBar tests */
-export const mockTheme: Theme = {
-	id: 'test-theme',
-	name: 'Test Theme',
-	mode: 'dark',
-	colors: {
-		bgMain: '#1a1a1a',
-		bgSidebar: '#2a2a2a',
-		bgActivity: '#3a3a3a',
-		textMain: '#ffffff',
-		textDim: '#888888',
-		accent: '#007acc',
-		border: '#444444',
-		error: '#ff4444',
-		success: '#44ff44',
-		warning: '#ffaa00',
-		vibe: '#ff00ff',
-		agentStatus: '#00ff00',
-	},
-};
+/** Standard dark theme used across all TabBar tests (from shared helpers) */
+export { mockTheme };
 
-/** Helper to create AI tabs with sensible defaults */
+/** Helper to create AI tabs with sensible defaults for TabBar tests */
 export function createTab(overrides: Partial<AITab> = {}): AITab {
-	return {
-		id: 'tab-1',
+	return createMockAITab({
 		agentSessionId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-		state: 'idle',
-		name: '',
-		starred: false,
 		hasUnread: false,
-		inputValue: '',
-		stagedImages: [],
 		...overrides,
-	};
+	});
 }
 
-/** Helper to create file preview tabs with sensible defaults */
+/** Helper to create file preview tabs with sensible defaults for TabBar tests */
 export function createFileTab(overrides: Partial<FilePreviewTab> = {}): FilePreviewTab {
-	return {
-		id: 'file-tab-1',
+	return sharedCreateMockFileTab({
 		path: '/path/to/file.ts',
-		name: 'file',
-		extension: '.ts',
-		content: '// test content',
-		scrollTop: 0,
-		searchQuery: '',
-		editMode: false,
-		editContent: undefined,
-		createdAt: Date.now(),
-		lastModified: Date.now(),
 		...overrides,
-	};
+	});
 }

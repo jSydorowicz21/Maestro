@@ -92,10 +92,21 @@ Other notable files (4,000+ lines): `git.test.ts` (4,469), `AutoRun.test.tsx` (3
 
 ### 5. Create shared test utilities if patterns emerge
 
-- [ ] During splitting, identify common test setup/render patterns
-- [ ] If common render setup exists: extract to `src/__tests__/helpers/renderWithProviders.ts`
-- [ ] If common assertions exist: extract to `src/__tests__/helpers/testUtils.ts`
-- [ ] Update split test files to import from shared utilities
+- [x] During splitting, identify common test setup/render patterns
+- [x] If common render setup exists: extract to `src/__tests__/helpers/renderWithProviders.ts`
+- [x] If common assertions exist: extract to `src/__tests__/helpers/testUtils.ts`
+- [x] Update split test files to import from shared utilities
+
+**Result:** Analyzed all three split test families for common patterns:
+
+- **No `renderWithProviders.ts` needed** - TabBar uses `render()`, useBatchProcessor uses `renderHook()`, symphony tests don't render at all. No common render wrapper pattern exists.
+- **No `testUtils.ts` needed** - No common assertion patterns across the split files. Standard Vitest/RTL assertions are sufficient.
+- **Updated setup files to import from shared helpers** instead of duplicating factories:
+  - `TabBar.setup.ts` now imports `mockTheme` from `helpers/mockTheme` and delegates `createTab`/`createFileTab` to `helpers/mockTab` (with TabBar-specific defaults)
+  - `useBatchProcessor.setup.ts` now imports `createMockSession` from `helpers/mockSession` (with batch-processor-specific defaults)
+  - `symphony.setup.ts` left as-is (IPC-specific context with no overlap with shared helpers)
+- Shared helpers already in place: `helpers/mockSession.ts`, `helpers/mockTab.ts`, `helpers/mockTheme.ts`, `helpers/mockMaestro.ts`
+- All 560 tests across the 3 split families pass (180 TabBar + 161 batch processor + 219 symphony).
 
 ### 6. Verify all tests pass after splitting
 
