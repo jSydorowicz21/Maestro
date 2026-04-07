@@ -4,53 +4,24 @@ import type {
 	AITab,
 	FilePreviewTab,
 	UnifiedTab,
-	UnifiedTabRef,
 	FilePreviewHistoryEntry,
 } from '../../types';
-import type { ThinkingMode } from '../../../shared/types';
-import {
-	setActiveTab,
-	createTab,
-	closeTab,
-	closeFileTab as closeFileTabHelper,
-	addAiTabToUnifiedHistory,
-	getActiveTab,
-	getInitialRenameValue,
-	hasActiveWizard,
-	hasDraft,
-	buildUnifiedTabs,
-	ensureInUnifiedTabOrder,
-} from '../../utils/tabHelpers';
-import { generateId } from '../../utils/ids';
-import {
-	useSessionStore,
-	selectActiveSession,
-	updateAiTab,
-	updateSessionWith,
-} from '../../stores/sessionStore';
-import { useActiveSession } from '../session/useActiveSession';
+import { setActiveTab, createTab, getActiveTab, buildUnifiedTabs } from '../../utils/tabHelpers';
+import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
 import { useModalStore } from '../../stores/modalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useTabStore } from '../../stores/tabStore';
+
+import { useFileTabHandlers } from './useFileTabHandlers';
+import { useTabCloseHandlers } from './useTabCloseHandlers';
+import type { CloseCurrentTabResult } from './useTabCloseHandlers';
+import { useTabPropertyHandlers } from './useTabPropertyHandlers';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export interface CloseCurrentTabResult {
-	type: 'file' | 'ai' | 'terminal' | 'prevented' | 'none';
-	tabId?: string;
-	isWizardTab?: boolean;
-	hasDraft?: boolean;
-}
-
-interface FileTabOpenParams {
-	path: string;
-	name: string;
-	content: string;
-	sshRemoteId?: string;
-	lastModified?: number;
-}
+export type { CloseCurrentTabResult } from './useTabCloseHandlers';
 
 export interface TabHandlersReturn {
 	// Derived state
@@ -92,7 +63,13 @@ export interface TabHandlersReturn {
 
 	// File Tab handlers
 	handleOpenFileTab: (
-		file: FileTabOpenParams,
+		file: {
+			path: string;
+			name: string;
+			content: string;
+			sshRemoteId?: string;
+			lastModified?: number;
+		},
 		options?: { openInNewTab?: boolean; targetSessionId?: string }
 	) => void;
 	handleSelectFileTab: (tabId: string) => Promise<void>;
@@ -123,7 +100,7 @@ export interface TabHandlersReturn {
 
 export function useTabHandlers(): TabHandlersReturn {
 	// --- Reactive subscriptions for derived state ---
-	const activeSession = useActiveSession();
+	const activeSession = useSessionStore(selectActiveSession);
 
 	// --- Derived state (useMemo) ---
 
@@ -181,196 +158,10 @@ export function useTabHandlers(): TabHandlersReturn {
 
 	const isResumingSession = !!activeTab?.agentSessionId;
 
-	// ========================================================================
-	// File Tab Creation
-	// ========================================================================
-
-	/**
-	 * Open a file preview tab. If a tab with the same path already exists, select it.
-	 * Otherwise, create a new FilePreviewTab, add it to filePreviewTabs and unifiedTabOrder,
-	 * and set it as the active file tab (deselecting any active AI tab).
-	 *
-	 * For SSH remote files, pass sshRemoteId so content can be re-fetched if needed.
-	 */
-	const handleOpenFileTab = useCallback(
-		(
-			file: FileTabOpenParams,
-			options?: {
-				/** If true, create new tab adjacent to current file tab. If false, replace current file tab content. Default: true (create new tab) */
-				openInNewTab?: boolean;
-				/** Override which session the tab is created in (defaults to current active session) */
-				targetSessionId?: string;
-			}
-		) => {
-			const openInNewTab = options?.openInNewTab ?? true;
-			const { setSessions } = useSessionStore.getState();
-			const activeSessionId =
-				options?.targetSessionId || useSessionStore.getState().activeSessionId;
-
-			setSessions((prev: Session[]) =>
-				prev.map((s) => {
-					if (s.id !== activeSessionId) return s;
-
-					// Check if a tab with this path already exists
-					const existingTab = s.filePreviewTabs.find((tab) => tab.path === file.path);
-					if (existingTab) {
-						// Tab exists - update content and lastModified if provided and select it
-						const updatedTabs = s.filePreviewTabs.map((tab) =>
-							tab.id === existingTab.id
-								? {
-										...tab,
-										content: file.content,
-										lastModified: file.lastModified ?? tab.lastModified,
-										isLoading: false,
-									}
-								: tab
-						);
-						return {
-							...s,
-							filePreviewTabs: updatedTabs,
-							activeFileTabId: existingTab.id,
-							activeTerminalTabId: null,
-							inputMode: 'ai' as const,
-							activeTabId: s.activeTabId,
-							unifiedTabOrder: ensureInUnifiedTabOrder(s.unifiedTabOrder, 'file', existingTab.id),
-						};
-					}
-
-					// If not opening in new tab and there's an active file tab, replace its content
-					if (!openInNewTab && s.activeFileTabId) {
-						const currentTabId = s.activeFileTabId;
-						const currentTab = s.filePreviewTabs.find((tab) => tab.id === currentTabId);
-						const extension = file.name.includes('.') ? '.' + file.name.split('.').pop() : '';
-						const nameWithoutExtension = extension
-							? file.name.slice(0, -extension.length)
-							: file.name;
-
-						// Replace current tab's content with new file and update navigation history
-						const updatedTabs = s.filePreviewTabs.map((tab) => {
-							if (tab.id !== currentTabId) return tab;
-
-							// Build updated navigation history
-							const currentHistory = tab.navigationHistory ?? [];
-							const currentIndex = tab.navigationIndex ?? currentHistory.length - 1;
-
-							// Save current file to history before replacing
-							// Truncate forward history if we're not at the end
-							const truncatedHistory =
-								currentIndex >= 0 && currentIndex < currentHistory.length - 1
-									? currentHistory.slice(0, currentIndex + 1)
-									: currentHistory;
-
-							// Add current file to history if it exists and isn't already the last entry
-							let newHistory = truncatedHistory;
-							if (
-								currentTab &&
-								currentTab.path &&
-								(truncatedHistory.length === 0 ||
-									truncatedHistory[truncatedHistory.length - 1].path !== currentTab.path)
-							) {
-								newHistory = [
-									...truncatedHistory,
-									{
-										path: currentTab.path,
-										name: currentTab.name,
-										scrollTop: currentTab.scrollTop,
-									},
-								];
-							}
-
-							// Add the new file to history
-							const finalHistory = [
-								...newHistory,
-								{
-									path: file.path,
-									name: nameWithoutExtension,
-									scrollTop: 0,
-								},
-							];
-
-							return {
-								...tab,
-								path: file.path,
-								name: nameWithoutExtension,
-								extension,
-								content: file.content,
-								scrollTop: 0,
-								searchQuery: '',
-								editMode: false,
-								editContent: undefined,
-								lastModified: file.lastModified ?? Date.now(),
-								sshRemoteId: file.sshRemoteId,
-								isLoading: false,
-								navigationHistory: finalHistory,
-								navigationIndex: finalHistory.length - 1,
-							};
-						});
-						return {
-							...s,
-							filePreviewTabs: updatedTabs,
-						};
-					}
-
-					// Create a new file preview tab
-					const newTabId = generateId();
-					const extension = file.name.includes('.') ? '.' + file.name.split('.').pop() : '';
-					const nameWithoutExtension = extension
-						? file.name.slice(0, -extension.length)
-						: file.name;
-
-					const newFileTab: FilePreviewTab = {
-						id: newTabId,
-						path: file.path,
-						name: nameWithoutExtension,
-						extension,
-						content: file.content,
-						scrollTop: 0,
-						searchQuery: '',
-						editMode: false,
-						editContent: undefined,
-						createdAt: Date.now(),
-						lastModified: file.lastModified ?? Date.now(),
-						sshRemoteId: file.sshRemoteId,
-						isLoading: false,
-						navigationHistory: [{ path: file.path, name: nameWithoutExtension, scrollTop: 0 }],
-						navigationIndex: 0,
-					};
-
-					// Create the unified tab reference
-					const newTabRef: UnifiedTabRef = { type: 'file', id: newTabId };
-
-					// If opening in new tab and there's an active file tab, insert adjacent to it
-					let updatedUnifiedTabOrder: UnifiedTabRef[];
-					if (openInNewTab && s.activeFileTabId) {
-						const currentIndex = s.unifiedTabOrder.findIndex(
-							(ref) => ref.type === 'file' && ref.id === s.activeFileTabId
-						);
-						if (currentIndex !== -1) {
-							updatedUnifiedTabOrder = [
-								...s.unifiedTabOrder.slice(0, currentIndex + 1),
-								newTabRef,
-								...s.unifiedTabOrder.slice(currentIndex + 1),
-							];
-						} else {
-							updatedUnifiedTabOrder = [...s.unifiedTabOrder, newTabRef];
-						}
-					} else {
-						updatedUnifiedTabOrder = [...s.unifiedTabOrder, newTabRef];
-					}
-
-					return {
-						...s,
-						filePreviewTabs: [...s.filePreviewTabs, newFileTab],
-						unifiedTabOrder: updatedUnifiedTabOrder,
-						activeFileTabId: newTabId,
-						activeTerminalTabId: null,
-						inputMode: 'ai' as const,
-					};
-				})
-			);
-		},
-		[]
-	);
+	// --- Compose sub-hooks ---
+	const fileTabHandlers = useFileTabHandlers();
+	const closeHandlers = useTabCloseHandlers();
+	const propertyHandlers = useTabPropertyHandlers();
 
 	// ========================================================================
 	// AI Tab Operations
@@ -409,609 +200,12 @@ export function useTabHandlers(): TabHandlersReturn {
 	}, []);
 
 	// ========================================================================
-	// File Tab Operations
-	// ========================================================================
-
-	/**
-	 * Force close a file preview tab without confirmation.
-	 */
-	const forceCloseFileTab = useCallback((tabId: string) => {
-		const { setSessions, activeSessionId } = useSessionStore.getState();
-		setSessions((prev: Session[]) =>
-			prev.map((s) => {
-				if (s.id !== activeSessionId) return s;
-				const result = closeFileTabHelper(s, tabId);
-				if (!result) return s;
-				return result.session;
-			})
-		);
-	}, []);
-
-	/**
-	 * Close a file preview tab with unsaved changes check.
-	 */
-	const handleCloseFileTab = useCallback(
-		(tabId: string) => {
-			const currentSession = selectActiveSession(useSessionStore.getState());
-			if (!currentSession) {
-				forceCloseFileTab(tabId);
-				return;
-			}
-
-			const tabToClose = currentSession.filePreviewTabs.find((tab) => tab.id === tabId);
-			if (!tabToClose) {
-				forceCloseFileTab(tabId);
-				return;
-			}
-
-			if (tabToClose.editContent !== undefined) {
-				useModalStore.getState().openModal('confirm', {
-					message: `"${tabToClose.name}${tabToClose.extension}" has unsaved changes. Are you sure you want to close it?`,
-					onConfirm: () => {
-						forceCloseFileTab(tabId);
-					},
-				});
-			} else {
-				forceCloseFileTab(tabId);
-			}
-		},
-		[forceCloseFileTab]
-	);
-
-	const handleFileTabEditModeChange = useCallback((tabId: string, editMode: boolean) => {
-		const { setSessions, activeSessionId } = useSessionStore.getState();
-		setSessions((prev: Session[]) =>
-			prev.map((s) => {
-				if (s.id !== activeSessionId) return s;
-				const updatedFileTabs = s.filePreviewTabs.map((tab) => {
-					if (tab.id !== tabId) return tab;
-					return { ...tab, editMode };
-				});
-				return { ...s, filePreviewTabs: updatedFileTabs };
-			})
-		);
-	}, []);
-
-	const handleFileTabEditContentChange = useCallback(
-		(tabId: string, editContent: string | undefined, savedContent?: string) => {
-			const { setSessions, activeSessionId } = useSessionStore.getState();
-			setSessions((prev: Session[]) =>
-				prev.map((s) => {
-					if (s.id !== activeSessionId) return s;
-					const updatedFileTabs = s.filePreviewTabs.map((tab) => {
-						if (tab.id !== tabId) return tab;
-						if (savedContent !== undefined) {
-							return { ...tab, editContent, content: savedContent };
-						}
-						return { ...tab, editContent };
-					});
-					return { ...s, filePreviewTabs: updatedFileTabs };
-				})
-			);
-		},
-		[]
-	);
-
-	const handleFileTabScrollPositionChange = useCallback((tabId: string, scrollTop: number) => {
-		const { setSessions, activeSessionId } = useSessionStore.getState();
-		setSessions((prev: Session[]) =>
-			prev.map((s) => {
-				if (s.id !== activeSessionId) return s;
-				const updatedFileTabs = s.filePreviewTabs.map((tab) => {
-					if (tab.id !== tabId) return tab;
-
-					let updatedHistory = tab.navigationHistory;
-					if (updatedHistory && updatedHistory.length > 0) {
-						const currentIndex = tab.navigationIndex ?? updatedHistory.length - 1;
-						if (currentIndex >= 0 && currentIndex < updatedHistory.length) {
-							updatedHistory = updatedHistory.map((entry, idx) =>
-								idx === currentIndex ? { ...entry, scrollTop } : entry
-							);
-						}
-					}
-					return { ...tab, scrollTop, navigationHistory: updatedHistory };
-				});
-				return { ...s, filePreviewTabs: updatedFileTabs };
-			})
-		);
-	}, []);
-
-	const handleFileTabSearchQueryChange = useCallback((tabId: string, searchQuery: string) => {
-		const { setSessions, activeSessionId } = useSessionStore.getState();
-		setSessions((prev: Session[]) =>
-			prev.map((s) => {
-				if (s.id !== activeSessionId) return s;
-				const updatedFileTabs = s.filePreviewTabs.map((tab) => {
-					if (tab.id !== tabId) return tab;
-					return { ...tab, searchQuery };
-				});
-				return { ...s, filePreviewTabs: updatedFileTabs };
-			})
-		);
-	}, []);
-
-	const handleReloadFileTab = useCallback(async (tabId: string) => {
-		const currentSession = selectActiveSession(useSessionStore.getState());
-		if (!currentSession) return;
-
-		const fileTab = currentSession.filePreviewTabs.find((tab) => tab.id === tabId);
-		if (!fileTab) return;
-
-		try {
-			const [content, stat] = await Promise.all([
-				window.maestro.fs.readFile(fileTab.path, fileTab.sshRemoteId),
-				window.maestro.fs.stat(fileTab.path, fileTab.sshRemoteId),
-			]);
-			if (content === null) return;
-			const newMtime = stat?.modifiedAt ? new Date(stat.modifiedAt).getTime() : Date.now();
-
-			useSessionStore.getState().setSessions((prev: Session[]) =>
-				prev.map((s) => {
-					if (s.id !== useSessionStore.getState().activeSessionId) return s;
-					return {
-						...s,
-						filePreviewTabs: s.filePreviewTabs.map((tab) =>
-							tab.id === tabId
-								? {
-										...tab,
-										content,
-										lastModified: newMtime,
-										editContent: undefined,
-									}
-								: tab
-						),
-					};
-				})
-			);
-		} catch (error) {
-			console.debug('[handleReloadFileTab] Failed to reload:', error);
-		}
-	}, []);
-
-	/**
-	 * Select a file preview tab. If fileTabAutoRefreshEnabled, checks if file changed on disk.
-	 */
-	const handleSelectFileTab = useCallback(async (tabId: string) => {
-		const { setSessions } = useSessionStore.getState();
-		const currentSession = selectActiveSession(useSessionStore.getState());
-		if (!currentSession) return;
-
-		const fileTab = currentSession.filePreviewTabs.find((tab) => tab.id === tabId);
-		if (!fileTab) return;
-
-		// Set the tab as active immediately, and reset inputMode/activeTerminalTabId in case
-		// we're switching away from terminal mode (clicking a file tab while terminal is active).
-		setSessions((prev: Session[]) =>
-			prev.map((s) => {
-				if (s.id !== currentSession.id) return s;
-				return { ...s, activeFileTabId: tabId, activeTerminalTabId: null, inputMode: 'ai' };
-			})
-		);
-
-		// Auto-refresh if enabled and tab has no pending edits
-		const { fileTabAutoRefreshEnabled } = useSettingsStore.getState();
-		if (fileTabAutoRefreshEnabled && !fileTab.editContent) {
-			try {
-				const stat = await window.maestro.fs.stat(fileTab.path, fileTab.sshRemoteId);
-				if (!stat || !stat.modifiedAt) return;
-
-				const currentMtime = new Date(stat.modifiedAt).getTime();
-
-				if (currentMtime > fileTab.lastModified) {
-					const content = await window.maestro.fs.readFile(fileTab.path, fileTab.sshRemoteId);
-					if (content === null) return;
-					useSessionStore.getState().setSessions((prev: Session[]) =>
-						prev.map((s) => {
-							if (s.id !== useSessionStore.getState().activeSessionId) return s;
-							return {
-								...s,
-								filePreviewTabs: s.filePreviewTabs.map((tab) =>
-									tab.id === tabId ? { ...tab, content, lastModified: currentMtime } : tab
-								),
-							};
-						})
-					);
-				}
-			} catch (error) {
-				console.debug('[handleSelectFileTab] Auto-refresh failed:', error);
-			}
-		}
-	}, []);
-
-	const handleUnifiedTabReorder = useCallback((fromIndex: number, toIndex: number) => {
-		const { setSessions, activeSessionId } = useSessionStore.getState();
-		setSessions((prev: Session[]) =>
-			prev.map((s) => {
-				if (s.id !== activeSessionId) return s;
-				console.debug('[useTabHandlers] handleUnifiedTabReorder', {
-					fromIndex,
-					toIndex,
-					orderLength: s.unifiedTabOrder.length,
-					order: s.unifiedTabOrder.map((r) => `${r.type}:${r.id.slice(0, 8)}`),
-				});
-				if (
-					fromIndex < 0 ||
-					fromIndex >= s.unifiedTabOrder.length ||
-					toIndex < 0 ||
-					toIndex >= s.unifiedTabOrder.length ||
-					fromIndex === toIndex
-				) {
-					console.debug(
-						'[useTabHandlers] handleUnifiedTabReorder: bounds check failed, returning unchanged'
-					);
-					return s;
-				}
-				const newOrder = [...s.unifiedTabOrder];
-				const [movedRef] = newOrder.splice(fromIndex, 1);
-				newOrder.splice(toIndex, 0, movedRef);
-				console.debug('[useTabHandlers] handleUnifiedTabReorder: reordered', {
-					movedRef,
-					newOrder: newOrder.map((r) => `${r.type}:${r.id.slice(0, 8)}`),
-				});
-				return { ...s, unifiedTabOrder: newOrder };
-			})
-		);
-	}, []);
-
-	// ========================================================================
-	// Tab Close Operations
-	// ========================================================================
-
-	/**
-	 * Internal tab close handler that performs the actual close.
-	 */
-	const performTabClose = useCallback((tabId: string) => {
-		const { setSessions, activeSessionId } = useSessionStore.getState();
-		setSessions((prev: Session[]) =>
-			prev.map((s) => {
-				if (s.id !== activeSessionId) return s;
-				const tab = s.aiTabs.find((t) => t.id === tabId);
-				const isWizardTab = tab && hasActiveWizard(tab);
-				const unifiedIndex = s.unifiedTabOrder.findIndex(
-					(ref) => ref.type === 'ai' && ref.id === tabId
-				);
-				const result = closeTab(s, tabId, false, { skipHistory: isWizardTab });
-				if (!result) return s;
-				if (!isWizardTab && tab) {
-					return addAiTabToUnifiedHistory(result.session, tab, unifiedIndex);
-				}
-				return result.session;
-			})
-		);
-	}, []);
-
-	const handleTabClose = useCallback(
-		(tabId: string) => {
-			const session = selectActiveSession(useSessionStore.getState());
-			const tab = session?.aiTabs.find((t) => t.id === tabId);
-
-			if (tab && hasActiveWizard(tab)) {
-				useModalStore.getState().openModal('confirm', {
-					message: 'Close this wizard? Your progress will be lost and cannot be restored.',
-					onConfirm: () => performTabClose(tabId),
-				});
-			} else if (tab && hasDraft(tab)) {
-				useModalStore.getState().openModal('confirm', {
-					message: 'This tab has an unsent draft. Are you sure you want to close it?',
-					onConfirm: () => performTabClose(tabId),
-				});
-			} else {
-				performTabClose(tabId);
-			}
-		},
-		[performTabClose]
-	);
-
-	const handleNewTab = useCallback(() => {
-		const { setSessions, activeSessionId } = useSessionStore.getState();
-		const { defaultSaveToHistory, defaultShowThinking } = useSettingsStore.getState();
-		setSessions((prev: Session[]) =>
-			prev.map((s) => {
-				if (s.id !== activeSessionId) return s;
-				const result = createTab(s, {
-					saveToHistory: defaultSaveToHistory,
-					showThinking: defaultShowThinking,
-				});
-				if (!result) return s;
-				return result.session;
-			})
-		);
-	}, []);
-
-	const performCloseAllTabs = useCallback(() => {
-		const { setSessions, activeSessionId } = useSessionStore.getState();
-		setSessions((prev: Session[]) =>
-			prev.map((s) => {
-				if (s.id !== activeSessionId) return s;
-				let updatedSession = s;
-				const tabIds = s.aiTabs.map((t) => t.id);
-				for (const tabId of tabIds) {
-					const tab = updatedSession.aiTabs.find((t) => t.id === tabId);
-					const result = closeTab(updatedSession, tabId, false, {
-						skipHistory: tab ? hasActiveWizard(tab) : false,
-					});
-					if (result) {
-						updatedSession = result.session;
-					}
-				}
-				return updatedSession;
-			})
-		);
-	}, []);
-
-	const handleCloseAllTabs = useCallback(() => {
-		const session = selectActiveSession(useSessionStore.getState());
-		if (!session) return;
-
-		const hasAnyDraft = session.aiTabs.some((tab) => hasDraft(tab));
-		if (hasAnyDraft) {
-			useModalStore.getState().openModal('confirm', {
-				message: 'Some tabs have unsent drafts. Are you sure you want to close all tabs?',
-				onConfirm: performCloseAllTabs,
-			});
-		} else {
-			performCloseAllTabs();
-		}
-	}, [performCloseAllTabs]);
-
-	const performCloseOtherTabs = useCallback(() => {
-		const { setSessions, activeSessionId } = useSessionStore.getState();
-		setSessions((prev: Session[]) =>
-			prev.map((s) => {
-				if (s.id !== activeSessionId) return s;
-
-				const activeUnifiedId = s.activeFileTabId ?? s.activeTabId;
-				const activeUnifiedType = s.activeFileTabId ? 'file' : 'ai';
-
-				const tabsToClose = s.unifiedTabOrder.filter(
-					(ref) => !(ref.type === activeUnifiedType && ref.id === activeUnifiedId)
-				);
-
-				let updatedSession = s;
-
-				for (const tabRef of tabsToClose) {
-					if (tabRef.type === 'ai') {
-						const tab = updatedSession.aiTabs.find((t) => t.id === tabRef.id);
-						if (tab) {
-							const result = closeTab(updatedSession, tab.id, false, {
-								skipHistory: hasActiveWizard(tab),
-							});
-							if (result) {
-								updatedSession = result.session;
-							}
-						}
-					} else {
-						updatedSession = {
-							...updatedSession,
-							filePreviewTabs: updatedSession.filePreviewTabs.filter((t) => t.id !== tabRef.id),
-							unifiedTabOrder: updatedSession.unifiedTabOrder.filter(
-								(ref) => !(ref.type === 'file' && ref.id === tabRef.id)
-							),
-						};
-					}
-				}
-
-				return updatedSession;
-			})
-		);
-	}, []);
-
-	const handleCloseOtherTabs = useCallback(() => {
-		const session = selectActiveSession(useSessionStore.getState());
-		if (!session) return;
-
-		const activeTabId = session.activeFileTabId ?? session.activeTabId;
-		const otherAiTabs = session.aiTabs.filter((t) => t.id !== activeTabId);
-		const hasAnyDraft = otherAiTabs.some((tab) => hasDraft(tab));
-		if (hasAnyDraft) {
-			useModalStore.getState().openModal('confirm', {
-				message: 'Some tabs have unsent drafts. Are you sure you want to close them?',
-				onConfirm: performCloseOtherTabs,
-			});
-		} else {
-			performCloseOtherTabs();
-		}
-	}, [performCloseOtherTabs]);
-
-	const performCloseTabsLeft = useCallback(() => {
-		const { setSessions, activeSessionId } = useSessionStore.getState();
-		setSessions((prev: Session[]) =>
-			prev.map((s) => {
-				if (s.id !== activeSessionId) return s;
-
-				const activeUnifiedId = s.activeFileTabId ?? s.activeTabId;
-				const activeUnifiedType = s.activeFileTabId ? 'file' : 'ai';
-
-				const activeIndex = s.unifiedTabOrder.findIndex(
-					(ref) => ref.type === activeUnifiedType && ref.id === activeUnifiedId
-				);
-				if (activeIndex <= 0) return s;
-
-				const tabsToClose = s.unifiedTabOrder.slice(0, activeIndex);
-
-				let updatedSession = s;
-
-				for (const tabRef of tabsToClose) {
-					if (tabRef.type === 'ai') {
-						const tab = updatedSession.aiTabs.find((t) => t.id === tabRef.id);
-						if (tab) {
-							const result = closeTab(updatedSession, tab.id, false, {
-								skipHistory: hasActiveWizard(tab),
-							});
-							if (result) {
-								updatedSession = result.session;
-							}
-						}
-					} else {
-						updatedSession = {
-							...updatedSession,
-							filePreviewTabs: updatedSession.filePreviewTabs.filter((t) => t.id !== tabRef.id),
-							unifiedTabOrder: updatedSession.unifiedTabOrder.filter(
-								(ref) => !(ref.type === 'file' && ref.id === tabRef.id)
-							),
-						};
-					}
-				}
-
-				return updatedSession;
-			})
-		);
-	}, []);
-
-	const handleCloseTabsLeft = useCallback(() => {
-		const session = selectActiveSession(useSessionStore.getState());
-		if (!session) return;
-
-		const activeUnifiedId = session.activeFileTabId ?? session.activeTabId;
-		const activeUnifiedType = session.activeFileTabId ? 'file' : 'ai';
-		const activeIndex = session.unifiedTabOrder.findIndex(
-			(ref) => ref.type === activeUnifiedType && ref.id === activeUnifiedId
-		);
-		if (activeIndex <= 0) return;
-
-		const tabRefsToClose = session.unifiedTabOrder.slice(0, activeIndex);
-		const aiTabIds = new Set(tabRefsToClose.filter((r) => r.type === 'ai').map((r) => r.id));
-		const hasAnyDraft = session.aiTabs
-			.filter((t) => aiTabIds.has(t.id))
-			.some((tab) => hasDraft(tab));
-		if (hasAnyDraft) {
-			useModalStore.getState().openModal('confirm', {
-				message: 'Some tabs have unsent drafts. Are you sure you want to close them?',
-				onConfirm: performCloseTabsLeft,
-			});
-		} else {
-			performCloseTabsLeft();
-		}
-	}, [performCloseTabsLeft]);
-
-	const performCloseTabsRight = useCallback(() => {
-		const { setSessions, activeSessionId } = useSessionStore.getState();
-		setSessions((prev: Session[]) =>
-			prev.map((s) => {
-				if (s.id !== activeSessionId) return s;
-
-				const activeUnifiedId = s.activeFileTabId ?? s.activeTabId;
-				const activeUnifiedType = s.activeFileTabId ? 'file' : 'ai';
-
-				const activeIndex = s.unifiedTabOrder.findIndex(
-					(ref) => ref.type === activeUnifiedType && ref.id === activeUnifiedId
-				);
-				if (activeIndex < 0 || activeIndex >= s.unifiedTabOrder.length - 1) return s;
-
-				const tabsToClose = s.unifiedTabOrder.slice(activeIndex + 1);
-
-				let updatedSession = s;
-
-				for (const tabRef of tabsToClose) {
-					if (tabRef.type === 'ai') {
-						const tab = updatedSession.aiTabs.find((t) => t.id === tabRef.id);
-						if (tab) {
-							const result = closeTab(updatedSession, tab.id, false, {
-								skipHistory: hasActiveWizard(tab),
-							});
-							if (result) {
-								updatedSession = result.session;
-							}
-						}
-					} else {
-						updatedSession = {
-							...updatedSession,
-							filePreviewTabs: updatedSession.filePreviewTabs.filter((t) => t.id !== tabRef.id),
-							unifiedTabOrder: updatedSession.unifiedTabOrder.filter(
-								(ref) => !(ref.type === 'file' && ref.id === tabRef.id)
-							),
-						};
-					}
-				}
-
-				return updatedSession;
-			})
-		);
-	}, []);
-
-	const handleCloseTabsRight = useCallback(() => {
-		const session = selectActiveSession(useSessionStore.getState());
-		if (!session) return;
-
-		const activeUnifiedId = session.activeFileTabId ?? session.activeTabId;
-		const activeUnifiedType = session.activeFileTabId ? 'file' : 'ai';
-		const activeIndex = session.unifiedTabOrder.findIndex(
-			(ref) => ref.type === activeUnifiedType && ref.id === activeUnifiedId
-		);
-		if (activeIndex < 0 || activeIndex >= session.unifiedTabOrder.length - 1) return;
-
-		const tabRefsToClose = session.unifiedTabOrder.slice(activeIndex + 1);
-		const aiTabIds = new Set(tabRefsToClose.filter((r) => r.type === 'ai').map((r) => r.id));
-		const hasAnyDraft = session.aiTabs
-			.filter((t) => aiTabIds.has(t.id))
-			.some((tab) => hasDraft(tab));
-		if (hasAnyDraft) {
-			useModalStore.getState().openModal('confirm', {
-				message: 'Some tabs have unsent drafts. Are you sure you want to close them?',
-				onConfirm: performCloseTabsRight,
-			});
-		} else {
-			performCloseTabsRight();
-		}
-	}, [performCloseTabsRight]);
-
-	const handleCloseCurrentTab = useCallback((): CloseCurrentTabResult => {
-		const { setSessions } = useSessionStore.getState();
-		const session = selectActiveSession(useSessionStore.getState());
-		if (!session) return { type: 'none' };
-
-		// Terminal tab is active — close it (unless it's the only tab of any type)
-		if (session.inputMode === 'terminal' && session.activeTerminalTabId) {
-			const tabId = session.activeTerminalTabId;
-			// Allow closing terminal tabs as long as there are other tabs to fall back to.
-			// closeTerminalTabHelper handles selecting the adjacent tab (which may be AI or file).
-			const totalTabs =
-				(session.aiTabs?.length || 0) +
-				(session.filePreviewTabs?.length || 0) +
-				(session.terminalTabs?.length || 0);
-			if (totalTabs <= 1) {
-				return { type: 'prevented' };
-			}
-			return { type: 'terminal', tabId };
-		}
-
-		// Check if a file tab is active
-		if (session.activeFileTabId) {
-			const tabId = session.activeFileTabId;
-			setSessions((prev: Session[]) =>
-				prev.map((s) => {
-					if (s.id !== session.id) return s;
-					const result = closeFileTabHelper(s, tabId);
-					if (!result) return s;
-					return result.session;
-				})
-			);
-			return { type: 'file', tabId };
-		}
-
-		// AI tab is active
-		if (session.activeTabId) {
-			if (session.aiTabs.length <= 1) {
-				return { type: 'prevented' };
-			}
-
-			const tabId = session.activeTabId;
-			const tab = session.aiTabs.find((t) => t.id === tabId);
-			const isWizardTab = tab ? hasActiveWizard(tab) : false;
-			const tabHasDraft = tab ? hasDraft(tab) : false;
-
-			return { type: 'ai', tabId, isWizardTab, hasDraft: tabHasDraft };
-		}
-
-		return { type: 'none' };
-	}, []);
-
-	// ========================================================================
 	// Log Deletion
 	// ========================================================================
 
 	const handleDeleteLog = useCallback((logId: string): number | null => {
-		const currentSession = selectActiveSession(useSessionStore.getState());
+		const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
+		const currentSession = sessions.find((s) => s.id === activeSessionId);
 		if (!currentSession) return null;
 
 		const isAIMode = currentSession.inputMode === 'ai';
@@ -1061,181 +255,46 @@ export function useTabHandlers(): TabHandlersReturn {
 						}
 					})
 					.catch((err) => {
-						// Expected: tab UI operations are recoverable
 						console.error('[handleDeleteLog] Error deleting from Claude session:', err);
 					});
 			}
 
 			const commandText = log.text.trim();
 
-			updateSessionWith(currentSession.id, (s) => {
-				const newAICommandHistory = (s.aiCommandHistory || []).filter((cmd) => cmd !== commandText);
-				return {
-					...s,
-					aiCommandHistory: newAICommandHistory,
-					aiTabs: s.aiTabs.map((tab) =>
-						tab.id === currentActiveTab.id ? { ...tab, logs: newLogs } : tab
-					),
-				};
-			});
+			setSessions((prev: Session[]) =>
+				prev.map((s) => {
+					if (s.id !== currentSession.id) return s;
+					const newAICommandHistory = (s.aiCommandHistory || []).filter(
+						(cmd) => cmd !== commandText
+					);
+					return {
+						...s,
+						aiCommandHistory: newAICommandHistory,
+						aiTabs: s.aiTabs.map((tab) =>
+							tab.id === currentActiveTab.id ? { ...tab, logs: newLogs } : tab
+						),
+					};
+				})
+			);
 		} else {
 			const commandText = log.text.trim();
 
-			updateSessionWith(currentSession.id, (s) => {
-				const newShellCommandHistory = (s.shellCommandHistory || []).filter(
-					(cmd) => cmd !== commandText
-				);
-				return {
-					...s,
-					shellLogs: newLogs,
-					shellCommandHistory: newShellCommandHistory,
-				};
-			});
+			setSessions((prev: Session[]) =>
+				prev.map((s) => {
+					if (s.id !== currentSession.id) return s;
+					const newShellCommandHistory = (s.shellCommandHistory || []).filter(
+						(cmd) => cmd !== commandText
+					);
+					return {
+						...s,
+						shellLogs: newLogs,
+						shellCommandHistory: newShellCommandHistory,
+					};
+				})
+			);
 		}
 
 		return nextUserCommandIndex;
-	}, []);
-
-	// ========================================================================
-	// Tab Properties
-	// ========================================================================
-
-	const handleRequestTabRename = useCallback((tabId: string) => {
-		console.log('[DEBUG renameTab] handleRequestTabRename called', { tabId });
-		const session = selectActiveSession(useSessionStore.getState());
-		if (!session) {
-			console.log('[DEBUG renameTab] no session found');
-			return;
-		}
-		const tab = session.aiTabs?.find((t) => t.id === tabId);
-		console.log('[DEBUG renameTab] tab found:', !!tab, {
-			aiTabCount: session.aiTabs?.length,
-			tabId,
-		});
-		if (tab) {
-			if (tab.isGeneratingName) {
-				updateAiTab(session.id, tabId, (t) => ({ ...t, isGeneratingName: false }));
-			}
-			useModalStore.getState().openModal('renameTab', {
-				tabId,
-				initialName: getInitialRenameValue(tab),
-			});
-		}
-	}, []);
-
-	const handleTabReorder = useCallback((fromIndex: number, toIndex: number) => {
-		const { activeSessionId } = useSessionStore.getState();
-		updateSessionWith(activeSessionId, (s) => {
-			if (!s.aiTabs) return s;
-			const tabs = [...s.aiTabs];
-			const [movedTab] = tabs.splice(fromIndex, 1);
-			tabs.splice(toIndex, 0, movedTab);
-			return { ...s, aiTabs: tabs };
-		});
-	}, []);
-
-	const handleUpdateTabByClaudeSessionId = useCallback(
-		(agentSessionId: string, updates: { name?: string | null; starred?: boolean }) => {
-			const { activeSessionId } = useSessionStore.getState();
-			updateSessionWith(activeSessionId, (s) => {
-				const tabIndex = s.aiTabs.findIndex((tab) => tab.agentSessionId === agentSessionId);
-				if (tabIndex === -1) return s;
-				return {
-					...s,
-					aiTabs: s.aiTabs.map((tab) =>
-						tab.agentSessionId === agentSessionId
-							? {
-									...tab,
-									...(updates.name !== undefined ? { name: updates.name } : {}),
-									...(updates.starred !== undefined ? { starred: updates.starred } : {}),
-								}
-							: tab
-					),
-				};
-			});
-		},
-		[]
-	);
-
-	const handleTabStar = useCallback((tabId: string, starred: boolean) => {
-		const session = selectActiveSession(useSessionStore.getState());
-		if (!session) return;
-		const tabToStar = session.aiTabs.find((t) => t.id === tabId);
-		if (!tabToStar?.agentSessionId) return;
-
-		updateSessionWith(session.id, (s) => {
-			const tab = s.aiTabs.find((t) => t.id === tabId);
-			if (tab?.agentSessionId) {
-				const agentId = s.toolType || 'claude-code';
-				if (agentId === 'claude-code') {
-					window.maestro.claude
-						.updateSessionStarred(s.projectRoot, tab.agentSessionId, starred)
-						// Expected: tab UI operations are recoverable
-						.catch((err) => console.error('Failed to persist tab starred:', err));
-				} else {
-					window.maestro.agentSessions
-						.setSessionStarred(agentId, s.projectRoot, tab.agentSessionId, starred)
-						// Expected: tab UI operations are recoverable
-						.catch((err) => console.error('Failed to persist tab starred:', err));
-				}
-			}
-			return {
-				...s,
-				aiTabs: s.aiTabs.map((t) => (t.id === tabId ? { ...t, starred } : t)),
-			};
-		});
-	}, []);
-
-	const handleTabMarkUnread = useCallback((tabId: string) => {
-		const { activeSessionId } = useSessionStore.getState();
-		updateAiTab(activeSessionId, tabId, (t) => ({ ...t, hasUnread: true }));
-	}, []);
-
-	const handleToggleTabReadOnlyMode = useCallback(() => {
-		const session = selectActiveSession(useSessionStore.getState());
-		if (!session) return;
-		const currentActiveTab = getActiveTab(session);
-		if (!currentActiveTab) return;
-		updateAiTab(session.id, currentActiveTab.id, (tab) => ({
-			...tab,
-			readOnlyMode: !tab.readOnlyMode,
-		}));
-	}, []);
-
-	const handleToggleTabSaveToHistory = useCallback(() => {
-		const session = selectActiveSession(useSessionStore.getState());
-		if (!session) return;
-		const currentActiveTab = getActiveTab(session);
-		if (!currentActiveTab) return;
-		updateAiTab(session.id, currentActiveTab.id, (tab) => ({
-			...tab,
-			saveToHistory: !tab.saveToHistory,
-		}));
-	}, []);
-
-	const handleToggleTabShowThinking = useCallback(() => {
-		const session = selectActiveSession(useSessionStore.getState());
-		if (!session) return;
-		const currentActiveTab = getActiveTab(session);
-		if (!currentActiveTab) return;
-
-		const cycleThinkingMode = (current: ThinkingMode | undefined): ThinkingMode => {
-			if (!current || current === 'off') return 'on';
-			if (current === 'on') return 'sticky';
-			return 'off';
-		};
-
-		updateAiTab(session.id, currentActiveTab.id, (tab) => {
-			const newMode = cycleThinkingMode(tab.showThinking);
-			if (newMode === 'off') {
-				return {
-					...tab,
-					showThinking: 'off',
-					logs: tab.logs.filter((l) => l.source !== 'thinking' && l.source !== 'tool'),
-				};
-			}
-			return { ...tab, showThinking: newMode };
-		});
 	}, []);
 
 	// ========================================================================
@@ -1243,187 +302,54 @@ export function useTabHandlers(): TabHandlersReturn {
 	// ========================================================================
 
 	const handleScrollPositionChange = useCallback((scrollTop: number) => {
-		const session = selectActiveSession(useSessionStore.getState());
+		const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
+		const session = sessions.find((s) => s.id === activeSessionId);
 		if (!session) return;
 		if (session.inputMode === 'ai') {
 			const currentActiveTab = getActiveTab(session);
 			if (!currentActiveTab) return;
-			updateAiTab(session.id, currentActiveTab.id, (tab) => ({ ...tab, scrollTop }));
+			setSessions((prev: Session[]) =>
+				prev.map((s) => {
+					if (s.id !== activeSessionId) return s;
+					return {
+						...s,
+						aiTabs: s.aiTabs.map((tab) =>
+							tab.id === currentActiveTab.id ? { ...tab, scrollTop } : tab
+						),
+					};
+				})
+			);
 		} else {
-			updateSessionWith(session.id, (s) => ({ ...s, terminalScrollTop: scrollTop }));
+			setSessions((prev: Session[]) =>
+				prev.map((s) => (s.id === activeSessionId ? { ...s, terminalScrollTop: scrollTop } : s))
+			);
 		}
 	}, []);
 
 	const handleAtBottomChange = useCallback((isAtBottom: boolean) => {
-		const session = selectActiveSession(useSessionStore.getState());
+		const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
+		const session = sessions.find((s) => s.id === activeSessionId);
 		if (!session) return;
 		if (session.inputMode === 'ai') {
 			const currentActiveTab = getActiveTab(session);
 			if (!currentActiveTab) return;
-			updateAiTab(session.id, currentActiveTab.id, (tab) => ({
-				...tab,
-				isAtBottom,
-				hasUnread: isAtBottom ? false : tab.hasUnread,
-			}));
-		}
-	}, []);
-
-	// ========================================================================
-	// File Tab Navigation
-	// ========================================================================
-
-	const handleClearFilePreviewHistory = useCallback(() => {
-		const currentSession = selectActiveSession(useSessionStore.getState());
-		if (!currentSession) return;
-		updateSessionWith(currentSession.id, (s) => ({
-			...s,
-			filePreviewHistory: [],
-			filePreviewHistoryIndex: -1,
-		}));
-	}, []);
-
-	const handleFileTabNavigateBack = useCallback(async () => {
-		const { setSessions } = useSessionStore.getState();
-		const currentSession = selectActiveSession(useSessionStore.getState());
-		if (!currentSession?.activeFileTabId) return;
-
-		const currentTab = currentSession.filePreviewTabs.find(
-			(tab) => tab.id === currentSession.activeFileTabId
-		);
-		if (!currentTab) return;
-
-		const history = currentTab.navigationHistory ?? [];
-		const currentIndex = currentTab.navigationIndex ?? history.length - 1;
-
-		if (currentIndex > 0) {
-			const newIndex = currentIndex - 1;
-			const historyEntry = history[newIndex];
-
-			try {
-				const sshRemoteId = currentTab.sshRemoteId;
-				const content = await window.maestro.fs.readFile(historyEntry.path, sshRemoteId);
-				if (!content) return;
-
-				setSessions((prev: Session[]) =>
-					prev.map((s) => {
-						if (s.id !== currentSession.id) return s;
-						return {
-							...s,
-							filePreviewTabs: s.filePreviewTabs.map((tab) =>
-								tab.id === currentTab.id
-									? {
-											...tab,
-											path: historyEntry.path,
-											name: historyEntry.name,
-											content,
-											scrollTop: historyEntry.scrollTop ?? 0,
-											navigationIndex: newIndex,
-										}
-									: tab
-							),
-						};
-					})
-				);
-			} catch (error) {
-				// Expected: tab UI operations are recoverable
-				console.error('Failed to navigate back:', error);
-			}
-		}
-	}, []);
-
-	const handleFileTabNavigateForward = useCallback(async () => {
-		const { setSessions } = useSessionStore.getState();
-		const currentSession = selectActiveSession(useSessionStore.getState());
-		if (!currentSession?.activeFileTabId) return;
-
-		const currentTab = currentSession.filePreviewTabs.find(
-			(tab) => tab.id === currentSession.activeFileTabId
-		);
-		if (!currentTab) return;
-
-		const history = currentTab.navigationHistory ?? [];
-		const currentIndex = currentTab.navigationIndex ?? history.length - 1;
-
-		if (currentIndex < history.length - 1) {
-			const newIndex = currentIndex + 1;
-			const historyEntry = history[newIndex];
-
-			try {
-				const sshRemoteId = currentTab.sshRemoteId;
-				const content = await window.maestro.fs.readFile(historyEntry.path, sshRemoteId);
-				if (!content) return;
-
-				setSessions((prev: Session[]) =>
-					prev.map((s) => {
-						if (s.id !== currentSession.id) return s;
-						return {
-							...s,
-							filePreviewTabs: s.filePreviewTabs.map((tab) =>
-								tab.id === currentTab.id
-									? {
-											...tab,
-											path: historyEntry.path,
-											name: historyEntry.name,
-											content,
-											scrollTop: historyEntry.scrollTop ?? 0,
-											navigationIndex: newIndex,
-										}
-									: tab
-							),
-						};
-					})
-				);
-			} catch (error) {
-				// Expected: tab UI operations are recoverable
-				console.error('Failed to navigate forward:', error);
-			}
-		}
-	}, []);
-
-	const handleFileTabNavigateToIndex = useCallback(async (index: number) => {
-		const { setSessions } = useSessionStore.getState();
-		const currentSession = selectActiveSession(useSessionStore.getState());
-		if (!currentSession?.activeFileTabId) return;
-
-		const currentTab = currentSession.filePreviewTabs.find(
-			(tab) => tab.id === currentSession.activeFileTabId
-		);
-		if (!currentTab) return;
-
-		const history = currentTab.navigationHistory ?? [];
-
-		if (index >= 0 && index < history.length) {
-			const historyEntry = history[index];
-
-			try {
-				const sshRemoteId = currentTab.sshRemoteId;
-				const content = await window.maestro.fs.readFile(historyEntry.path, sshRemoteId);
-				if (!content) return;
-
-				setSessions((prev: Session[]) =>
-					prev.map((s) => {
-						if (s.id !== currentSession.id) return s;
-						return {
-							...s,
-							filePreviewTabs: s.filePreviewTabs.map((tab) =>
-								tab.id === currentTab.id
-									? {
-											...tab,
-											path: historyEntry.path,
-											name: historyEntry.name,
-											content,
-											scrollTop: historyEntry.scrollTop ?? 0,
-											navigationIndex: index,
-										}
-									: tab
-							),
-						};
-					})
-				);
-			} catch (error) {
-				// Expected: tab UI operations are recoverable
-				console.error('Failed to navigate to index:', error);
-			}
+			setSessions((prev: Session[]) =>
+				prev.map((s) => {
+					if (s.id !== activeSessionId) return s;
+					return {
+						...s,
+						aiTabs: s.aiTabs.map((tab) =>
+							tab.id === currentActiveTab.id
+								? {
+										...tab,
+										isAtBottom,
+										hasUnread: isAtBottom ? false : tab.hasUnread,
+									}
+								: tab
+						),
+					};
+				})
+			);
 		}
 	}, []);
 
@@ -1444,41 +370,41 @@ export function useTabHandlers(): TabHandlersReturn {
 		activeFileTabNavIndex,
 
 		// Internal helpers (needed by keyboard handler)
-		performTabClose,
+		performTabClose: closeHandlers.performTabClose,
 
 		// AI Tab handlers
 		handleNewAgentSession,
 		handleTabSelect,
-		handleTabClose,
-		handleNewTab,
-		handleTabReorder,
-		handleUnifiedTabReorder,
-		handleCloseAllTabs,
-		handleCloseOtherTabs,
-		handleCloseTabsLeft,
-		handleCloseTabsRight,
-		handleCloseCurrentTab,
-		handleRequestTabRename,
-		handleUpdateTabByClaudeSessionId,
-		handleTabStar,
-		handleTabMarkUnread,
-		handleToggleTabReadOnlyMode,
-		handleToggleTabSaveToHistory,
-		handleToggleTabShowThinking,
+		handleTabClose: closeHandlers.handleTabClose,
+		handleNewTab: closeHandlers.handleNewTab,
+		handleTabReorder: propertyHandlers.handleTabReorder,
+		handleUnifiedTabReorder: fileTabHandlers.handleUnifiedTabReorder,
+		handleCloseAllTabs: closeHandlers.handleCloseAllTabs,
+		handleCloseOtherTabs: closeHandlers.handleCloseOtherTabs,
+		handleCloseTabsLeft: closeHandlers.handleCloseTabsLeft,
+		handleCloseTabsRight: closeHandlers.handleCloseTabsRight,
+		handleCloseCurrentTab: closeHandlers.handleCloseCurrentTab,
+		handleRequestTabRename: propertyHandlers.handleRequestTabRename,
+		handleUpdateTabByClaudeSessionId: propertyHandlers.handleUpdateTabByClaudeSessionId,
+		handleTabStar: propertyHandlers.handleTabStar,
+		handleTabMarkUnread: propertyHandlers.handleTabMarkUnread,
+		handleToggleTabReadOnlyMode: propertyHandlers.handleToggleTabReadOnlyMode,
+		handleToggleTabSaveToHistory: propertyHandlers.handleToggleTabSaveToHistory,
+		handleToggleTabShowThinking: propertyHandlers.handleToggleTabShowThinking,
 
 		// File Tab handlers
-		handleOpenFileTab,
-		handleSelectFileTab,
-		handleCloseFileTab,
-		handleFileTabEditModeChange,
-		handleFileTabEditContentChange,
-		handleFileTabScrollPositionChange,
-		handleFileTabSearchQueryChange,
-		handleReloadFileTab,
-		handleFileTabNavigateBack,
-		handleFileTabNavigateForward,
-		handleFileTabNavigateToIndex,
-		handleClearFilePreviewHistory,
+		handleOpenFileTab: fileTabHandlers.handleOpenFileTab,
+		handleSelectFileTab: fileTabHandlers.handleSelectFileTab,
+		handleCloseFileTab: fileTabHandlers.handleCloseFileTab,
+		handleFileTabEditModeChange: fileTabHandlers.handleFileTabEditModeChange,
+		handleFileTabEditContentChange: fileTabHandlers.handleFileTabEditContentChange,
+		handleFileTabScrollPositionChange: fileTabHandlers.handleFileTabScrollPositionChange,
+		handleFileTabSearchQueryChange: fileTabHandlers.handleFileTabSearchQueryChange,
+		handleReloadFileTab: fileTabHandlers.handleReloadFileTab,
+		handleFileTabNavigateBack: fileTabHandlers.handleFileTabNavigateBack,
+		handleFileTabNavigateForward: fileTabHandlers.handleFileTabNavigateForward,
+		handleFileTabNavigateToIndex: fileTabHandlers.handleFileTabNavigateToIndex,
+		handleClearFilePreviewHistory: fileTabHandlers.handleClearFilePreviewHistory,
 
 		// Scroll/log handlers
 		handleScrollPositionChange,

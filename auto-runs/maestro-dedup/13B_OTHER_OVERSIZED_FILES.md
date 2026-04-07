@@ -125,10 +125,26 @@ All 69 FilePreview tests pass. Baseline maintained: 24,573 passed, 42 pre-existi
 
 ### 5. Address useTabHandlers.ts and useInputProcessing.ts
 
-- [ ] Check current size of both files (should be smaller after Phase 07)
-- [ ] If `useTabHandlers.ts` still exceeds 800 lines: split by tab operation type (create, close, reorder, activate)
-- [ ] If `useInputProcessing.ts` still exceeds 800 lines: split by input type (text, slash commands, file drops)
-- [ ] Run lint and tests after any splits: `rtk npm run lint && CI=1 rtk vitest run`
+- [x] Check current size of both files (should be smaller after Phase 07)
+- [x] If `useTabHandlers.ts` still exceeds 800 lines: split by tab operation type (create, close, reorder, activate)
+- [x] If `useInputProcessing.ts` still exceeds 800 lines: split by input type (text, slash commands, file drops)
+- [x] Run lint and tests after any splits: `rtk npm run lint && CI=1 rtk vitest run`
+
+**Note:** Both files exceeded 800 lines and were decomposed:
+
+**useTabHandlers.ts** (1,625 -> 469 lines) - split into 3 focused sub-hooks composed by the main hook:
+
+- `useFileTabHandlers.ts` (664 lines) - file tab creation, operations (edit, scroll, search, reload, select), unified tab reorder, and file tab navigation (back/forward/to-index)
+- `useTabCloseHandlers.ts` (402 lines) - all tab close operations (single tab, all tabs, other tabs, tabs left/right, current tab) with draft/wizard confirmation modals
+- `useTabPropertyHandlers.ts` (229 lines) - rename, reorder, star, mark unread, toggle read-only/save-to-history/show-thinking
+
+**useInputProcessing.ts** (1,242 -> 752 lines) - split by extracting 3 helper modules:
+
+- `processSlashCommand.ts` (221 lines) - slash command detection and execution (/history, /wizard, /skills, custom AI commands)
+- `resolveTerminalCwd.ts` (133 lines) - terminal cd command tracking (bare cd, relative/absolute paths, tilde expansion, SSH remote)
+- `spawnBatchAgent.ts` (216 lines) - batch mode agent spawning (agent config, system prompt, read-only mode, merged context, error recovery)
+
+All 137 targeted tests pass (86 useTabHandlers + 51 useInputProcessing). Baseline maintained: 24,573 passed, 42 pre-existing failures, 0 new.
 
 ### 6. Verify full build
 
