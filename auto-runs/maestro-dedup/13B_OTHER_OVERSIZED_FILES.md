@@ -107,11 +107,21 @@ Current oversized files status:
 
 ### 4. Finish FilePreview.tsx decomposition (1,320 lines)
 
-- [ ] Read the file to identify remaining extractable sections
-- [ ] Extract language-specific renderers into separate components
-- [ ] Extract toolbar logic into a component or hook
-- [ ] Extract preview mode switching logic
-- [ ] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+- [x] Read the file to identify remaining extractable sections
+- [x] Extract language-specific renderers into separate components
+- [x] Extract toolbar logic into a component or hook
+- [x] Extract preview mode switching logic
+- [x] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+
+**Note:** Decomposed FilePreview.tsx from 1,322 to 802 lines by extracting 5 focused modules into the existing `FilePreview/` directory:
+
+- `FilePreviewEditor.tsx` (113 lines) - edit mode textarea with cursor/page navigation keyboard handlers
+- `FilePreviewCodeView.tsx` (76 lines) - syntax-highlighted code view with large-file truncation banner
+- `FilePreviewMarkdownView.tsx` (163 lines) - markdown renderer with scoped prose styles, remark/rehype plugins, and MarkdownImage integration
+- `FilePreviewSearch.tsx` (97 lines) - floating in-file text search bar with match navigation
+- `useFilePreviewKeyboard.ts` (234 lines) - keyboard handling hook (shortcuts, clipboard ops, scroll navigation, mode switching)
+
+All 69 FilePreview tests pass. Baseline maintained: 24,573 passed, 42 pre-existing failures, 0 new.
 
 ### 5. Address useTabHandlers.ts and useInputProcessing.ts
 
