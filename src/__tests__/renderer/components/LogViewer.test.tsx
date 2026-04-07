@@ -17,7 +17,28 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { LogViewer } from '../../../renderer/components/LogViewer';
 import { formatShortcutKeys } from '../../../renderer/utils/shortcutFormatter';
 import type { Theme } from '../../../renderer/types';
-import { mockTheme } from '../../helpers/mockTheme';
+
+// Mock theme
+const mockTheme: Theme = {
+	id: 'dracula',
+	name: 'Dracula',
+	mode: 'dark',
+	colors: {
+		bgMain: '#282a36',
+		bgSidebar: '#21222c',
+		bgActivity: '#44475a',
+		textMain: '#f8f8f2',
+		textDim: '#6272a4',
+		accent: '#bd93f9',
+		border: '#44475a',
+		error: '#ff5555',
+		warning: '#ffb86c',
+		success: '#50fa7b',
+		syntaxComment: '#6272a4',
+		syntaxKeyword: '#ff79c6',
+	},
+};
+
 // Mock log entries
 const createMockLog = (
 	overrides: Partial<{
@@ -84,7 +105,6 @@ vi.mock('../../../renderer/stores/sessionStore', () => ({
 		};
 		return selector(mockState);
 	},
-	updateSessionWith: vi.fn(),
 }));
 
 // Add getLogs, clearLogs, and onNewLog to the existing window.maestro.logger mock
@@ -955,6 +975,53 @@ describe('LogViewer', () => {
 			}
 
 			expect(scrollToSpy).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'smooth' }));
+		});
+	});
+
+	describe('Viewport indicator', () => {
+		it('should show indicator line when scrolled', async () => {
+			getMockGetLogs().mockResolvedValue([
+				createMockLog({ level: 'info', message: 'Log 1' }),
+				createMockLog({ level: 'error', message: 'Log 2' }),
+				createMockLog({ level: 'warn', message: 'Log 3' }),
+			]);
+
+			render(<LogViewer theme={mockTheme} onClose={vi.fn()} />);
+
+			await waitFor(() => {
+				expect(screen.getByText('Log 1')).toBeInTheDocument();
+			});
+
+			const container = screen.getByRole('dialog').querySelector('.overflow-y-auto');
+			if (container) {
+				Object.defineProperty(container, 'scrollHeight', { value: 1000, configurable: true });
+				Object.defineProperty(container, 'clientHeight', { value: 500, configurable: true });
+				Object.defineProperty(container, 'scrollTop', {
+					value: 200,
+					writable: true,
+					configurable: true,
+				});
+				fireEvent.scroll(container);
+			}
+
+			await waitFor(() => {
+				const indicator = screen.getByRole('dialog').querySelector('.pointer-events-none.z-20');
+				expect(indicator).toBeInTheDocument();
+			});
+		});
+
+		it('should not show indicator when at top', async () => {
+			getMockGetLogs().mockResolvedValue([createMockLog({ level: 'info', message: 'Log 1' })]);
+
+			render(<LogViewer theme={mockTheme} onClose={vi.fn()} />);
+
+			await waitFor(() => {
+				expect(screen.getByText('Log 1')).toBeInTheDocument();
+			});
+
+			// No scroll event fired, so no indicator
+			const indicator = screen.getByRole('dialog').querySelector('.pointer-events-none.z-20');
+			expect(indicator).not.toBeInTheDocument();
 		});
 	});
 

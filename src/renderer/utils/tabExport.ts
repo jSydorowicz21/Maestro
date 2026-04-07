@@ -9,7 +9,6 @@
 
 import { marked } from 'marked';
 import type { AITab, LogEntry, Theme, UsageStats } from '../types';
-import { formatDurationCompact, formatTimestamp } from '../../shared/formatters';
 
 // Configure marked for GFM (tables, strikethrough, etc.)
 marked.setOptions({
@@ -30,14 +29,26 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * Compute and format conversation duration from log timestamps
+ * Format a timestamp for display
+ */
+function formatTimestamp(timestamp: number): string {
+	const date = new Date(timestamp);
+	return date.toLocaleString();
+}
+
+/**
+ * Format duration from milliseconds
  */
 function formatDuration(logs: LogEntry[]): string {
 	if (logs.length < 2) return '0m';
 
 	const firstTimestamp = logs[0].timestamp;
 	const lastTimestamp = logs[logs.length - 1].timestamp;
-	return formatDurationCompact(lastTimestamp - firstTimestamp);
+	const durationMs = lastTimestamp - firstTimestamp;
+	const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
+	const durationMins = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+
+	return durationHours > 0 ? `${durationHours}h ${durationMins}m` : `${durationMins}m`;
 }
 
 /**
@@ -149,7 +160,7 @@ export function generateTabExportHtml(
       <div class="message ${isUser ? 'message-user' : 'message-agent'}">
         <div class="message-header">
           <span class="message-from" style="color: ${color}">${escapeHtml(label)}</span>
-          <span class="message-time">${formatTimestamp(log.timestamp, 'full')}</span>
+          <span class="message-time">${formatTimestamp(log.timestamp)}</span>
           ${log.readOnly ? '<span class="read-only-badge">read-only</span>' : ''}
         </div>
         <div class="message-content">${formattedContent}</div>
@@ -667,7 +678,7 @@ export function generateTabExportHtml(
 
     <header class="header">
       <h1>${escapeHtml(tabName)}</h1>
-      <p class="subtitle">Tab Export - ${formatTimestamp(tab.createdAt, 'full')}</p>
+      <p class="subtitle">Tab Export - ${formatTimestamp(tab.createdAt)}</p>
     </header>
 
     <div class="stats-grid">
@@ -707,7 +718,7 @@ export function generateTabExportHtml(
         <span class="info-label">Working Directory</span>
         <span class="info-value">${escapeHtml(session.cwd)}</span>
         <span class="info-label">Created</span>
-        <span class="info-value">${formatTimestamp(tab.createdAt, 'full')}</span>
+        <span class="info-value">${formatTimestamp(tab.createdAt)}</span>
         <span class="info-label">Usage</span>
         <span class="info-value">${formatUsageStats(tab.usageStats)}</span>
       </div>
@@ -721,7 +732,7 @@ export function generateTabExportHtml(
     </section>
 
     <footer class="footer">
-      <p>Exported from <a href="https://runmaestro.ai" target="_blank">Maestro</a> on ${formatTimestamp(Date.now(), 'full')}</p>
+      <p>Exported from <a href="https://runmaestro.ai" target="_blank">Maestro</a> on ${formatTimestamp(Date.now())}</p>
       <p class="footer-theme">Theme: ${escapeHtml(theme.name)}</p>
     </footer>
   </div>

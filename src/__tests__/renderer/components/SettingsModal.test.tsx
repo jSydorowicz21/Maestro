@@ -26,7 +26,6 @@ import type {
 	CustomAICommand,
 	AgentConfig,
 } from '../../../renderer/types';
-import { mockTheme, mockThemeColors } from '../../helpers/mockTheme';
 
 // Mock the LayerStackContext
 vi.mock('../../../renderer/contexts/LayerStackContext', () => ({
@@ -116,7 +115,21 @@ vi.mock('../../../renderer/hooks/settings/useSettings', () => ({
 		// Theme settings
 		activeThemeId: 'dracula',
 		setActiveThemeId: mockSetActiveThemeId,
-		customThemeColors: mockThemeColors,
+		customThemeColors: {
+			bgMain: '#282a36',
+			bgSidebar: '#21222c',
+			bgActivity: '#343746',
+			border: '#44475a',
+			textMain: '#f8f8f2',
+			textDim: '#6272a4',
+			accent: '#bd93f9',
+			accentDim: '#bd93f920',
+			accentText: '#ff79c6',
+			accentForeground: '#ffffff',
+			success: '#50fa7b',
+			warning: '#ffb86c',
+			error: '#ff5555',
+		},
 		setCustomThemeColors: mockSetCustomThemeColors,
 		customThemeBaseId: 'dracula',
 		setCustomThemeBaseId: mockSetCustomThemeBaseId,
@@ -263,6 +276,29 @@ vi.mock('../../../renderer/hooks/settings/useSettings', () => ({
 		...mockUseSettingsOverrides,
 	}),
 }));
+
+// Sample theme for testing
+const mockTheme: Theme = {
+	id: 'dracula',
+	name: 'Dracula',
+	mode: 'dark',
+	colors: {
+		bgMain: '#282a36',
+		bgSidebar: '#21222c',
+		bgActivity: '#343746',
+		border: '#44475a',
+		textMain: '#f8f8f2',
+		textDim: '#6272a4',
+		accent: '#bd93f9',
+		accentDim: '#bd93f920',
+		accentText: '#ff79c6',
+		accentForeground: '#ffffff',
+		success: '#50fa7b',
+		warning: '#ffb86c',
+		error: '#ff5555',
+	},
+};
+
 const mockLightTheme: Theme = {
 	id: 'github-light',
 	name: 'GitHub Light',
@@ -1108,7 +1144,7 @@ describe('SettingsModal', () => {
 				await vi.advanceTimersByTimeAsync(100);
 			});
 
-			expect(screen.getByText(mockTheme.name)).toBeInTheDocument();
+			expect(screen.getByText('Dracula')).toBeInTheDocument();
 			expect(screen.getByText('GitHub Light')).toBeInTheDocument();
 			expect(screen.getByText('Pedurple')).toBeInTheDocument();
 		});
@@ -1134,7 +1170,7 @@ describe('SettingsModal', () => {
 				await vi.advanceTimersByTimeAsync(100);
 			});
 
-			const draculaButton = screen.getByText(mockTheme.name).closest('button');
+			const draculaButton = screen.getByText('Dracula').closest('button');
 			expect(draculaButton).toHaveClass('ring-2');
 		});
 
@@ -1580,7 +1616,6 @@ describe('SettingsModal', () => {
 					return 'layer-123';
 				}),
 				unregisterLayer: vi.fn(),
-				updateLayerHandler: vi.fn(),
 				getTopLayer: vi.fn(),
 				closeTopLayer: vi.fn(),
 				getLayers: vi.fn(),
@@ -2429,6 +2464,145 @@ describe('SettingsModal', () => {
 				// "90 days" appears in both the scale marker <span> and a <select> <option>
 				expect(screen.getAllByText('90 days').length).toBeGreaterThanOrEqual(1);
 			});
+		});
+	});
+
+	describe('settings search', () => {
+		it('should render search input', () => {
+			render(<SettingsModal {...createDefaultProps()} />);
+			expect(screen.getByPlaceholderText('Search settings...')).toBeInTheDocument();
+		});
+
+		it('should show search results when typing a query', async () => {
+			render(<SettingsModal {...createDefaultProps()} />);
+
+			const searchInput = screen.getByPlaceholderText('Search settings...');
+			fireEvent.change(searchInput, { target: { value: 'font' } });
+
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(50);
+			});
+
+			// Text may be split by highlight spans, so use a function matcher
+			expect(
+				screen.getByText(
+					(_content, element) => element?.textContent === 'Font Family' && element.tagName === 'DIV'
+				)
+			).toBeInTheDocument();
+			expect(
+				screen.getByText(
+					(_content, element) => element?.textContent === 'Font Size' && element.tagName === 'DIV'
+				)
+			).toBeInTheDocument();
+		});
+
+		it('should show result count badge when searching', async () => {
+			render(<SettingsModal {...createDefaultProps()} />);
+
+			const searchInput = screen.getByPlaceholderText('Search settings...');
+			fireEvent.change(searchInput, { target: { value: 'font' } });
+
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(50);
+			});
+
+			// The count badge should be visible
+			const badge = screen.getByText(/^\d+$/);
+			expect(badge).toBeInTheDocument();
+		});
+
+		it('should show no results message for unmatched query', async () => {
+			render(<SettingsModal {...createDefaultProps()} />);
+
+			const searchInput = screen.getByPlaceholderText('Search settings...');
+			fireEvent.change(searchInput, { target: { value: 'xyznonexistent' } });
+
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(50);
+			});
+
+			expect(screen.getByText(/No settings found/)).toBeInTheDocument();
+		});
+
+		it('should hide sidebar and content when search is active', async () => {
+			render(<SettingsModal {...createDefaultProps()} />);
+
+			const searchInput = screen.getByPlaceholderText('Search settings...');
+			fireEvent.change(searchInput, { target: { value: 'shell' } });
+
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(50);
+			});
+
+			// The sidebar+content wrapper should have the hidden class
+			const sidebar = screen.getByLabelText('Settings tabs');
+			expect(sidebar.closest('div.flex')?.className).toContain('hidden');
+		});
+
+		it('should clear search and show clear button', async () => {
+			render(<SettingsModal {...createDefaultProps()} />);
+
+			const searchInput = screen.getByPlaceholderText('Search settings...');
+			fireEvent.change(searchInput, { target: { value: 'notification' } });
+
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(50);
+			});
+
+			// Clear button should be visible
+			const clearButton = screen.getByLabelText('Clear search');
+			expect(clearButton).toBeInTheDocument();
+
+			fireEvent.click(clearButton);
+
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(50);
+			});
+
+			// Search should be cleared, tab content visible again
+			expect(searchInput).toHaveValue('');
+		});
+
+		it('should search across multiple tabs', async () => {
+			render(<SettingsModal {...createDefaultProps()} />);
+
+			const searchInput = screen.getByPlaceholderText('Search settings...');
+			fireEvent.change(searchInput, { target: { value: 'ignore' } });
+
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(50);
+			});
+
+			// Text may be split by highlight spans, so use a function matcher
+			expect(
+				screen.getByText(
+					(_content, element) =>
+						element?.textContent === 'Local Ignore Patterns' && element.tagName === 'DIV'
+				)
+			).toBeInTheDocument();
+			expect(
+				screen.getByText(
+					(_content, element) =>
+						element?.textContent === 'SSH Remote Ignore Patterns' && element.tagName === 'DIV'
+				)
+			).toBeInTheDocument();
+		});
+
+		it('should group results by tab label', async () => {
+			render(<SettingsModal {...createDefaultProps()} />);
+
+			const searchInput = screen.getByPlaceholderText('Search settings...');
+			fireEvent.change(searchInput, { target: { value: 'ignore' } });
+
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(50);
+			});
+
+			// Should show tab group headers (h3 elements in search results)
+			const groupHeaders = screen.getAllByRole('heading', { level: 3 });
+			const headerTexts = groupHeaders.map((h) => h.textContent);
+			expect(headerTexts).toContain('Display');
+			expect(headerTexts).toContain('SSH Hosts');
 		});
 	});
 });

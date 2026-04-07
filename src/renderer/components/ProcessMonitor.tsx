@@ -18,7 +18,7 @@ import {
 	Tag,
 } from 'lucide-react';
 import type { Session, Group, Theme, GroupChat } from '../types';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 
 interface ProcessMonitorProps {
@@ -27,7 +27,7 @@ interface ProcessMonitorProps {
 	groups: Group[];
 	groupChats?: GroupChat[];
 	onClose: () => void;
-	onNavigateToSession?: (sessionId: string, tabId?: string) => void;
+	onNavigateToSession?: (sessionId: string, tabId?: string, processType?: string) => void;
 	onNavigateToGroupChat?: (groupChatId: string) => void;
 }
 
@@ -46,6 +46,7 @@ interface ActiveProcess {
 	cueSessionName?: string;
 	cueSubscriptionName?: string;
 	cueEventType?: string;
+	childProcesses?: Array<{ pid: number; command: string }>;
 }
 
 interface ProcessNode {
@@ -86,6 +87,7 @@ interface ProcessNode {
 	cueEventType?: string; // Event type that triggered this Cue run
 	cueSessionName?: string; // Target session name for this Cue run
 	tabName?: string; // AI tab name (e.g., user-assigned tab label)
+	childProcesses?: Array<{ pid: number; command: string }>; // Child processes running inside terminal
 }
 
 // Format runtime in human readable format (e.g., "2m 30s", "1h 5m", "3d 2h")
@@ -129,6 +131,7 @@ interface ProcessDetailData {
 	cueEventType?: string;
 	cueSessionName?: string;
 	tabName?: string;
+	childProcesses?: Array<{ pid: number; command: string }>;
 }
 
 export function ProcessMonitor(props: ProcessMonitorProps) {
@@ -155,14 +158,8 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 	const selectedNodeRef = useRef<HTMLButtonElement | HTMLDivElement>(null);
 	const killConfirmRef = useRef<HTMLDivElement>(null);
 	const detailViewRef = useRef<HTMLDivElement>(null);
-	// Escape handler: detail view -> list view -> close modal
-	const handleEscape = useCallback(() => {
-		if (detailView) {
-			setDetailView(null);
-		} else {
-			onClose();
-		}
-	}, [onClose, detailView]);
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
+	const layerIdRef = useRef<string>();
 
 	// Fetch active processes from ProcessManager
 	const fetchActiveProcesses = useCallback(async (showRefresh = false) => {
@@ -214,7 +211,34 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 	}, [killConfirmProcessId]);
 
 	// Register layer on mount
-	useModalLayer(MODAL_PRIORITIES.PROCESS_MONITOR, 'System Processes', handleEscape);
+	useEffect(() => {
+		const layerId = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.PROCESS_MONITOR,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'strict',
+			ariaLabel: 'System Processes',
+			onEscape: () => {},
+		});
+		layerIdRef.current = layerId;
+		return () => unregisterLayer(layerId);
+	}, [registerLayer, unregisterLayer]);
+
+	// Update handler when onClose or detailView changes
+	// If in detail view, Escape goes back to list; otherwise closes the modal
+	useEffect(() => {
+		if (layerIdRef.current) {
+			const handleEscape = () => {
+				if (detailView) {
+					setDetailView(null);
+				} else {
+					onClose();
+				}
+			};
+			updateLayerHandler(layerIdRef.current, handleEscape);
+		}
+	}, [onClose, detailView, updateLayerHandler]);
 
 	// Fetch processes on mount and poll for updates
 	useEffect(() => {
@@ -304,6 +328,11 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 		if (aiTabMatch) {
 			return aiTabMatch[1];
 		}
+		// Check for tab-based terminal pattern: {sessionId}-terminal-{tabId}
+		const terminalTabMatch = processSessionId.match(/^(.+)-terminal-.+$/);
+		if (terminalTabMatch) {
+			return terminalTabMatch[1];
+		}
 		// Try to match common suffixes
 		const suffixes = ['-ai', '-terminal'];
 		for (const suffix of suffixes) {
@@ -320,7 +349,8 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 		processSessionId: string
 	): 'ai' | 'terminal' | 'batch' | 'synopsis' | 'wizard' | 'wizard-gen' | 'cue' => {
 		if (processSessionId.startsWith('cue-run-')) return 'cue';
-		if (processSessionId.endsWith('-terminal')) return 'terminal';
+		if (processSessionId.endsWith('-terminal') || processSessionId.match(/-terminal-.+$/))
+			return 'terminal';
 		if (processSessionId.match(/-batch-\d+$/)) return 'batch';
 		if (processSessionId.match(/-synopsis-\d+$/)) return 'synopsis';
 		// Wizard document generation: inline-wizard-gen-{timestamp}-{random}
@@ -330,10 +360,13 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 		return 'ai';
 	};
 
-	// Extract tab ID from process session ID (format: {sessionId}-ai-{tabId})
+	// Extract tab ID from process session ID (format: {sessionId}-ai-{tabId} or {sessionId}-terminal-{tabId})
 	const parseTabId = (processSessionId: string): string | null => {
-		const match = processSessionId.match(/-ai-(.+)$/);
-		return match ? match[1] : null;
+		const aiMatch = processSessionId.match(/-ai-(.+)$/);
+		if (aiMatch) return aiMatch[1];
+		const terminalMatch = processSessionId.match(/-terminal-(.+)$/);
+		if (terminalMatch) return terminalMatch[1];
+		return null;
 	};
 
 	// Build the process tree using real active processes
@@ -386,7 +419,14 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 				let label: string;
 				let isAutoRun = false;
 				if (processType === 'terminal') {
-					label = 'Terminal Shell';
+					// Show the running command if there are child processes
+					if (proc.childProcesses && proc.childProcesses.length > 0) {
+						const lastChild = proc.childProcesses[proc.childProcesses.length - 1];
+						const cmdBasename = lastChild.command.split('/').pop() || lastChild.command;
+						label = `Terminal: ${cmdBasename}`;
+					} else {
+						label = 'Terminal Shell';
+					}
 				} else if (processType === 'batch') {
 					label = `AI Agent (${proc.toolType})`;
 					isAutoRun = true;
@@ -399,11 +439,13 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 				// Get session name for process label
 				const sessionName = session.name;
 
-				// Look up Claude session ID and tab name from the tab if this is an AI process
+				// Look up Claude session ID and tab name from the tab if this is an AI or terminal process
 				let agentSessionId: string | undefined;
 				let tabId: string | undefined;
 				let tabName: string | undefined;
-				if (processType === 'ai' || processType === 'batch' || processType === 'synopsis') {
+				if (processType === 'terminal') {
+					tabId = parseTabId(proc.sessionId) || undefined;
+				} else if (processType === 'ai' || processType === 'batch' || processType === 'synopsis') {
 					tabId = parseTabId(proc.sessionId) || undefined;
 					if (session.aiTabs) {
 						// First try to find by tab ID
@@ -451,6 +493,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 					args: proc.args,
 					sshRemote,
 					tabName,
+					childProcesses: proc.childProcesses,
 				});
 			});
 
@@ -726,6 +769,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 			cueEventType: node.cueEventType,
 			cueSessionName: node.cueSessionName,
 			tabName: node.tabName,
+			childProcesses: node.childProcesses,
 		});
 	};
 
@@ -842,7 +886,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 		}
 	};
 
-	const renderNode = (node: ProcessNode, depth: number = 0): React.ReactNode => {
+	const renderNode = (node: ProcessNode, depth: number = 0, index: number = 0): React.ReactNode => {
 		const isExpanded = expandedNodes.has(node.id);
 		const hasChildren = node.children && node.children.length > 0;
 		const paddingLeft = depth * 20 + 16; // 20px per depth level + 16px base
@@ -899,7 +943,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 						)}
 					</button>
 					{isExpanded && hasChildren && (
-						<div>{node.children!.map((child) => renderNode(child, depth + 1))}</div>
+						<div>{node.children!.map((child, i) => renderNode(child, depth + 1, i))}</div>
 					)}
 				</div>
 			);
@@ -990,7 +1034,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 							>
 								{node.sshRemote ? `SSH: ${node.sshRemote.name}` : 'Local'}
 							</span>
-							<span>Session: {node.sessionId?.substring(0, 8)}...</span>
+							<span>Session: {node.sessionId?.substring(0, 8)}</span>
 						</span>
 						{node.sessionId && onNavigateToSession && (
 							<button
@@ -1012,7 +1056,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 						)}
 					</div>
 					{isExpanded && hasChildren && (
-						<div>{node.children!.map((child) => renderNode(child, depth + 1))}</div>
+						<div>{node.children!.map((child, i) => renderNode(child, depth + 1, i))}</div>
 					)}
 				</div>
 			);
@@ -1026,6 +1070,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 			const isWizardProcess = node.processType === 'wizard' || node.processType === 'wizard-gen';
 			// Determine if this is a Cue run process
 			const isCueProcess = node.processType === 'cue';
+			const altBg = index % 2 === 1 ? `${theme.colors.textDim}08` : 'transparent';
 
 			return (
 				<div
@@ -1036,9 +1081,10 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 					style={{
 						paddingLeft: `${paddingLeft}px`,
 						color: theme.colors.textMain,
-						backgroundColor: isSelected ? `${theme.colors.accent}25` : 'transparent',
+						backgroundColor: isSelected ? `${theme.colors.accent}25` : altBg,
 						outline: isSelected ? `2px solid ${theme.colors.accent}` : 'none',
 						outlineOffset: '-2px',
+						borderTop: index > 0 ? `1px solid ${theme.colors.border}40` : 'none',
 					}}
 					onClick={() => setSelectedNodeId(node.id)}
 					onDoubleClick={() => openProcessDetail(node)}
@@ -1046,7 +1092,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 						if (!isSelected) e.currentTarget.style.backgroundColor = `${theme.colors.accent}15`;
 					}}
 					onMouseLeave={(e) => {
-						if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+						if (!isSelected) e.currentTarget.style.backgroundColor = altBg;
 					}}
 				>
 					{/* First line: status dot, label, badges, kill button */}
@@ -1143,7 +1189,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 										style={{ color: theme.colors.accent }}
 										onClick={(e) => {
 											e.stopPropagation();
-											onNavigateToSession(node.sessionId!, node.tabId);
+											onNavigateToSession(node.sessionId!, node.tabId, node.processType);
 											onClose();
 										}}
 										onMouseEnter={(e) =>
@@ -1203,17 +1249,17 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 								style={{ color: theme.colors.accent }}
 								onClick={(e) => {
 									e.stopPropagation();
-									onNavigateToSession(node.sessionId!, node.tabId);
+									onNavigateToSession(node.sessionId!, node.tabId, node.processType);
 									onClose();
 								}}
 								title="Click to navigate to this session"
 							>
-								{node.agentSessionId.substring(0, 8)}...
+								{node.agentSessionId.substring(0, 8)}
 							</button>
 						)}
 						{node.agentSessionId && (!node.sessionId || !onNavigateToSession) && (
 							<span className="text-xs font-mono" style={{ color: theme.colors.accent }}>
-								{node.agentSessionId.substring(0, 8)}...
+								{node.agentSessionId.substring(0, 8)}
 							</span>
 						)}
 						{/* For group chat and wizard processes, show tool type */}
@@ -1329,7 +1375,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 						</span>
 					</button>
 					{isExpanded && hasChildren && (
-						<div>{node.children!.map((child) => renderNode(child, depth + 1))}</div>
+						<div>{node.children!.map((child, i) => renderNode(child, depth + 1, i))}</div>
 					)}
 				</div>
 			);
@@ -1640,12 +1686,40 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 								</span>
 							</div>
 							<code
-								className="text-sm font-mono break-all block whitespace-pre-wrap"
-								style={{ color: theme.colors.textMain, userSelect: 'text', cursor: 'text' }}
+								className="text-sm font-mono break-all block whitespace-pre-wrap overflow-y-auto"
+								style={{
+									color: theme.colors.textMain,
+									userSelect: 'text',
+									cursor: 'text',
+									maxHeight: '300px',
+								}}
 							>
 								{commandLine}
 							</code>
 						</div>
+
+						{/* Child Processes (terminal only) */}
+						{detailView.childProcesses && detailView.childProcesses.length > 0 && (
+							<div className="p-4 rounded-lg" style={{ backgroundColor: theme.colors.bgMain }}>
+								<div className="flex items-center gap-2 mb-2">
+									<Activity className="w-4 h-4" style={{ color: theme.colors.accent }} />
+									<span
+										className="text-xs font-medium uppercase tracking-wide"
+										style={{ color: theme.colors.textDim }}
+									>
+										Running in Terminal
+									</span>
+								</div>
+								<div className="flex flex-col gap-1">
+									{detailView.childProcesses.map((child) => (
+										<div key={child.pid} className="flex items-center gap-3 text-sm font-mono">
+											<span style={{ color: theme.colors.textDim }}>PID {child.pid}</span>
+											<span style={{ color: theme.colors.textMain }}>{child.command}</span>
+										</div>
+									))}
+								</div>
+							</div>
+						)}
 
 						{/* Start Time */}
 						<div className="p-4 rounded-lg" style={{ backgroundColor: theme.colors.bgMain }}>
@@ -1697,8 +1771,14 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 				role="dialog"
 				aria-modal="true"
 				aria-label={detailView ? 'Process Details' : 'System Processes'}
-				className="w-[875px] max-h-[80vh] rounded-xl shadow-2xl border overflow-hidden flex flex-col outline-none"
-				style={{ backgroundColor: theme.colors.bgActivity, borderColor: theme.colors.border }}
+				className="max-h-[80vh] rounded-xl shadow-2xl border overflow-hidden flex flex-col outline-none"
+				style={{
+					backgroundColor: theme.colors.bgActivity,
+					borderColor: theme.colors.border,
+					width: 'fit-content',
+					minWidth: '700px',
+					maxWidth: '90vw',
+				}}
 				onClick={(e) => e.stopPropagation()}
 				onKeyDown={detailView ? undefined : handleKeyDown}
 			>
@@ -1801,7 +1881,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 									No running processes
 								</div>
 							) : (
-								<div className="py-2">{processTree.map((node) => renderNode(node, 0))}</div>
+								<div className="py-2">{processTree.map((node, i) => renderNode(node, 0, i))}</div>
 							)}
 						</div>
 
@@ -1813,14 +1893,14 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 								color: theme.colors.textDim,
 							}}
 						>
-							<div className="flex items-center gap-4">
+							<div className="flex items-center gap-4 whitespace-nowrap">
 								<span>
 									{sessions.length} {sessions.length === 1 ? 'session' : 'sessions'} •{' '}
 									{groups.length} {groups.length === 1 ? 'group' : 'groups'}
 								</span>
 								<span style={{ opacity: 0.7 }}>↑↓ navigate • Enter view details • R refresh</span>
 							</div>
-							<div className="flex items-center gap-2">
+							<div className="flex items-center gap-2 flex-shrink-0 whitespace-nowrap">
 								<div
 									className="w-2 h-2 rounded-full"
 									style={{ backgroundColor: theme.colors.success }}

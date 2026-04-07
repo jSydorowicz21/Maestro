@@ -30,12 +30,10 @@ import {
 	createAssistantMessage,
 } from '../services/conversationManager';
 import type { WizardError } from '../services/wizardErrorDetection';
-import { wizardDebugLogger } from '../services/phaseGenerator';
-import { PLAYBOOKS_DIR } from '../../../../shared/maestro-paths';
+import { AUTO_RUN_FOLDER_NAME, wizardDebugLogger } from '../services/phaseGenerator';
 import { getNextFillerPhrase } from '../services/fillerPhrases';
 import { ScreenReaderAnnouncement } from '../ScreenReaderAnnouncement';
 import { formatShortcutKeys } from '../../../utils/shortcutFormatter';
-import { formatTimestamp } from '../../../../shared/formatters';
 import { TypingIndicator } from '../shared/TypingIndicator';
 import { formatAgentName, getToolDetail } from '../shared/wizardHelpers';
 import {
@@ -49,6 +47,14 @@ interface ConversationScreenProps {
 	showThinking: boolean;
 	/** Callback to toggle thinking display (controlled by parent for global shortcut) */
 	setShowThinking: (value: boolean | ((prev: boolean) => boolean)) => void;
+}
+
+/**
+ * Format timestamp for display
+ */
+function formatTimestamp(timestamp: number): string {
+	const date = new Date(timestamp);
+	return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 /**
@@ -197,7 +203,7 @@ function MessageBubble({
 					className="text-xs mt-1 text-right opacity-60"
 					style={{ color: isUser ? theme.colors.accentForeground : theme.colors.textDim }}
 				>
-					{formatTimestamp(message.timestamp, 'time')}
+					{formatTimestamp(message.timestamp)}
 				</div>
 			</div>
 		</div>
@@ -456,7 +462,7 @@ export function ConversationScreen({
 			}
 
 			try {
-				const autoRunPath = `${state.directoryPath}/${PLAYBOOKS_DIR}`;
+				const autoRunPath = `${state.directoryPath}/${AUTO_RUN_FOLDER_NAME}`;
 				const listResult = await window.maestro.autorun.listDocs(autoRunPath);
 
 				if (!listResult.success || !listResult.files || listResult.files.length === 0) {
@@ -861,7 +867,7 @@ export function ConversationScreen({
 				}
 
 				// Fetch existing docs for the system prompt
-				const autoRunPath = `${state.directoryPath}/${PLAYBOOKS_DIR}`;
+				const autoRunPath = `${state.directoryPath}/${AUTO_RUN_FOLDER_NAME}`;
 				const listResult = await window.maestro.autorun.listDocs(autoRunPath);
 				const existingDocs: ExistingDocument[] = [];
 

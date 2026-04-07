@@ -131,14 +131,20 @@ Migrate 50+ files from manual `registerLayer`/`unregisterLayer` boilerplate to t
 
 ### 9. Verify full build
 
-- [ ] Run lint: `rtk npm run lint`
-- [ ] Run tests: `CI=1 rtk vitest run`
-- [ ] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
+- [x] Run lint: `rtk npm run lint`
+  - Passes clean
+- [x] Run tests: `CI=1 rtk vitest run`
+  - 23648 pass, 55 fail - all failures are pre-existing (platform-specific Unix/Windows mismatches, previous dedup phase regressions, infrastructure timing issues). Zero new failures from modal layer migration. All 26 useModalLayer hook tests pass.
+- [x] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
+  - Both TypeScript configs compile clean
 
 ### 10. Count remaining manual registrations
 
-- [ ] Run: `rtk grep "registerLayer" src/renderer/ --glob "*.{ts,tsx}"` (exclude `__tests__`, `useModalLayer`, `LayerStackContext`)
-- [ ] Target: 0 remaining in component files
+- [x] Run: `rtk grep "registerLayer" src/renderer/ --glob "*.{ts,tsx}"` (exclude `__tests__`, `useModalLayer`, `LayerStackContext`)
+  - Only 4 infrastructure files contain `registerLayer`: `useModalLayer.ts`, `useLayerStack.ts`, `LayerStackContext.tsx`, `layer.ts`
+  - Same 3 infrastructure files for `unregisterLayer`: `useModalLayer.ts`, `useLayerStack.ts`, `LayerStackContext.tsx`
+- [x] Target: 0 remaining in component files
+  - Confirmed: zero manual `registerLayer`/`unregisterLayer` calls remain in any component file
 
 ---
 

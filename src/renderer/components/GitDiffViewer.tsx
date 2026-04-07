@@ -1,10 +1,9 @@
 import { useState, useMemo, useEffect, useRef, memo } from 'react';
-import { useEventListener } from '../hooks/utils/useEventListener';
 import { Diff, Hunk } from 'react-diff-view';
 import { Plus, Minus, ImageIcon } from 'lucide-react';
 import type { Theme } from '../types';
 import { parseGitDiff, getFileName, getDiffStats } from '../utils/gitDiffParser';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { ImageDiffViewer } from './ImageDiffViewer';
 import { generateDiffViewStyles } from '../utils/markdownConfig';
@@ -25,13 +24,43 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 }: GitDiffViewerProps) {
 	const [activeTab, setActiveTab] = useState(0);
 	const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
+	const layerIdRef = useRef<string>();
 
-	useModalLayer(MODAL_PRIORITIES.GIT_DIFF, 'Git Diff Preview', onClose, {
-		focusTrap: 'lenient',
-	});
+	// Store onClose in ref to avoid re-registering layer on every parent re-render
+	const onCloseRef = useRef(onClose);
+	onCloseRef.current = onClose;
 
 	// Parse the diff into separate files
 	const parsedFiles = useMemo(() => parseGitDiff(diffText), [diffText]);
+
+	// Register layer on mount
+	// Note: Using 'modal' type so App.tsx blocks all shortcuts and lets this component
+	// handle its own Cmd+Shift+[] for tab navigation
+	useEffect(() => {
+		layerIdRef.current = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.GIT_DIFF,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'lenient',
+			ariaLabel: 'Git Diff Preview',
+			onEscape: () => onCloseRef.current(),
+		});
+
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [registerLayer, unregisterLayer]); // Removed onClose from deps
+
+	// Update handler when dependencies change (not really needed since onClose uses ref)
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, () => onCloseRef.current());
+		}
+	}, [updateLayerHandler]);
 
 	// Auto-scroll to active tab when it changes
 	useEffect(() => {
@@ -46,18 +75,23 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 	}, [activeTab]);
 
 	// Handle keyboard shortcuts (tab navigation only)
-	useEventListener('keydown', (e: KeyboardEvent) => {
-		// Cmd+[ or Cmd+Shift+[ - Previous tab
-		if ((e.metaKey || e.ctrlKey) && e.key === '[') {
-			e.preventDefault();
-			setActiveTab((prev) => (prev === 0 ? parsedFiles.length - 1 : prev - 1));
-		}
-		// Cmd+] or Cmd+Shift+] - Next tab
-		else if ((e.metaKey || e.ctrlKey) && e.key === ']') {
-			e.preventDefault();
-			setActiveTab((prev) => (prev + 1) % parsedFiles.length);
-		}
-	});
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			// Cmd+[ or Cmd+Shift+[ - Previous tab
+			if ((e.metaKey || e.ctrlKey) && e.key === '[') {
+				e.preventDefault();
+				setActiveTab((prev) => (prev === 0 ? parsedFiles.length - 1 : prev - 1));
+			}
+			// Cmd+] or Cmd+Shift+] - Next tab
+			else if ((e.metaKey || e.ctrlKey) && e.key === ']') {
+				e.preventDefault();
+				setActiveTab((prev) => (prev + 1) % parsedFiles.length);
+			}
+		};
+
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
+	}, [parsedFiles.length]);
 
 	if (parsedFiles.length === 0) {
 		return (

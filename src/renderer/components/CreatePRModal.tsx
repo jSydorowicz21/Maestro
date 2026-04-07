@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { X, GitPullRequest, AlertTriangle, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, GitPullRequest, Loader2, AlertTriangle, ExternalLink } from 'lucide-react';
 import type { Theme, GhCliStatus } from '../types';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
-import { GhostIconButton } from './ui/GhostIconButton';
-import { Spinner } from './ui';
 
 /**
  * Renders error text with URLs converted to clickable links
@@ -86,10 +84,9 @@ export function CreatePRModal({
 	availableBranches,
 	onPRCreated,
 }: CreatePRModalProps) {
-	useModalLayer(MODAL_PRIORITIES.CREATE_PR, 'Create Pull Request', onClose, {
-		isOpen,
-		focusTrap: 'lenient',
-	});
+	const { registerLayer, unregisterLayer } = useLayerStack();
+	const onCloseRef = useRef(onClose);
+	onCloseRef.current = onClose;
 
 	// Form state
 	const [targetBranch, setTargetBranch] = useState('main');
@@ -102,6 +99,21 @@ export function CreatePRModal({
 	const [error, setError] = useState<string | null>(null);
 	const [hasUncommittedChanges, setHasUncommittedChanges] = useState(false);
 	const [uncommittedCount, setUncommittedCount] = useState(0);
+
+	// Register with layer stack for Escape handling
+	useEffect(() => {
+		if (isOpen) {
+			const id = registerLayer({
+				type: 'modal',
+				priority: MODAL_PRIORITIES.CREATE_PR,
+				onEscape: () => onCloseRef.current(),
+				blocksLowerLayers: true,
+				capturesFocus: true,
+				focusTrap: 'lenient',
+			});
+			return () => unregisterLayer(id);
+		}
+	}, [isOpen, registerLayer, unregisterLayer]);
 
 	// Check gh CLI status and uncommitted changes on mount
 	useEffect(() => {
@@ -215,9 +227,9 @@ export function CreatePRModal({
 							Create Pull Request
 						</h2>
 					</div>
-					<GhostIconButton onClick={onClose}>
+					<button onClick={onClose} className="p-1 rounded hover:bg-white/10 transition-colors">
 						<X className="w-4 h-4" style={{ color: theme.colors.textDim }} />
-					</GhostIconButton>
+					</button>
 				</div>
 
 				{/* Content */}
@@ -288,7 +300,7 @@ export function CreatePRModal({
 							className="flex items-center gap-2 text-sm"
 							style={{ color: theme.colors.textDim }}
 						>
-							<Spinner />
+							<Loader2 className="w-4 h-4 animate-spin" />
 							Checking GitHub CLI...
 						</div>
 					)}
@@ -459,7 +471,7 @@ export function CreatePRModal({
 					>
 						{isCreating ? (
 							<>
-								<Spinner />
+								<Loader2 className="w-4 h-4 animate-spin" />
 								Creating...
 							</>
 						) : (

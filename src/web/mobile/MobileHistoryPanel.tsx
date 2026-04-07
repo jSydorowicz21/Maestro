@@ -19,8 +19,27 @@ import { buildApiUrl } from '../utils/config';
 import { webLogger } from '../utils/logger';
 import { HistoryEntry } from '../../shared/types';
 import { stripAnsiCodes } from '../../shared/stringUtils';
-import { formatElapsedTime, formatTimestamp } from '../../shared/formatters';
+import { formatElapsedTime } from '../../shared/formatters';
 import { useSwipeGestures } from '../hooks/useSwipeGestures';
+
+/**
+ * Format timestamp for display
+ */
+function formatTime(timestamp: number): string {
+	const date = new Date(timestamp);
+	const now = new Date();
+	const isToday = date.toDateString() === now.toDateString();
+
+	if (isToday) {
+		return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+	} else {
+		return (
+			date.toLocaleDateString([], { month: 'short', day: 'numeric' }) +
+			' ' +
+			date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+		);
+	}
+}
 
 /**
  * History entry card component
@@ -70,7 +89,7 @@ function HistoryCard({ entry, onSelect }: HistoryCardProps) {
 				userSelect: 'none',
 				WebkitUserSelect: 'none',
 			}}
-			aria-label={`${entry.type} entry from ${formatTimestamp(entry.timestamp)}`}
+			aria-label={`${entry.type} entry from ${formatTime(entry.timestamp)}`}
 		>
 			{/* Top row: Type pill, success indicator (for AUTO), and timestamp */}
 			<div
@@ -197,7 +216,7 @@ function HistoryCard({ entry, onSelect }: HistoryCardProps) {
 						flexShrink: 0,
 					}}
 				>
-					{formatTimestamp(entry.timestamp)}
+					{formatTime(entry.timestamp)}
 				</span>
 			</div>
 
@@ -477,7 +496,7 @@ function HistoryDetailView({
 							color: colors.textDim,
 						}}
 					>
-						{formatTimestamp(entry.timestamp)}
+						{formatTime(entry.timestamp)}
 					</span>
 				</div>
 

@@ -466,7 +466,6 @@ Please provide a comprehensive but compacted summary of the above conversation, 
 		try {
 			await window.maestro.context.cancelGrooming();
 		} catch (error) {
-			// Expected: grooming process may already be dead when cancel is requested
 			console.error('[ContextSummarizer] Failed to cancel grooming:', error);
 		}
 	}

@@ -13,10 +13,8 @@
  */
 
 import { memo, useState, useMemo } from 'react';
-import { EmptyState } from '../ui';
 import type { Theme } from '../../types';
 import type { StatsAggregation } from '../../hooks/stats/useStats';
-import { formatDurationCompact as formatDuration } from '../../../shared/formatters';
 
 type MetricMode = 'count' | 'duration';
 
@@ -37,6 +35,23 @@ function formatHour(hour: number): string {
 	if (hour === 12) return '12pm';
 	if (hour < 12) return `${hour}am`;
 	return `${hour - 12}pm`;
+}
+
+/**
+ * Format duration in milliseconds to human-readable string
+ */
+function formatDuration(ms: number): string {
+	const totalSeconds = Math.floor(ms / 1000);
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+	if (hours > 0) {
+		return `${hours}h ${minutes}m`;
+	}
+	if (minutes > 0) {
+		return `${minutes}m`;
+	}
+	return `${totalSeconds}s`;
 }
 
 export const PeakHoursChart = memo(function PeakHoursChart({
@@ -145,8 +160,11 @@ export const PeakHoursChart = memo(function PeakHoursChart({
 
 			{/* Chart */}
 			{!hasData ? (
-				<div style={{ height: chartHeight }}>
-					<EmptyState theme={theme} className="h-full" message="No hourly data available" />
+				<div
+					className="flex items-center justify-center"
+					style={{ height: chartHeight, color: theme.colors.textDim }}
+				>
+					<span className="text-sm">No hourly data available</span>
 				</div>
 			) : (
 				<div className="relative">

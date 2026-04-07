@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type { Session, BatchRunConfig } from '../../types';
-import { useSessionStore, updateSessionWith } from '../../stores/sessionStore';
+import { useSessionStore } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { gitService } from '../../services/git';
 import { notifyToast } from '../../stores/notificationStore';
@@ -26,6 +26,7 @@ export interface AutoRunTreeNode {
  */
 export interface UseAutoRunHandlersDeps {
 	// State setters
+	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	setAutoRunDocumentList: React.Dispatch<React.SetStateAction<string[]>>;
 	setAutoRunDocumentTree: React.Dispatch<React.SetStateAction<AutoRunTreeNode[]>>;
 	setAutoRunIsLoadingDocuments: React.Dispatch<React.SetStateAction<boolean>>;
@@ -203,6 +204,7 @@ export function useAutoRunHandlers(
 	deps: UseAutoRunHandlersDeps
 ): UseAutoRunHandlersReturn {
 	const {
+		setSessions,
 		setAutoRunDocumentList,
 		setAutoRunDocumentTree,
 		setAutoRunIsLoadingDocuments,
@@ -249,23 +251,35 @@ export function useAutoRunHandlers(
 					}
 				}
 				// Update session with folder, file, AND content (atomically)
-				updateSessionWith(activeSession.id, (s) => ({
-					...s,
-					autoRunFolderPath: folderPath,
-					autoRunSelectedFile: firstFile,
-					autoRunContent: firstFileContent,
-					autoRunContentVersion: (s.autoRunContentVersion || 0) + 1,
-				}));
+				setSessions((prev) =>
+					prev.map((s) =>
+						s.id === activeSession.id
+							? {
+									...s,
+									autoRunFolderPath: folderPath,
+									autoRunSelectedFile: firstFile,
+									autoRunContent: firstFileContent,
+									autoRunContentVersion: (s.autoRunContentVersion || 0) + 1,
+								}
+							: s
+					)
+				);
 			} else {
 				setAutoRunDocumentList([]);
 				setAutoRunDocumentTree([]);
-				updateSessionWith(activeSession.id, (s) => ({
-					...s,
-					autoRunFolderPath: folderPath,
-					autoRunSelectedFile: undefined,
-					autoRunContent: '',
-					autoRunContentVersion: (s.autoRunContentVersion || 0) + 1,
-				}));
+				setSessions((prev) =>
+					prev.map((s) =>
+						s.id === activeSession.id
+							? {
+									...s,
+									autoRunFolderPath: folderPath,
+									autoRunSelectedFile: undefined,
+									autoRunContent: '',
+									autoRunContentVersion: (s.autoRunContentVersion || 0) + 1,
+								}
+							: s
+					)
+				);
 			}
 			setAutoRunSetupModalOpen(false);
 			// Switch to the autorun tab now that folder is configured
@@ -275,6 +289,7 @@ export function useAutoRunHandlers(
 		},
 		[
 			activeSession,
+			setSessions,
 			setAutoRunDocumentList,
 			setAutoRunDocumentTree,
 			setAutoRunSetupModalOpen,
@@ -420,18 +435,22 @@ export function useAutoRunHandlers(
 	const handleAutoRunContentChange = useCallback(
 		async (content: string) => {
 			if (!activeSession) return;
-			updateSessionWith(activeSession.id, (s) => ({ ...s, autoRunContent: content }));
+			setSessions((prev) =>
+				prev.map((s) => (s.id === activeSession.id ? { ...s, autoRunContent: content } : s))
+			);
 		},
-		[activeSession]
+		[activeSession, setSessions]
 	);
 
 	// Auto Run mode change handler
 	const handleAutoRunModeChange = useCallback(
 		(mode: 'edit' | 'preview') => {
 			if (!activeSession) return;
-			updateSessionWith(activeSession.id, (s) => ({ ...s, autoRunMode: mode }));
+			setSessions((prev) =>
+				prev.map((s) => (s.id === activeSession.id ? { ...s, autoRunMode: mode } : s))
+			);
 		},
-		[activeSession]
+		[activeSession, setSessions]
 	);
 
 	// Auto Run state change handler (scroll/cursor positions)
@@ -443,15 +462,21 @@ export function useAutoRunHandlers(
 			previewScrollPos: number;
 		}) => {
 			if (!activeSession) return;
-			updateSessionWith(activeSession.id, (s) => ({
-				...s,
-				autoRunMode: state.mode,
-				autoRunCursorPosition: state.cursorPosition,
-				autoRunEditScrollPos: state.editScrollPos,
-				autoRunPreviewScrollPos: state.previewScrollPos,
-			}));
+			setSessions((prev) =>
+				prev.map((s) =>
+					s.id === activeSession.id
+						? {
+								...s,
+								autoRunMode: state.mode,
+								autoRunCursorPosition: state.cursorPosition,
+								autoRunEditScrollPos: state.editScrollPos,
+								autoRunPreviewScrollPos: state.previewScrollPos,
+							}
+						: s
+				)
+			);
 		},
-		[activeSession]
+		[activeSession, setSessions]
 	);
 
 	// Auto Run document selection handler
@@ -471,14 +496,20 @@ export function useAutoRunHandlers(
 
 			// Update both selectedFile and content atomically in session state
 			// This prevents any race conditions or mismatched file/content
-			updateSessionWith(activeSession.id, (s) => ({
-				...s,
-				autoRunSelectedFile: filename,
-				autoRunContent: newContent,
-				autoRunContentVersion: (s.autoRunContentVersion || 0) + 1,
-			}));
+			setSessions((prev) =>
+				prev.map((s) =>
+					s.id === activeSession.id
+						? {
+								...s,
+								autoRunSelectedFile: filename,
+								autoRunContent: newContent,
+								autoRunContentVersion: (s.autoRunContentVersion || 0) + 1,
+							}
+						: s
+				)
+			);
 		},
-		[activeSession]
+		[activeSession, setSessions]
 	);
 
 	// Auto Run refresh handler - reload document list and show flash notification
@@ -581,13 +612,19 @@ export function useAutoRunHandlers(
 					}
 
 					// Select the new document, set content, and switch to edit mode (atomically)
-					updateSessionWith(activeSession.id, (s) => ({
-						...s,
-						autoRunSelectedFile: filename,
-						autoRunContent: '',
-						autoRunContentVersion: (s.autoRunContentVersion || 0) + 1,
-						autoRunMode: 'edit',
-					}));
+					setSessions((prev) =>
+						prev.map((s) =>
+							s.id === activeSession.id
+								? {
+										...s,
+										autoRunSelectedFile: filename,
+										autoRunContent: '',
+										autoRunContentVersion: (s.autoRunContentVersion || 0) + 1,
+										autoRunMode: 'edit',
+									}
+								: s
+						)
+					);
 
 					return true;
 				}
@@ -597,7 +634,7 @@ export function useAutoRunHandlers(
 				return false;
 			}
 		},
-		[activeSession, setAutoRunDocumentList, setAutoRunDocumentTree]
+		[activeSession, setSessions, setAutoRunDocumentList, setAutoRunDocumentTree]
 	);
 
 	return {

@@ -4,9 +4,6 @@ import type { RefObject } from 'react';
 import { useAgentSessionManagement } from '../../../renderer/hooks';
 import type { Session, AITab, LogEntry } from '../../../renderer/types';
 import type { RightPanelHandle } from '../../../renderer/components/RightPanel';
-import { useSessionStore } from '../../../renderer/stores/sessionStore';
-import { createMockSession } from '../../helpers/mockSession';
-import { createMockAITab } from '../../helpers/mockTab';
 
 type MaestroHistoryApi = typeof window.maestro.history;
 
@@ -14,15 +11,65 @@ type MaestroAgentSessionsApi = typeof window.maestro.agentSessions;
 
 type MaestroClaudeApi = typeof window.maestro.claude;
 
+const createMockTab = (overrides: Partial<AITab> = {}): AITab => ({
+	id: 'tab-1',
+	agentSessionId: null,
+	name: null,
+	starred: false,
+	logs: [],
+	inputValue: '',
+	stagedImages: [],
+	createdAt: 1700000000000,
+	state: 'idle',
+	saveToHistory: true,
+	...overrides,
+});
+
+const createMockSession = (overrides: Partial<Session> = {}): Session => {
+	const baseTab = createMockTab();
+
+	return {
+		id: 'session-1',
+		name: 'Test Session',
+		toolType: 'claude-code',
+		state: 'idle',
+		cwd: '/test/project',
+		fullPath: '/test/project',
+		projectRoot: '/test/project',
+		aiLogs: [],
+		shellLogs: [],
+		workLog: [],
+		contextUsage: 0,
+		inputMode: 'ai',
+		aiPid: 0,
+		terminalPid: 0,
+		port: 0,
+		isLive: false,
+		changedFiles: [],
+		isGitRepo: true,
+		fileTree: [],
+		fileExplorerExpanded: [],
+		fileExplorerScrollPos: 0,
+		aiTabs: [baseTab],
+		activeTabId: baseTab.id,
+		closedTabHistory: [],
+		executionQueue: [],
+		activeTimeMs: 0,
+		...overrides,
+	};
+};
+
 describe('useAgentSessionManagement', () => {
+	const originalMaestro = { ...window.maestro };
+
 	const createRightPanelRef = (): RefObject<RightPanelHandle | null> =>
 		({ current: { refreshHistoryPanel: vi.fn() } }) as RefObject<RightPanelHandle | null>;
 
 	beforeEach(() => {
 		vi.clearAllMocks();
-		vi.spyOn(useSessionStore, 'setState');
 
-		Object.assign(window.maestro, {
+		window.maestro = {
+			...window.maestro,
 			history: {
 				add: vi.fn().mockResolvedValue(true),
 				getAll: vi.fn().mockResolvedValue([]),
@@ -34,19 +81,25 @@ describe('useAgentSessionManagement', () => {
 				onExternalChange: vi.fn().mockReturnValue(() => {}),
 				reload: vi.fn().mockResolvedValue(true),
 			} satisfies MaestroHistoryApi,
-		});
-		Object.assign(window.maestro.agentSessions, {
-			read: vi.fn().mockResolvedValue({ messages: [], total: 0, hasMore: false }),
-		});
-		Object.assign(window.maestro.claude, {
-			getSessionOrigins: vi.fn().mockResolvedValue({}),
-		});
+			agentSessions: {
+				...window.maestro.agentSessions,
+				read: vi.fn().mockResolvedValue({ messages: [], total: 0, hasMore: false }),
+			} satisfies MaestroAgentSessionsApi,
+			claude: {
+				...window.maestro.claude,
+				getSessionOrigins: vi.fn().mockResolvedValue({}),
+			} satisfies MaestroClaudeApi,
+		};
+	});
+
+	afterEach(() => {
+		Object.assign(window.maestro, originalMaestro);
 	});
 
 	it('adds history entries using active session metadata', async () => {
 		const activeSession = createMockSession({
 			contextUsage: 42,
-			aiTabs: [createMockAITab({ id: 'tab-2', name: 'Active Tab' })],
+			aiTabs: [createMockTab({ id: 'tab-2', name: 'Active Tab' })],
 			activeTabId: 'tab-2',
 		});
 
@@ -56,6 +109,7 @@ describe('useAgentSessionManagement', () => {
 		const { result } = renderHook(() =>
 			useAgentSessionManagement({
 				activeSession,
+				setSessions: vi.fn(),
 				setActiveAgentSessionId: vi.fn(),
 				setAgentSessionsOpen: vi.fn(),
 				rightPanelRef,
@@ -98,7 +152,7 @@ describe('useAgentSessionManagement', () => {
 	it('avoids cross-session context usage when overriding session info', async () => {
 		const activeSession = createMockSession({
 			contextUsage: 99,
-			aiTabs: [createMockAITab({ id: 'tab-3', name: 'Active Tab' })],
+			aiTabs: [createMockTab({ id: 'tab-3', name: 'Active Tab' })],
 			activeTabId: 'tab-3',
 		});
 
@@ -107,6 +161,7 @@ describe('useAgentSessionManagement', () => {
 		const { result } = renderHook(() =>
 			useAgentSessionManagement({
 				activeSession,
+				setSessions: vi.fn(),
 				setActiveAgentSessionId: vi.fn(),
 				setAgentSessionsOpen: vi.fn(),
 				rightPanelRef,
@@ -136,18 +191,57 @@ describe('useAgentSessionManagement', () => {
 		expect(Object.prototype.hasOwnProperty.call(payload, 'contextUsage')).toBe(false);
 	});
 
-	it('switches to an existing tab when resuming a known agent session', async () => {
-		const existingTab = createMockAITab({ id: 'tab-existing', agentSessionId: 'agent-123' });
+	it('uses entry contextUsage as fallback for cross-session history entries', async () => {
 		const activeSession = createMockSession({
-			aiTabs: [createMockAITab({ id: 'tab-1' }), existingTab],
+			contextUsage: 99,
+			aiTabs: [createMockTab({ id: 'tab-4', name: 'Active Tab' })],
+			activeTabId: 'tab-4',
+		});
+
+		const rightPanelRef = createRightPanelRef();
+
+		const { result } = renderHook(() =>
+			useAgentSessionManagement({
+				activeSession,
+				setSessions: vi.fn(),
+				setActiveAgentSessionId: vi.fn(),
+				setAgentSessionsOpen: vi.fn(),
+				rightPanelRef,
+				defaultSaveToHistory: false,
+			})
+		);
+
+		await act(async () => {
+			await result.current.addHistoryEntry({
+				type: 'AUTO',
+				summary: 'Background task with context',
+				sessionId: 'session-override',
+				projectPath: '/override/project',
+				sessionName: 'Background Session',
+				contextUsage: 75, // From the spawned agent's last usage event
+			});
+		});
+
+		const payload = vi.mocked(window.maestro.history.add).mock.calls[0][0];
+
+		// Should use entry's contextUsage (75), not active session's (99)
+		expect(payload.contextUsage).toBe(75);
+	});
+
+	it('switches to an existing tab when resuming a known agent session', async () => {
+		const existingTab = createMockTab({ id: 'tab-existing', agentSessionId: 'agent-123' });
+		const activeSession = createMockSession({
+			aiTabs: [createMockTab({ id: 'tab-1' }), existingTab],
 			activeTabId: 'tab-1',
 			projectRoot: '/test/project',
 		});
+		const setSessions = vi.fn();
 		const setActiveAgentSessionId = vi.fn();
 
 		const { result } = renderHook(() =>
 			useAgentSessionManagement({
 				activeSession,
+				setSessions,
 				setActiveAgentSessionId,
 				setAgentSessionsOpen: vi.fn(),
 				rightPanelRef: createRightPanelRef(),
@@ -160,15 +254,11 @@ describe('useAgentSessionManagement', () => {
 		});
 
 		expect(window.maestro.agentSessions.read).not.toHaveBeenCalled();
-		expect(useSessionStore.setState).toHaveBeenCalled();
+		expect(setSessions).toHaveBeenCalledOnce();
 		expect(setActiveAgentSessionId).toHaveBeenCalledWith('agent-123');
 
-		// Verify the updater function passed to setState produces correct values
-		const setStateFn = vi.mocked(useSessionStore.setState).mock.calls[0][0] as (state: {
-			sessions: Session[];
-		}) => { sessions: Session[] };
-		const updatedState = setStateFn({ sessions: [activeSession] });
-		const updatedSession = updatedState.sessions[0];
+		const updateFn = setSessions.mock.calls[0][0];
+		const [updatedSession] = updateFn([activeSession]);
 
 		expect(updatedSession.activeTabId).toBe('tab-existing');
 		expect(updatedSession.activeFileTabId).toBeNull();
@@ -176,17 +266,19 @@ describe('useAgentSessionManagement', () => {
 	});
 
 	it('clears activeFileTabId when resuming an existing tab from file preview', async () => {
-		const existingTab = createMockAITab({ id: 'tab-existing', agentSessionId: 'agent-123' });
+		const existingTab = createMockTab({ id: 'tab-existing', agentSessionId: 'agent-123' });
 		const activeSession = createMockSession({
-			aiTabs: [createMockAITab({ id: 'tab-1' }), existingTab],
+			aiTabs: [createMockTab({ id: 'tab-1' }), existingTab],
 			activeTabId: 'tab-1',
 			activeFileTabId: 'file-tab-1',
 			projectRoot: '/test/project',
 		});
+		const setSessions = vi.fn();
 
 		const { result } = renderHook(() =>
 			useAgentSessionManagement({
 				activeSession,
+				setSessions,
 				setActiveAgentSessionId: vi.fn(),
 				setAgentSessionsOpen: vi.fn(),
 				rightPanelRef: createRightPanelRef(),
@@ -198,12 +290,8 @@ describe('useAgentSessionManagement', () => {
 			await result.current.handleResumeSession('agent-123');
 		});
 
-		// Verify the updater function passed to setState produces correct values
-		const setStateFn = vi.mocked(useSessionStore.setState).mock.calls[0][0] as (state: {
-			sessions: Session[];
-		}) => { sessions: Session[] };
-		const updatedState = setStateFn({ sessions: [activeSession] });
-		const updatedSession = updatedState.sessions[0];
+		const updateFn = setSessions.mock.calls[0][0];
+		const [updatedSession] = updateFn([activeSession]);
 
 		expect(updatedSession.activeTabId).toBe('tab-existing');
 		expect(updatedSession.activeFileTabId).toBeNull();
@@ -215,6 +303,8 @@ describe('useAgentSessionManagement', () => {
 			activeFileTabId: 'file-tab-1',
 			projectRoot: '/test/project',
 		});
+		const setSessions = vi.fn();
+
 		window.maestro.agentSessions.read = vi.fn().mockResolvedValue({
 			messages: [
 				{ type: 'user', content: 'Hello', timestamp: '2024-01-01T00:00:00.000Z', uuid: 'msg-1' },
@@ -226,6 +316,7 @@ describe('useAgentSessionManagement', () => {
 		const { result } = renderHook(() =>
 			useAgentSessionManagement({
 				activeSession,
+				setSessions,
 				setActiveAgentSessionId: vi.fn(),
 				setAgentSessionsOpen: vi.fn(),
 				rightPanelRef: createRightPanelRef(),
@@ -237,13 +328,8 @@ describe('useAgentSessionManagement', () => {
 			await result.current.handleResumeSession('agent-new');
 		});
 
-		// updateSessionWith calls useSessionStore.setState internally
-		const setStateCalls = vi.mocked(useSessionStore.setState).mock.calls;
-		const lastSetStateFn = setStateCalls[setStateCalls.length - 1][0] as (state: {
-			sessions: Session[];
-		}) => { sessions: Session[] };
-		const updatedState = lastSetStateFn({ sessions: [activeSession] });
-		const updatedSession = updatedState.sessions[0];
+		const updateFn = setSessions.mock.calls[0][0];
+		const [updatedSession] = updateFn([activeSession]);
 
 		expect(updatedSession.activeFileTabId).toBeNull();
 		expect(updatedSession.inputMode).toBe('ai');
@@ -253,6 +339,7 @@ describe('useAgentSessionManagement', () => {
 		const activeSession = createMockSession({
 			projectRoot: '/test/project',
 		});
+		const setSessions = vi.fn();
 		const setActiveAgentSessionId = vi.fn();
 
 		const messages = [
@@ -278,6 +365,7 @@ describe('useAgentSessionManagement', () => {
 		const { result } = renderHook(() =>
 			useAgentSessionManagement({
 				activeSession,
+				setSessions,
 				setActiveAgentSessionId,
 				setAgentSessionsOpen: vi.fn(),
 				rightPanelRef: createRightPanelRef(),
@@ -298,13 +386,8 @@ describe('useAgentSessionManagement', () => {
 		expect(window.maestro.claude.getSessionOrigins).toHaveBeenCalledOnce();
 		expect(setActiveAgentSessionId).toHaveBeenCalledWith('agent-456');
 
-		// updateSessionWith calls useSessionStore.setState internally
-		const setStateCalls = vi.mocked(useSessionStore.setState).mock.calls;
-		const lastSetStateFn = setStateCalls[setStateCalls.length - 1][0] as (state: {
-			sessions: Session[];
-		}) => { sessions: Session[] };
-		const updatedState = lastSetStateFn({ sessions: [activeSession] });
-		const updatedSession = updatedState.sessions[0];
+		const updateFn = setSessions.mock.calls[0][0];
+		const [updatedSession] = updateFn([activeSession]);
 		const resumedTab = updatedSession.aiTabs.find((tab) => tab.agentSessionId === 'agent-456');
 
 		expect(resumedTab).toBeTruthy();
@@ -330,10 +413,12 @@ describe('useAgentSessionManagement', () => {
 
 	it('skips message fetch when messages are already provided', async () => {
 		const activeSession = createMockSession({ projectRoot: '/test/project' });
+		const setSessions = vi.fn();
 
 		const { result } = renderHook(() =>
 			useAgentSessionManagement({
 				activeSession,
+				setSessions,
 				setActiveAgentSessionId: vi.fn(),
 				setAgentSessionsOpen: vi.fn(),
 				rightPanelRef: createRightPanelRef(),

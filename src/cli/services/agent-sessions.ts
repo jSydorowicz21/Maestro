@@ -30,8 +30,24 @@ const PARSE_LIMITS = {
 // Types
 // ============================================================================
 
-import type { AgentSessionInfo, AgentSessionOrigin } from '../../main/agents/session-storage';
-export type { AgentSessionInfo };
+export interface AgentSessionInfo {
+	sessionId: string;
+	sessionName?: string;
+	projectPath: string;
+	timestamp: string;
+	modifiedAt: string;
+	firstMessage: string;
+	messageCount: number;
+	sizeBytes: number;
+	costUsd: number;
+	inputTokens: number;
+	outputTokens: number;
+	cacheReadTokens: number;
+	cacheCreationTokens: number;
+	durationSeconds: number;
+	origin?: string;
+	starred?: boolean;
+}
 
 export interface ListSessionsOptions {
 	limit?: number;
@@ -293,7 +309,7 @@ export function listClaudeSessions(
 				// Attach origin info
 				const originInfo = getSessionOriginInfo(originsStore, projectPath, sessionId);
 				session.sessionName = originInfo.sessionName;
-				session.origin = originInfo.origin as AgentSessionOrigin | undefined;
+				session.origin = originInfo.origin;
 				session.starred = originInfo.starred;
 				sessions.push(session);
 			}

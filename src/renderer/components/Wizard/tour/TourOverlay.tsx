@@ -10,9 +10,8 @@
  */
 
 import { useEffect, useCallback, useRef, useState } from 'react';
-import { useEventListener } from '../../../hooks/utils/useEventListener';
 import type { Theme, Shortcut } from '../../../types';
-import { useModalLayer } from '../../../hooks/ui/useModalLayer';
+import { useLayerStack } from '../../../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../../../constants/modalPriorities';
 import { TourStep } from './TourStep';
 import { TourWelcome } from './TourWelcome';
@@ -97,6 +96,8 @@ export function TourOverlay({
 	onTourComplete,
 	onTourSkip,
 }: TourOverlayProps): JSX.Element | null {
+	const { registerLayer, unregisterLayer } = useLayerStack();
+
 	// Track whether we're showing the welcome screen (before tour steps)
 	const [showWelcome, setShowWelcome] = useState(true);
 
@@ -228,13 +229,27 @@ export function TourOverlay({
 	);
 
 	// Register keyboard handler
-	useEventListener('keydown', handleKeyDown, isOpen ? window : null);
+	useEffect(() => {
+		if (isOpen) {
+			window.addEventListener('keydown', handleKeyDown);
+			return () => window.removeEventListener('keydown', handleKeyDown);
+		}
+	}, [isOpen, handleKeyDown]);
 
 	// Register with layer stack for proper focus management
-	useModalLayer(MODAL_PRIORITIES.TOUR, 'Interface tour', skipTour, {
-		isOpen,
-		focusTrap: 'lenient',
-	});
+	useEffect(() => {
+		if (isOpen) {
+			const id = registerLayer({
+				type: 'modal',
+				priority: MODAL_PRIORITIES.TOUR,
+				blocksLowerLayers: true,
+				capturesFocus: true,
+				focusTrap: 'lenient',
+				onEscape: skipTour,
+			});
+			return () => unregisterLayer(id);
+		}
+	}, [isOpen, registerLayer, unregisterLayer, skipTour]);
 
 	// Don't render if not open
 	if (!isOpen) {

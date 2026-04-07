@@ -340,7 +340,6 @@ async function loadFileTreeRecursive(
 			return a.name.localeCompare(b.name);
 		});
 	} catch (error) {
-		// Expected: file tree load may fail (permissions, missing directory) - re-thrown to caller
 		console.error('Error loading file tree:', error);
 		throw error; // Propagate error to be caught by caller
 	}

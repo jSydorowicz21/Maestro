@@ -406,9 +406,7 @@ export class CueEngine {
 				sessionId,
 				sessionName: session.name,
 				toolType: session.toolType,
-				subscriptions: state.config.subscriptions.filter(
-					(s) => !s.agent_id || s.agent_id === sessionId
-				),
+				subscriptions: state.config.subscriptions,
 			});
 		}
 
@@ -423,9 +421,7 @@ export class CueEngine {
 					sessionId: session.id,
 					sessionName: session.name,
 					toolType: session.toolType,
-					subscriptions: config.subscriptions.filter(
-						(s) => !s.agent_id || s.agent_id === session.id
-					),
+					subscriptions: config.subscriptions,
 				});
 			}
 		}
@@ -456,8 +452,8 @@ export class CueEngine {
 	}
 
 	/** Clears queued events for a session */
-	clearQueue(sessionId: string): void {
-		this.runManager.clearQueue(sessionId);
+	clearQueue(sessionId: string, preserveStartup = false): void {
+		this.runManager.clearQueue(sessionId, preserveStartup);
 	}
 
 	/**
@@ -526,15 +522,29 @@ export class CueEngine {
 				if (!sources.some((src) => src === sessionId || src === completingName)) continue;
 
 				if (sources.length === 1) {
-					// Single source — fire immediately
+					// Single source — fire immediately.
+					//
+					// INVARIANT: sourceOutput is built EXCLUSIVELY from
+					// completionData.stdout. There must NEVER be a fallback to any
+					// session-level output store, group-chat output buffer, or live
+					// process buffer. Adding such a fallback would leak whatever the
+					// caller's session buffer happens to contain (including group-chat
+					// transcripts when the source session is also a group-chat
+					// participant) into the downstream {{CUE_SOURCE_OUTPUT}} template.
+					// The exit-listener path (process-listeners/exit-listener.ts)
+					// passes only { status, exitCode } → sourceOutput = ''.
+					// The self-loop path (cue-engine.ts onRunCompleted) passes the
+					// cue-spawned run's own extractCleanStdout() result, which is the
+					// ONLY sanctioned way stdout reaches this field.
+					const rawStdout = completionData?.stdout ?? '';
 					const event = createCueEvent('agent.completed', sub.name, {
 						sourceSession: completingName,
 						sourceSessionId: sessionId,
 						status: completionData?.status ?? 'completed',
 						exitCode: completionData?.exitCode ?? null,
 						durationMs: completionData?.durationMs ?? 0,
-						sourceOutput: (completionData?.stdout ?? '').slice(-SOURCE_OUTPUT_MAX_CHARS),
-						outputTruncated: (completionData?.stdout ?? '').length > SOURCE_OUTPUT_MAX_CHARS,
+						sourceOutput: rawStdout.slice(-SOURCE_OUTPUT_MAX_CHARS),
+						outputTruncated: rawStdout.length > SOURCE_OUTPUT_MAX_CHARS,
 						triggeredBy: completionData?.triggeredBy,
 					});
 
@@ -781,7 +791,9 @@ export class CueEngine {
 		this.clearFanInState(sessionId);
 
 		// Clean up queued events for this session (prevents stale events after config reload)
-		this.clearQueue(sessionId);
+		// Preserve app.startup events — they are one-time boot intents that should survive
+		// config hot-reloads (e.g., OneDrive touching the YAML file during the boot scan).
+		this.clearQueue(sessionId, /* preserveStartup */ true);
 
 		// Clean up scheduledFiredKeys for this session's subscriptions
 		for (const sub of state.config.subscriptions) {

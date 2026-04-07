@@ -26,13 +26,13 @@ export function setGetCustomShellPathCallback(callback: () => string | undefined
  * Gets the custom shell path using the registered callback.
  * Returns undefined if no callback is registered or if the callback returns undefined.
  */
-function getCustomShellPath(): string | undefined {
+export function getCustomShellPath(): string | undefined {
 	return getCustomShellPathCallback?.();
 }
 
 /**
  * SSH remote configuration type for spawn config.
- * Matches the pattern used in GroupChatSessionInfo.sshRemoteConfig.
+ * Matches the pattern used in SessionInfo.sshRemoteConfig.
  */
 export interface SpawnSshConfig {
 	enabled: boolean;

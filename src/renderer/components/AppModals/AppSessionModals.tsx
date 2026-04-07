@@ -68,6 +68,7 @@ export interface AppSessionModalsProps {
 	renameSessionValue: string;
 	setRenameSessionValue: (value: string) => void;
 	onCloseRenameSessionModal: () => void;
+	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	renameSessionTargetId: string | null;
 	onAfterRename?: () => void;
 
@@ -77,6 +78,7 @@ export interface AppSessionModalsProps {
 	renameTabInitialName: string;
 	onCloseRenameTabModal: () => void;
 	onRenameTab: (newName: string) => void;
+	onAutoNameTab: () => void;
 
 	// NewAgentChoiceModal
 	onOpenManualSetup: () => void;
@@ -114,6 +116,7 @@ export const AppSessionModals = memo(function AppSessionModals({
 	renameSessionValue,
 	setRenameSessionValue,
 	onCloseRenameSessionModal,
+	setSessions,
 	renameSessionTargetId,
 	onAfterRename,
 	// RenameTabModal
@@ -122,6 +125,7 @@ export const AppSessionModals = memo(function AppSessionModals({
 	renameTabInitialName,
 	onCloseRenameTabModal,
 	onRenameTab,
+	onAutoNameTab,
 	// NewAgentChoiceModal
 	onOpenManualSetup,
 	onOpenWizardSetup,
@@ -182,6 +186,7 @@ export const AppSessionModals = memo(function AppSessionModals({
 					setValue={setRenameSessionValue}
 					onClose={onCloseRenameSessionModal}
 					sessions={sessions}
+					setSessions={setSessions}
 					activeSessionId={activeSessionId}
 					targetSessionId={renameSessionTargetId || undefined}
 					onAfterRename={onAfterRename}
@@ -196,6 +201,10 @@ export const AppSessionModals = memo(function AppSessionModals({
 					agentSessionId={activeSession?.aiTabs?.find((t) => t.id === renameTabId)?.agentSessionId}
 					onClose={onCloseRenameTabModal}
 					onRename={onRenameTab}
+					onAutoName={onAutoNameTab}
+					hasLogs={
+						(activeSession?.aiTabs?.find((t) => t.id === renameTabId)?.logs?.length ?? 0) > 0
+					}
 				/>
 			)}
 

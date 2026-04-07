@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Copy, Check, Trash2 } from 'lucide-react';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { ConfirmModal } from './ConfirmModal';
 import type { Theme } from '../types';
@@ -30,6 +30,8 @@ export function LightboxModal({
 	const currentIndex = stagedImages.indexOf(image);
 	const canNavigate = stagedImages.length > 1;
 	const canDelete = Boolean(onDelete);
+	const layerIdRef = useRef<string>();
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
 	const [copied, setCopied] = useState(false);
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -46,11 +48,32 @@ export function LightboxModal({
 	};
 
 	// Register layer on mount
-	useModalLayer(MODAL_PRIORITIES.LIGHTBOX, 'Image Lightbox', onClose, {
-		type: 'overlay',
-		blocksLowerLayers: true,
-		capturesFocus: true,
-	});
+	useEffect(() => {
+		const layerId = registerLayer({
+			type: 'overlay',
+			priority: MODAL_PRIORITIES.LIGHTBOX,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'none',
+			ariaLabel: 'Image Lightbox',
+			onEscape: onClose,
+			allowClickOutside: true,
+		});
+		layerIdRef.current = layerId;
+
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [registerLayer, unregisterLayer]);
+
+	// Update handler when onClose changes
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, onClose);
+		}
+	}, [onClose, updateLayerHandler]);
 
 	useEffect(() => {
 		// Focus the lightbox when it opens

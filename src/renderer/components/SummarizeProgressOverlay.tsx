@@ -14,12 +14,9 @@
  */
 
 import { useState, useEffect, memo, useCallback } from 'react';
-import { X, Check, AlertTriangle, Wand2 } from 'lucide-react';
-import { Spinner } from './ui';
+import { X, Check, Loader2, AlertTriangle, Wand2 } from 'lucide-react';
 import type { Theme } from '../types';
 import type { SummarizeProgress, SummarizeResult } from '../types/contextMerge';
-import { formatElapsedTime } from '../../shared/formatters';
-import { GhostIconButton } from './ui/GhostIconButton';
 
 /**
  * Progress stage definition for display
@@ -46,6 +43,20 @@ export interface SummarizeProgressOverlayProps {
 	result: SummarizeResult | null;
 	onCancel: () => void;
 	startTime: number;
+}
+
+/**
+ * Format milliseconds as a readable time string
+ */
+function formatElapsedTime(ms: number): string {
+	const seconds = Math.floor(ms / 1000);
+	const minutes = Math.floor(seconds / 60);
+	const remainingSeconds = seconds % 60;
+
+	if (minutes > 0) {
+		return `${minutes}m ${remainingSeconds}s`;
+	}
+	return `${remainingSeconds}s`;
 }
 
 /**
@@ -218,13 +229,15 @@ export const SummarizeProgressOverlay = memo(function SummarizeProgressOverlay({
 								)}
 							</div>
 							{!isComplete && (
-								<GhostIconButton
+								<button
+									type="button"
 									onClick={handleCancelClick}
+									className="p-1 rounded hover:bg-white/10 transition-colors"
 									style={{ color: theme.colors.textDim }}
-									tooltip="Cancel"
+									title="Cancel"
 								>
 									<X className="w-4 h-4" />
-								</GhostIconButton>
+								</button>
 							)}
 						</div>
 
@@ -265,7 +278,10 @@ export const SummarizeProgressOverlay = memo(function SummarizeProgressOverlay({
 											{isCompleted ? (
 												<Check className="w-3 h-3" style={{ color: theme.colors.success }} />
 											) : isActive ? (
-												<Spinner size="xs" style={{ color: theme.colors.accent }} />
+												<Loader2
+													className="w-3 h-3 animate-spin"
+													style={{ color: theme.colors.accent }}
+												/>
 											) : (
 												<div
 													className="w-3 h-3 rounded-full border"

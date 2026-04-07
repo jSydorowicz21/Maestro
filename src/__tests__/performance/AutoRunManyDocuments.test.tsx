@@ -18,7 +18,6 @@ import {
 import { AutoRun, AutoRunHandle } from '../../renderer/components/AutoRun';
 import { LayerStackProvider } from '../../renderer/contexts/LayerStackContext';
 import type { Theme } from '../../renderer/types';
-import { createMockTheme } from '../helpers/mockTheme';
 
 // Helper to wrap component in LayerStackProvider with custom rerender
 const renderWithProviders = (ui: React.ReactElement) => {
@@ -191,22 +190,52 @@ vi.mock('lucide-react', () => ({
 		</span>
 	),
 }));
-// Override specific window.maestro namespaces (setup.ts provides the base mock)
-const overrideMaestroMock = () => {
-	Object.assign(window.maestro.fs, {
-		readFile: vi.fn().mockResolvedValue('data:image/png;base64,abc123'),
-		readDir: vi.fn().mockResolvedValue([]),
-	});
-	Object.assign(window.maestro.autorun, {
-		listImages: vi.fn().mockResolvedValue({ success: true, images: [] }),
-		saveImage: vi.fn().mockResolvedValue({ success: true, relativePath: 'images/test-123.png' }),
-		deleteImage: vi.fn().mockResolvedValue({ success: true }),
-		writeDoc: vi.fn().mockResolvedValue(undefined),
-	});
-	Object.assign(window.maestro.settings, {
-		get: vi.fn().mockResolvedValue(null),
-		set: vi.fn().mockResolvedValue(undefined),
-	});
+
+// Helper to create mock theme
+const createMockTheme = (): Theme => ({
+	id: 'test-theme',
+	name: 'Test Theme',
+	mode: 'dark',
+	colors: {
+		bgMain: '#1a1a1a',
+		bgPanel: '#252525',
+		bgActivity: '#2d2d2d',
+		bgSidebar: '#202020',
+		bgHover: '#353535',
+		textMain: '#ffffff',
+		textDim: '#888888',
+		accent: '#0066ff',
+		accentForeground: '#ffffff',
+		border: '#333333',
+		highlight: '#0066ff33',
+		success: '#00aa00',
+		warning: '#ffaa00',
+		error: '#ff0000',
+		purple: '#8b5cf6',
+	},
+});
+
+// Setup window.maestro mock
+const setupMaestroMock = () => {
+	const mockMaestro = {
+		fs: {
+			readFile: vi.fn().mockResolvedValue('data:image/png;base64,abc123'),
+			readDir: vi.fn().mockResolvedValue([]),
+		},
+		autorun: {
+			listImages: vi.fn().mockResolvedValue({ success: true, images: [] }),
+			saveImage: vi.fn().mockResolvedValue({ success: true, relativePath: 'images/test-123.png' }),
+			deleteImage: vi.fn().mockResolvedValue({ success: true }),
+			writeDoc: vi.fn().mockResolvedValue(undefined),
+		},
+		settings: {
+			get: vi.fn().mockResolvedValue(null),
+			set: vi.fn().mockResolvedValue(undefined),
+		},
+	};
+
+	(window as any).maestro = mockMaestro;
+	return mockMaestro;
 };
 
 /**
@@ -336,8 +365,10 @@ const createAutoRunDefaultProps = (
 });
 
 describe('AutoRun Many Documents Performance', () => {
+	let mockMaestro: ReturnType<typeof setupMaestroMock>;
+
 	beforeEach(() => {
-		overrideMaestroMock();
+		mockMaestro = setupMaestroMock();
 		vi.useFakeTimers({ shouldAdvanceTime: true });
 	});
 

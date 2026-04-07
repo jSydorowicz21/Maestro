@@ -8,13 +8,6 @@ import { useSettingsStore } from '../../../renderer/stores/settingsStore';
 import { useFileExplorerStore } from '../../../renderer/stores/fileExplorerStore';
 import { useBatchStore } from '../../../renderer/stores/batchStore';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
-import { mockTheme } from '../../helpers/mockTheme';
-
-/** Convert a hex color (e.g. '#8b5cf6') to the 'rgb(r, g, b)' string browsers return from style accessors. */
-function hexToRgb(hex: string): string {
-	const n = parseInt(hex.replace('#', ''), 16);
-	return `rgb(${(n >> 16) & 0xff}, ${(n >> 8) & 0xff}, ${n & 0xff})`;
-}
 
 // Mock child components
 vi.mock('../../../renderer/components/FileExplorerPanel', () => ({
@@ -94,6 +87,27 @@ vi.mock('lucide-react', () => ({
 }));
 
 describe('RightPanel', () => {
+	const mockTheme: Theme = {
+		id: 'dracula',
+		name: 'Dracula',
+		mode: 'dark',
+		colors: {
+			bgMain: '#282a36',
+			bgSidebar: '#21222c',
+			bgActivity: '#1e1f29',
+			border: '#44475a',
+			textMain: '#f8f8f2',
+			textDim: '#6272a4',
+			accent: '#bd93f9',
+			accentDim: 'rgba(189, 147, 249, 0.2)',
+			accentText: '#bd93f9',
+			accentForeground: '#f8f8f2',
+			success: '#50fa7b',
+			warning: '#f1fa8c',
+			error: '#ff5555',
+		},
+	};
+
 	const mockSession: Session = {
 		id: 'session-1',
 		name: 'Test Session',
@@ -190,6 +204,7 @@ describe('RightPanel', () => {
 			documentTree: [] as any,
 			isLoadingDocuments: false,
 			documentTaskCounts: undefined as any,
+			batchRunStates: {},
 		});
 	});
 
@@ -285,7 +300,7 @@ describe('RightPanel', () => {
 
 			const filesTab = screen.getByRole('button', { name: 'Files' });
 			// Browser normalizes hex to rgb
-			expect(filesTab.style.borderColor).toBe(hexToRgb(mockTheme.colors.accent));
+			expect(filesTab.style.borderColor).toBe('rgb(189, 147, 249)');
 		});
 
 		it('should show transparent border for inactive tabs', () => {
@@ -483,7 +498,7 @@ describe('RightPanel', () => {
 	describe('Scroll position tracking', () => {
 		it('should update session scroll position on scroll for files tab', () => {
 			useUIStore.setState({ activeRightTab: 'files' });
-			const spy = vi.spyOn(useSessionStore, 'setState');
+			const spy = vi.spyOn(useSessionStore.getState(), 'setSessions');
 			const props = createDefaultProps();
 			const { container } = render(<RightPanel {...props} />);
 
@@ -499,7 +514,7 @@ describe('RightPanel', () => {
 
 		it('should not update scroll position for non-files tabs', () => {
 			useUIStore.setState({ activeRightTab: 'history' });
-			const spy = vi.spyOn(useSessionStore, 'setState');
+			const spy = vi.spyOn(useSessionStore.getState(), 'setSessions');
 			const props = createDefaultProps();
 			const { container } = render(<RightPanel {...props} />);
 
@@ -508,7 +523,7 @@ describe('RightPanel', () => {
 
 			fireEvent.scroll(scrollContainer);
 
-			// setState should not be called for scroll tracking on non-files tabs
+			// setSessions should not be called for scroll tracking on non-files tabs
 			expect(spy).not.toHaveBeenCalled();
 		});
 	});
@@ -895,6 +910,9 @@ describe('RightPanel', () => {
 					agentId: 'test',
 				},
 			};
+			useBatchStore.setState({
+				batchRunStates: { 'session-1': currentSessionBatchState },
+			});
 			const props = createDefaultProps({ currentSessionBatchState });
 			render(<RightPanel {...props} />);
 
@@ -927,6 +945,9 @@ describe('RightPanel', () => {
 					agentId: 'test',
 				},
 			};
+			useBatchStore.setState({
+				batchRunStates: { 'session-1': currentSessionBatchState },
+			});
 			const props = createDefaultProps({ currentSessionBatchState });
 			render(<RightPanel {...props} />);
 
@@ -958,6 +979,9 @@ describe('RightPanel', () => {
 					agentId: 'test',
 				},
 			};
+			useBatchStore.setState({
+				batchRunStates: { 'session-1': currentSessionBatchState },
+			});
 			const props = createDefaultProps({ currentSessionBatchState, setActiveRightTab });
 			render(<RightPanel {...props} />);
 
@@ -990,6 +1014,9 @@ describe('RightPanel', () => {
 					agentId: 'test',
 				},
 			};
+			useBatchStore.setState({
+				batchRunStates: { 'session-1': currentSessionBatchState },
+			});
 			const props = createDefaultProps({
 				currentSessionBatchState,
 				onResumeAfterError,
@@ -1033,6 +1060,9 @@ describe('RightPanel', () => {
 					agentId: 'test',
 				},
 			};
+			useBatchStore.setState({
+				batchRunStates: { 'session-1': currentSessionBatchState },
+			});
 			const props = createDefaultProps({
 				currentSessionBatchState,
 				onResumeAfterError,
@@ -1063,6 +1093,9 @@ describe('RightPanel', () => {
 				loopEnabled: false,
 				loopIteration: 0,
 			};
+			useBatchStore.setState({
+				batchRunStates: { 'session-1': currentSessionBatchState },
+			});
 			const props = createDefaultProps({
 				currentSessionBatchState,
 				onResumeAfterError,
@@ -1253,7 +1286,7 @@ describe('RightPanel', () => {
 
 			const panel = container.firstChild as HTMLElement;
 			// Browser normalizes hex to rgb
-			expect(panel.style.backgroundColor).toBe(hexToRgb(mockTheme.colors.bgSidebar));
+			expect(panel.style.backgroundColor).toBe('rgb(33, 34, 44)');
 		});
 
 		it('should apply theme border color', () => {
@@ -1262,7 +1295,7 @@ describe('RightPanel', () => {
 
 			const panel = container.firstChild as HTMLElement;
 			// Browser normalizes hex to rgb
-			expect(panel.style.borderColor).toBe(hexToRgb(mockTheme.colors.border));
+			expect(panel.style.borderColor).toBe('rgb(68, 71, 90)');
 		});
 
 		it('should apply theme accent color to focus ring', () => {
@@ -1272,7 +1305,7 @@ describe('RightPanel', () => {
 
 			const panel = container.firstChild as HTMLElement;
 			// --tw-ring-color is a CSS custom property for Tailwind ring utility
-			expect(panel.style.getPropertyValue('--tw-ring-color')).toBe(mockTheme.colors.accent);
+			expect(panel.style.getPropertyValue('--tw-ring-color')).toBe('#bd93f9');
 		});
 
 		it('should apply correct width based on rightPanelWidth', () => {
@@ -1427,7 +1460,7 @@ describe('RightPanel', () => {
 
 			// Find the progress bar inner div with error color (browser normalizes hex to rgb)
 			const progressInner = container.querySelector('.h-1\\.5 > div') as HTMLElement;
-			expect(progressInner?.style.backgroundColor).toBe(hexToRgb(mockTheme.colors.error));
+			expect(progressInner?.style.backgroundColor).toBe('rgb(255, 85, 85)');
 		});
 
 		it('should use warning color when not stopping', () => {
@@ -1445,12 +1478,15 @@ describe('RightPanel', () => {
 				loopEnabled: false,
 				loopIteration: 0,
 			};
+			useBatchStore.setState({
+				batchRunStates: { 'session-1': currentSessionBatchState },
+			});
 			const props = createDefaultProps({ currentSessionBatchState });
 			const { container } = render(<RightPanel {...props} />);
 
 			// Find the progress bar inner div with warning color (browser normalizes hex to rgb)
 			const progressInner = container.querySelector('.h-1\\.5 > div') as HTMLElement;
-			expect(progressInner?.style.backgroundColor).toBe(hexToRgb(mockTheme.colors.warning));
+			expect(progressInner?.style.backgroundColor).toBe('rgb(241, 250, 140)');
 		});
 	});
 
@@ -1636,8 +1672,8 @@ describe('RightPanel', () => {
 			const props = createDefaultProps({ currentSessionBatchState });
 			render(<RightPanel {...props} />);
 
-			// Should show 0ms when just started (elapsed time is displayed even at 0)
-			expect(screen.getByText('0ms')).toBeInTheDocument();
+			// Should show 0s when just started (elapsed time is displayed even at 0)
+			expect(screen.getByText('0s')).toBeInTheDocument();
 		});
 	});
 
@@ -1645,14 +1681,21 @@ describe('RightPanel', () => {
 		it('should execute setSessions callback to update fileExplorerScrollPos', () => {
 			useUIStore.setState({ activeRightTab: 'files' });
 
-			// Set up store with two sessions so we can verify only the active one is updated
-			const otherSession = { ...mockSession, id: 'other-session', name: 'Other Session' };
-			useSessionStore.setState({
-				sessions: [mockSession, otherSession],
-				activeSessionId: 'session-1',
+			const setSessions = vi.fn((callback) => {
+				// Execute the callback with a mock sessions array
+				if (typeof callback === 'function') {
+					const mockSessions = [
+						{ id: 'session-1', name: 'Test Session' },
+						{ id: 'other-session', name: 'Other Session' },
+					];
+					const result = callback(mockSessions);
+					// Verify the callback transforms sessions correctly
+					expect(result[0].fileExplorerScrollPos).toBe(250);
+					expect(result[1].fileExplorerScrollPos).toBeUndefined();
+				}
 			});
-
-			const spy = vi.spyOn(useSessionStore, 'setState');
+			// Replace the store's setSessions with our mock so the component calls it
+			vi.spyOn(useSessionStore.getState(), 'setSessions').mockImplementation(setSessions as any);
 
 			const props = createDefaultProps();
 			const { container } = render(<RightPanel {...props} />);
@@ -1662,14 +1705,7 @@ describe('RightPanel', () => {
 
 			fireEvent.scroll(scrollContainer);
 
-			expect(spy).toHaveBeenCalled();
-
-			// Verify the store was updated with the correct scroll position for the active session
-			const updatedSessions = useSessionStore.getState().sessions;
-			const updatedActive = updatedSessions.find((s) => s.id === 'session-1');
-			const updatedOther = updatedSessions.find((s) => s.id === 'other-session');
-			expect(updatedActive?.fileExplorerScrollPos).toBe(250);
-			expect(updatedOther?.fileExplorerScrollPos).toBeUndefined();
+			expect(setSessions).toHaveBeenCalled();
 		});
 	});
 });

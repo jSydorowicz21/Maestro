@@ -2,7 +2,24 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SidebarActions } from '../../../../renderer/components/SessionList/SidebarActions';
 import type { Theme } from '../../../../renderer/types';
-import { mockTheme } from '../../../helpers/mockTheme';
+
+const mockTheme: Theme = {
+	name: 'test',
+	colors: {
+		bgMain: '#1a1a2e',
+		bgSidebar: '#16213e',
+		bgInput: '#0f3460',
+		textMain: '#e0e0e0',
+		textDim: '#888888',
+		accent: '#e94560',
+		accentForeground: '#ffffff',
+		border: '#333333',
+		error: '#ff4444',
+		success: '#00cc66',
+		warning: '#ffaa00',
+	},
+} as Theme;
+
 const defaultShortcuts = {
 	toggleSidebar: { keys: ['Cmd', 'B'], label: 'Toggle Sidebar' },
 	filterUnreadAgents: { keys: ['Meta', 'Shift', 'u'], label: 'Filter Unread Agents' },
@@ -15,6 +32,7 @@ function createProps(overrides: Partial<Parameters<typeof SidebarActions>[0]> = 
 		hasNoSessions: false,
 		shortcuts: defaultShortcuts,
 		showUnreadAgentsOnly: false,
+		hasUnreadAgents: false,
 		addNewSession: vi.fn(),
 		setLeftSidebarOpen: vi.fn(),
 		toggleShowUnreadAgentsOnly: vi.fn(),
@@ -123,5 +141,17 @@ describe('SidebarActions', () => {
 		const newAgentBtn = screen.getByText('New Agent');
 		const grid = newAgentBtn.closest('div[style]');
 		expect(grid?.style.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))');
+	});
+
+	it('prevents text wrapping in action buttons', () => {
+		render(<SidebarActions {...createProps({ openFeedback: vi.fn() })} />);
+
+		const newAgentBtn = screen.getByText('New Agent').closest('button');
+		const feedbackBtn = screen.getByText('Feedback').closest('button');
+
+		expect(newAgentBtn?.className).toContain('whitespace-nowrap');
+		expect(feedbackBtn?.className).toContain('whitespace-nowrap');
+		expect(newAgentBtn?.className).toContain('overflow-hidden');
+		expect(feedbackBtn?.className).toContain('overflow-hidden');
 	});
 });

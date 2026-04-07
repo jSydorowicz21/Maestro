@@ -3,8 +3,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { FileExplorerPanel } from '../../../renderer/components/FileExplorerPanel';
 import type { Session, Theme } from '../../../renderer/types';
-import { createMockSession as _createMockSession } from '../../helpers/mockSession';
-import { mockTheme } from '../../helpers/mockTheme';
 
 // Mock lucide-react
 vi.mock('lucide-react', () => ({
@@ -211,18 +209,53 @@ vi.mock('../../../renderer/hooks/ui/useClickOutside', () => ({
 		}
 	},
 }));
-// Wrapper: old factory had different cwd/paths, non-zero pids, isGitRepo, and fileTreeAutoRefreshInterval: 0
-const createMockSession = (overrides: Partial<Session> = {}): Session =>
-	_createMockSession({
-		cwd: '/Users/test/project',
-		projectRoot: '/Users/test/project',
-		fullPath: '/Users/test/project',
-		aiPid: 1234,
-		terminalPid: 5678,
-		isGitRepo: true,
-		fileTreeAutoRefreshInterval: 0,
-		...overrides,
-	} as Partial<Session>);
+
+// Create mock theme
+const mockTheme: Theme = {
+	id: 'test-theme',
+	name: 'Test Theme',
+	mode: 'dark',
+	colors: {
+		bgMain: '#1a1a1a',
+		bgSidebar: '#2d2d2d',
+		bgActivity: '#3d3d3d',
+		bgInput: '#404040',
+		textMain: '#ffffff',
+		textDim: '#888888',
+		accent: '#4a9eff',
+		border: '#404040',
+		success: '#4caf50',
+		warning: '#ff9800',
+		error: '#f44336',
+		info: '#2196f3',
+		scrollbarThumb: '#666666',
+	},
+};
+
+// Create mock session
+const createMockSession = (overrides: Partial<Session> = {}): Session => ({
+	id: 'session-1',
+	name: 'Test Session',
+	toolType: 'claude-code',
+	state: 'idle',
+	inputMode: 'ai',
+	cwd: '/Users/test/project',
+	projectRoot: '/Users/test/project',
+	fullPath: '/Users/test/project',
+	aiPid: 1234,
+	terminalPid: 5678,
+	aiLogs: [],
+	shellLogs: [],
+	isGitRepo: true,
+	fileTree: [],
+	fileExplorerExpanded: [],
+	messageQueue: [],
+	changedFiles: [],
+	fileTreeAutoRefreshInterval: 0,
+	terminalTabs: [],
+	activeTerminalTabId: null,
+	...overrides,
+});
 
 // Create mock file tree
 const mockFileTree = [
@@ -284,6 +317,7 @@ describe('FileExplorerPanel', () => {
 			collapseAllFolders: vi.fn(),
 			updateSessionWorkingDirectory: vi.fn().mockResolvedValue(undefined),
 			refreshFileTree: vi.fn().mockResolvedValue({ totalChanges: 0 }),
+			setSessions: vi.fn(),
 			onAutoRefreshChange: vi.fn(),
 			onShowFlash: vi.fn(),
 			showHiddenFiles: false,
@@ -431,14 +465,21 @@ describe('FileExplorerPanel', () => {
 			render(<FileExplorerPanel {...defaultProps} />);
 			const expandButton = screen.getByTitle('Expand all folders');
 			fireEvent.click(expandButton);
-			expect(defaultProps.expandAllFolders).toHaveBeenCalledWith('session-1', expect.any(Object));
+			expect(defaultProps.expandAllFolders).toHaveBeenCalledWith(
+				'session-1',
+				expect.any(Object),
+				expect.any(Function)
+			);
 		});
 
 		it('calls collapseAllFolders when collapse button is clicked', () => {
 			render(<FileExplorerPanel {...defaultProps} />);
 			const collapseButton = screen.getByTitle('Collapse all folders');
 			fireEvent.click(collapseButton);
-			expect(defaultProps.collapseAllFolders).toHaveBeenCalledWith('session-1');
+			expect(defaultProps.collapseAllFolders).toHaveBeenCalledWith(
+				'session-1',
+				expect.any(Function)
+			);
 		});
 	});
 
@@ -967,7 +1008,11 @@ describe('FileExplorerPanel', () => {
 			const srcFolder = screen.getByText('src');
 			fireEvent.click(srcFolder);
 
-			expect(defaultProps.toggleFolder).toHaveBeenCalledWith('src', 'session-1');
+			expect(defaultProps.toggleFolder).toHaveBeenCalledWith(
+				'src',
+				'session-1',
+				expect.any(Function)
+			);
 		});
 
 		it('sets selectedFileIndex and activeFocus when clicking a file', () => {
@@ -1373,7 +1418,11 @@ describe('FileExplorerPanel', () => {
 			const srcFolder = screen.getByText('src');
 			fireEvent.click(srcFolder);
 
-			expect(defaultProps.toggleFolder).toHaveBeenCalledWith('src', 'session-1');
+			expect(defaultProps.toggleFolder).toHaveBeenCalledWith(
+				'src',
+				'session-1',
+				expect.any(Function)
+			);
 		});
 
 		it('builds correct path for nested folders', () => {
@@ -1383,7 +1432,11 @@ describe('FileExplorerPanel', () => {
 			const utilsFolder = screen.getByText('utils');
 			fireEvent.click(utilsFolder);
 
-			expect(defaultProps.toggleFolder).toHaveBeenCalledWith('src/utils', 'session-1');
+			expect(defaultProps.toggleFolder).toHaveBeenCalledWith(
+				'src/utils',
+				'session-1',
+				expect.any(Function)
+			);
 		});
 	});
 
@@ -1729,8 +1782,7 @@ describe('FileExplorerPanel', () => {
 			const mockFs = {
 				countItems: vi.fn().mockResolvedValue({ fileCount: 0, folderCount: 0 }),
 			};
-			(window as any).maestro.platform = 'darwin';
-			Object.assign(window.maestro.fs, mockFs);
+			(window as any).maestro = { platform: 'darwin', fs: mockFs };
 
 			const { container } = render(<FileExplorerPanel {...defaultProps} />);
 			const fileItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
@@ -1792,8 +1844,7 @@ describe('FileExplorerPanel', () => {
 
 		it('calls shell.showItemInFolder with full path when Reveal in Finder is clicked', () => {
 			const mockShell = { showItemInFolder: vi.fn().mockResolvedValue(undefined) };
-			(window as any).maestro.platform = 'darwin';
-			Object.assign(window.maestro.shell, mockShell);
+			(window as any).maestro = { platform: 'darwin', shell: mockShell };
 
 			const { container } = render(<FileExplorerPanel {...defaultProps} />);
 			const fileItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
@@ -1809,8 +1860,7 @@ describe('FileExplorerPanel', () => {
 
 		it('calls shell.showItemInFolder with folder path when Reveal in Finder is clicked on folder', () => {
 			const mockShell = { showItemInFolder: vi.fn().mockResolvedValue(undefined) };
-			(window as any).maestro.platform = 'darwin';
-			Object.assign(window.maestro.shell, mockShell);
+			(window as any).maestro = { platform: 'darwin', shell: mockShell };
 
 			const { container } = render(<FileExplorerPanel {...defaultProps} />);
 			const folderItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
@@ -1826,8 +1876,7 @@ describe('FileExplorerPanel', () => {
 
 		it('calls shell.openPath with full file path when Open in Default App is clicked', () => {
 			const mockShell = { openPath: vi.fn().mockResolvedValue(undefined) };
-			(window as any).maestro.platform = 'darwin';
-			Object.assign(window.maestro.shell, mockShell);
+			(window as any).maestro = { platform: 'darwin', shell: mockShell };
 
 			const { container } = render(<FileExplorerPanel {...defaultProps} />);
 			const fileItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
@@ -1872,8 +1921,7 @@ describe('FileExplorerPanel', () => {
 			const mockFs = {
 				countItems: vi.fn().mockResolvedValue({ fileCount: 5, folderCount: 2 }),
 			};
-			(window as any).maestro.platform = 'darwin';
-			Object.assign(window.maestro.fs, mockFs);
+			(window as any).maestro = { platform: 'darwin', fs: mockFs };
 
 			const { container } = render(<FileExplorerPanel {...defaultProps} />);
 			const folderItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
@@ -1896,8 +1944,7 @@ describe('FileExplorerPanel', () => {
 			const mockFs = {
 				countItems: vi.fn().mockResolvedValue({ fileCount: 0, folderCount: 0 }),
 			};
-			(window as any).maestro.platform = 'darwin';
-			Object.assign(window.maestro.fs, mockFs);
+			(window as any).maestro = { platform: 'darwin', fs: mockFs };
 
 			const { container } = render(<FileExplorerPanel {...defaultProps} />);
 			const fileItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>

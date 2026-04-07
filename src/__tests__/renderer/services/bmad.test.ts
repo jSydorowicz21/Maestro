@@ -13,8 +13,10 @@ const mockBmad = {
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	// Add bmad namespace to window.maestro (not in setup.ts base mock)
-	(window as any).maestro.bmad = mockBmad;
+	(window as any).maestro = {
+		...(window as any).maestro,
+		bmad: mockBmad,
+	};
 	vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 

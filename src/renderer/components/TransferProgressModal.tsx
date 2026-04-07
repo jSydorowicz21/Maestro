@@ -19,15 +19,12 @@
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
-import { X, Check, AlertTriangle, ArrowRight, Wand2 } from 'lucide-react';
-import { Spinner as SpinnerIcon } from './ui';
+import { X, Check, Loader2, AlertTriangle, ArrowRight, Wand2 } from 'lucide-react';
 import type { Theme, ToolType } from '../types';
 import type { GroomingProgress } from '../types/contextMerge';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { getAgentDisplayName } from '../services/contextGroomer';
-import { formatElapsedTime } from '../../shared/formatters';
-import { GhostIconButton } from './ui/GhostIconButton';
 
 /**
  * Progress stage definition for transfer display
@@ -74,6 +71,20 @@ export interface TransferProgressModalProps {
 	onCancel: () => void;
 	/** Called when the transfer completes successfully and user clicks Done */
 	onComplete?: () => void;
+}
+
+/**
+ * Format milliseconds as a readable time string
+ */
+function formatElapsedTime(ms: number): string {
+	const seconds = Math.floor(ms / 1000);
+	const minutes = Math.floor(seconds / 60);
+	const remainingSeconds = seconds % 60;
+
+	if (minutes > 0) {
+		return `${minutes}m ${remainingSeconds}s`;
+	}
+	return `${remainingSeconds}s`;
 }
 
 /**
@@ -248,6 +259,9 @@ export function TransferProgressModal({
 	// Cancel confirmation state
 	const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
+	// Layer stack registration
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
+	const layerIdRef = useRef<string>();
 	const onCancelRef = useRef(onCancel);
 	const onCompleteRef = useRef(onComplete);
 
@@ -274,9 +288,32 @@ export function TransferProgressModal({
 	}, [progress.stage]);
 
 	// Register layer on mount
-	useModalLayer(MODAL_PRIORITIES.TRANSFER_PROGRESS, 'Transfer Progress', handleEscape, {
-		isOpen,
-	});
+	useEffect(() => {
+		if (!isOpen) return;
+
+		layerIdRef.current = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.TRANSFER_PROGRESS,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'strict',
+			ariaLabel: 'Transfer Progress',
+			onEscape: handleEscape,
+		});
+
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [isOpen, registerLayer, unregisterLayer, handleEscape]);
+
+	// Update handler when callbacks change
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, handleEscape);
+		}
+	}, [updateLayerHandler, handleEscape]);
 
 	// Get the current stage index
 	const currentStageIndex = useMemo(() => {
@@ -344,13 +381,15 @@ export function TransferProgressModal({
 						{isComplete ? 'Transfer Complete' : 'Transferring Context...'}
 					</h2>
 					{isComplete && (
-						<GhostIconButton
+						<button
+							type="button"
 							onClick={() => onComplete?.() || onCancel()}
+							className="p-1 rounded hover:bg-white/10 transition-colors"
 							style={{ color: theme.colors.textDim }}
 							aria-label="Close modal"
 						>
 							<X className="w-4 h-4" />
-						</GhostIconButton>
+						</button>
 					)}
 				</div>
 
@@ -433,7 +472,10 @@ export function TransferProgressModal({
 												<Check className="w-3 h-3" style={{ color: '#fff' }} />
 											</div>
 										) : isActive ? (
-											<SpinnerIcon size="md" style={{ color: theme.colors.accent }} />
+											<Loader2
+												className="w-5 h-5 animate-spin"
+												style={{ color: theme.colors.accent }}
+											/>
 										) : (
 											<div
 												className="w-5 h-5 rounded-full border-2"

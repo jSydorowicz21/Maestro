@@ -35,7 +35,6 @@ export function useCueAutoDiscovery(sessions: Session[], encoreFeatures: EncoreF
 				if (session.projectRoot) {
 					window.maestro.cue
 						.refreshSession(session.id, session.projectRoot)
-						// Expected: Cue auto-discovery is best-effort, non-critical
 						.catch((err) => console.error('[CueAutoDiscovery] Failed to refresh session:', err));
 				}
 			}
@@ -59,7 +58,6 @@ export function useCueAutoDiscovery(sessions: Session[], encoreFeatures: EncoreF
 			if (!prevIds.has(session.id) && session.projectRoot) {
 				window.maestro.cue
 					.refreshSession(session.id, session.projectRoot)
-					// Expected: Cue auto-discovery is best-effort, non-critical
 					.catch((err) => console.error('[CueAutoDiscovery] Failed to refresh session:', err));
 			}
 		}
@@ -69,7 +67,6 @@ export function useCueAutoDiscovery(sessions: Session[], encoreFeatures: EncoreF
 			if (!currentIds.has(prevId)) {
 				window.maestro.cue
 					.removeSession(prevId)
-					// Expected: Cue auto-discovery is best-effort, non-critical
 					.catch((err) => console.error('[CueAutoDiscovery] Failed to remove session:', err));
 			}
 		}
@@ -97,20 +94,17 @@ export function useCueAutoDiscovery(sessions: Session[], encoreFeatures: EncoreF
 							.map((session) =>
 								window.maestro.cue
 									.refreshSession(session.id, session.projectRoot)
-									// Expected: Cue auto-discovery is best-effort, non-critical
 									.catch((err) =>
 										console.error('[CueAutoDiscovery] Failed to refresh session:', err)
 									)
 							)
 					)
 				)
-				// Expected: Cue auto-discovery is best-effort, non-critical
 				.catch((err) => console.error('[CueAutoDiscovery] Failed to enable Cue:', err));
 		} else {
 			// Feature was just disabled — stop the engine
 			window.maestro.cue
 				.disable()
-				// Expected: Cue auto-discovery is best-effort, non-critical
 				.catch((err) => console.error('[CueAutoDiscovery] Failed to disable Cue:', err));
 		}
 	}, [encoreFeatures.maestroCue, sessions, sessionsLoaded]);

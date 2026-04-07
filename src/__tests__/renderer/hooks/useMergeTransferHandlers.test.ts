@@ -19,7 +19,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
 import type { Session } from '../../../renderer/types';
-import { createMockSession } from '../../helpers/mockSession';
 
 // ============================================================================
 // Mock modules BEFORE importing the hook
@@ -136,6 +135,41 @@ import { useSendToAgentWithSessions } from '../../../renderer/hooks/agent/useSen
 // Helpers
 // ============================================================================
 
+function createMockSession(overrides: Partial<Session> = {}): Session {
+	return {
+		id: 'session-1',
+		name: 'Test Agent',
+		state: 'idle',
+		busySource: undefined,
+		toolType: 'claude-code',
+		aiTabs: [
+			{
+				id: 'tab-1',
+				name: 'Tab 1',
+				inputValue: '',
+				data: [],
+				logs: [
+					{ id: 'log-1', timestamp: Date.now(), source: 'user', text: 'Hello' },
+					{ id: 'log-2', timestamp: Date.now(), source: 'ai', text: 'Hi there' },
+				],
+				stagedImages: [],
+				agentSessionId: 'agent-1',
+				starred: false,
+				createdAt: Date.now(),
+			},
+		],
+		activeTabId: 'tab-1',
+		inputMode: 'ai',
+		isGitRepo: false,
+		cwd: '/test',
+		projectRoot: '/test/project',
+		shellLogs: [],
+		shellCwd: '/test',
+		terminalTabs: [],
+		activeTerminalTabId: null,
+	} as unknown as Session;
+}
+
 // Create stable deps to avoid reference changes
 const stableDeps: UseMergeTransferHandlersDeps = {
 	sessionsRef: { current: [] },
@@ -174,15 +208,17 @@ beforeEach(() => {
 	(stableDeps.setActiveSessionId as ReturnType<typeof vi.fn>).mockReset();
 
 	// Mock window.maestro APIs
-	Object.assign(window.maestro.notification, { show: vi.fn() });
-	Object.assign(window.maestro.agents, {
-		get: vi.fn().mockResolvedValue({
-			command: 'claude',
-			args: [],
-			path: '/usr/bin/claude',
-		}),
-	});
-	Object.assign(window.maestro.process, { spawn: vi.fn().mockResolvedValue(undefined) });
+	(window as any).maestro = {
+		notification: { show: vi.fn() },
+		agents: {
+			get: vi.fn().mockResolvedValue({
+				command: 'claude',
+				args: [],
+				path: '/usr/bin/claude',
+			}),
+		},
+		process: { spawn: vi.fn().mockResolvedValue(undefined) },
+	};
 });
 
 afterEach(() => {
@@ -649,24 +685,26 @@ describe('useMergeTransferHandlers', () => {
 	// ----------------------------------------------------------------
 
 	describe('sub-hook callbacks', () => {
-		it('passes sessions and callbacks to useMergeSessionWithSessions', () => {
+		it('passes sessions and setSessions to useMergeSessionWithSessions', () => {
 			const deps = createMockDeps();
 			renderHook(() => useMergeTransferHandlers(deps));
 
 			const mockMerge = vi.mocked(useMergeSessionWithSessions);
 			const callArgs = mockMerge.mock.calls[0]?.[0];
 			expect(callArgs).toHaveProperty('sessions');
+			expect(callArgs).toHaveProperty('setSessions');
 			expect(callArgs).toHaveProperty('onSessionCreated');
 			expect(callArgs).toHaveProperty('onMergeComplete');
 		});
 
-		it('passes sessions and callbacks to useSendToAgentWithSessions', () => {
+		it('passes sessions and setSessions to useSendToAgentWithSessions', () => {
 			const deps = createMockDeps();
 			renderHook(() => useMergeTransferHandlers(deps));
 
 			const mockTransfer = vi.mocked(useSendToAgentWithSessions);
 			const callArgs = mockTransfer.mock.calls[0]?.[0];
 			expect(callArgs).toHaveProperty('sessions');
+			expect(callArgs).toHaveProperty('setSessions');
 			expect(callArgs).toHaveProperty('onSessionCreated');
 		});
 

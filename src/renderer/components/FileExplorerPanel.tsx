@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
-import { useEventListener } from '../hooks/utils/useEventListener';
 import { createPortal } from 'react-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
@@ -23,10 +22,8 @@ import {
 	Edit2,
 	Trash2,
 	AlertTriangle,
+	Loader2,
 } from 'lucide-react';
-import { EmptyState, Spinner } from './ui';
-import { GhostIconButton } from './ui/GhostIconButton';
-import { updateSessionWith } from '../stores/sessionStore';
 import type { Session, Theme, FocusArea } from '../types';
 import type { FileNode } from '../types/fileTree';
 import type { FileTreeChanges } from '../utils/fileExplorer';
@@ -37,7 +34,7 @@ import {
 	countNodesInTree,
 } from '../utils/fileExplorer';
 import { getExplorerFileIcon, getExplorerFolderIcon } from '../utils/theme';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { useClickOutside } from '../hooks/ui/useClickOutside';
 import { useContextMenuPosition } from '../hooks/ui/useContextMenuPosition';
@@ -115,7 +112,7 @@ function FileTreeLoadingProgress({
 	return (
 		<div className="flex flex-col items-center justify-center gap-3 py-8">
 			{/* Animated spinner */}
-			<Spinner size="lg" style={{ color: theme.colors.accent }} />
+			<Loader2 className="w-6 h-6 animate-spin" style={{ color: theme.colors.accent }} />
 
 			{/* Status text */}
 			<div className="text-center">
@@ -337,12 +334,27 @@ interface FileExplorerPanelProps {
 	setActiveFocus: (focus: FocusArea) => void;
 	fileTreeContainerRef?: React.RefObject<HTMLDivElement>;
 	fileTreeFilterInputRef?: React.RefObject<HTMLInputElement>;
-	toggleFolder: (path: string, activeSessionId: string) => void;
+	toggleFolder: (
+		path: string,
+		activeSessionId: string,
+		setSessions: React.Dispatch<React.SetStateAction<Session[]>>
+	) => void;
 	handleFileClick: (node: any, path: string, activeSession: Session) => Promise<void>;
-	expandAllFolders: (activeSessionId: string, activeSession: Session) => void;
-	collapseAllFolders: (activeSessionId: string) => void;
-	updateSessionWorkingDirectory: () => Promise<void>;
+	expandAllFolders: (
+		activeSessionId: string,
+		activeSession: Session,
+		setSessions: React.Dispatch<React.SetStateAction<Session[]>>
+	) => void;
+	collapseAllFolders: (
+		activeSessionId: string,
+		setSessions: React.Dispatch<React.SetStateAction<Session[]>>
+	) => void;
+	updateSessionWorkingDirectory: (
+		activeSessionId: string,
+		setSessions: React.Dispatch<React.SetStateAction<Session[]>>
+	) => Promise<void>;
 	refreshFileTree: (sessionId: string) => Promise<FileTreeChanges | undefined>;
+	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	onAutoRefreshChange?: (interval: number) => void;
 	onShowFlash?: (message: string) => void;
 	showHiddenFiles: boolean;
@@ -377,6 +389,7 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 		collapseAllFolders,
 		updateSessionWorkingDirectory,
 		refreshFileTree,
+		setSessions,
 		onAutoRefreshChange,
 		onShowFlash,
 		showHiddenFiles,
@@ -387,20 +400,8 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 		onOpenLastDocumentGraph,
 	} = props;
 
-	const handleFilterEscape = useCallback(() => {
-		setFileTreeFilterOpen(false);
-		setFileTreeFilter('');
-	}, [setFileTreeFilterOpen, setFileTreeFilter]);
-
-	useModalLayer(MODAL_PRIORITIES.FILE_TREE_FILTER, 'File Tree Filter', handleFilterEscape, {
-		isOpen: fileTreeFilterOpen,
-		type: 'overlay',
-		allowClickOutside: true,
-		blocksLowerLayers: false,
-		capturesFocus: true,
-		focusTrap: 'none',
-	});
-
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
+	const layerIdRef = useRef<string>();
 	const [isRefreshing, setIsRefreshing] = useState(false);
 
 	// Refresh overlay state
@@ -689,26 +690,40 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 			pathParts[pathParts.length - 1] = newName;
 			const newRelativePath = pathParts.join('/');
 
-			updateSessionWith(session.id, (s) => ({
-				...s,
-				fileTree: newTree,
-				// Update expanded folder paths if renamed item was a folder
-				fileExplorerExpanded:
-					renameModal.node.type === 'folder'
-						? (s.fileExplorerExpanded || []).map((p) => {
-								if (p === oldPath) return newRelativePath;
-								if (p.startsWith(oldPath + '/')) return newRelativePath + p.slice(oldPath.length);
-								return p;
-							})
-						: s.fileExplorerExpanded,
-			}));
+			setSessions((prev) =>
+				prev.map((s) => {
+					if (s.id !== session.id) return s;
+					return {
+						...s,
+						fileTree: newTree,
+						// Update expanded folder paths if renamed item was a folder
+						fileExplorerExpanded:
+							renameModal.node.type === 'folder'
+								? (s.fileExplorerExpanded || []).map((p) => {
+										if (p === oldPath) return newRelativePath;
+										if (p.startsWith(oldPath + '/'))
+											return newRelativePath + p.slice(oldPath.length);
+										return p;
+									})
+								: s.fileExplorerExpanded,
+					};
+				})
+			);
 
 			setRenameModal(null);
 			onShowFlash?.(`Renamed to "${newName}"`);
 		} catch (error) {
 			setRenameError(error instanceof Error ? error.message : 'Rename failed');
 		}
-	}, [renameModal, renameValue, session.id, session.fileTree, onShowFlash, sshRemoteId]);
+	}, [
+		renameModal,
+		renameValue,
+		session.id,
+		session.fileTree,
+		onShowFlash,
+		sshRemoteId,
+		setSessions,
+	]);
 
 	// Open delete confirmation modal
 	const handleOpenDelete = useCallback(async () => {
@@ -763,22 +778,27 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 
 			// Update tree locally instead of full refresh
 			const newTree = removeNodeFromTree(session.fileTree || [], deleteModal.path);
-			updateSessionWith(session.id, (s) => ({
-				...s,
-				fileTree: newTree,
-				fileTreeStats: s.fileTreeStats
-					? {
-							...s.fileTreeStats,
-							fileCount: Math.max(0, s.fileTreeStats.fileCount - deletedFileCount),
-							folderCount: Math.max(0, s.fileTreeStats.folderCount - deletedFolderCount),
-						}
-					: undefined,
-				// Also remove from expanded folders if it was a folder
-				fileExplorerExpanded:
-					deleteModal.node.type === 'folder'
-						? (s.fileExplorerExpanded || []).filter((p) => !p.startsWith(deleteModal.path))
-						: s.fileExplorerExpanded,
-			}));
+			setSessions((prev) =>
+				prev.map((s) => {
+					if (s.id !== session.id) return s;
+					return {
+						...s,
+						fileTree: newTree,
+						fileTreeStats: s.fileTreeStats
+							? {
+									...s.fileTreeStats,
+									fileCount: Math.max(0, s.fileTreeStats.fileCount - deletedFileCount),
+									folderCount: Math.max(0, s.fileTreeStats.folderCount - deletedFolderCount),
+								}
+							: undefined,
+						// Also remove from expanded folders if it was a folder
+						fileExplorerExpanded:
+							deleteModal.node.type === 'folder'
+								? (s.fileExplorerExpanded || []).filter((p) => !p.startsWith(deleteModal.path))
+								: s.fileExplorerExpanded,
+					};
+				})
+			);
 
 			setDeleteModal(null);
 			onShowFlash?.(`Deleted "${deleteModal.node.name}"`);
@@ -787,18 +807,51 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 		} finally {
 			setIsDeleting(false);
 		}
-	}, [deleteModal, session.id, session.fileTree, onShowFlash, sshRemoteId]);
+	}, [deleteModal, session.id, session.fileTree, onShowFlash, sshRemoteId, setSessions]);
 
 	// Close context menu on Escape key
-	useEventListener(
-		'keydown',
-		(e: KeyboardEvent) => {
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.key === 'Escape' && contextMenu) {
 				setContextMenu(null);
 			}
-		},
-		contextMenu ? window : null
-	);
+		};
+		if (contextMenu) {
+			window.addEventListener('keydown', handleKeyDown);
+			return () => window.removeEventListener('keydown', handleKeyDown);
+		}
+	}, [contextMenu]);
+
+	// Register layer when filter is open
+	useEffect(() => {
+		if (fileTreeFilterOpen) {
+			const id = registerLayer({
+				type: 'overlay',
+				priority: MODAL_PRIORITIES.FILE_TREE_FILTER,
+				blocksLowerLayers: false,
+				capturesFocus: true,
+				focusTrap: 'none',
+				onEscape: () => {
+					setFileTreeFilterOpen(false);
+					setFileTreeFilter('');
+				},
+				allowClickOutside: true,
+				ariaLabel: 'File Tree Filter',
+			});
+			layerIdRef.current = id;
+			return () => unregisterLayer(id);
+		}
+	}, [fileTreeFilterOpen, registerLayer, unregisterLayer]);
+
+	// Update handler when dependencies change
+	useEffect(() => {
+		if (fileTreeFilterOpen && layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, () => {
+				setFileTreeFilterOpen(false);
+				setFileTreeFilter('');
+			});
+		}
+	}, [fileTreeFilterOpen, setFileTreeFilterOpen, setFileTreeFilter, updateLayerHandler]);
 
 	// Filter hidden files from the tree based on showHiddenFiles setting
 	const filterHiddenFiles = useCallback(
@@ -940,7 +993,7 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 					}}
 					onClick={() => {
 						if (isFolder) {
-							toggleFolder(fullPath, session.id);
+							toggleFolder(fullPath, session.id, setSessions);
 						} else {
 							setSelectedFileIndex(globalIndex);
 							// Only change focus if not filtering
@@ -1013,6 +1066,7 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 			selectedFileIndex,
 			theme,
 			toggleFolder,
+			setSessions,
 			setSelectedFileIndex,
 			setActiveFocus,
 			handleFileClick,
@@ -1081,42 +1135,46 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 				<div className="flex items-center gap-1 flex-shrink-0">
 					{/* Open working directory in system file manager */}
 					{!session.sshRemote && (
-						<GhostIconButton
+						<button
 							onClick={() =>
 								window.maestro?.shell?.openPath(session.fullPath || session.projectRoot)
 							}
-							tooltip={getOpenInLabel(window.maestro?.platform || 'darwin')}
+							className="p-1 rounded hover:bg-white/10 transition-colors"
+							title={getOpenInLabel(window.maestro?.platform || 'darwin')}
 							style={{ color: theme.colors.textDim }}
 						>
 							<FolderOpen className="w-3.5 h-3.5" />
-						</GhostIconButton>
+						</button>
 					)}
 					{/* Last Document Graph indicator */}
 					{lastGraphFocusFile && onOpenLastDocumentGraph && (
-						<GhostIconButton
+						<button
 							onClick={onOpenLastDocumentGraph}
-							tooltip="Open Last Document Graph"
+							className="p-1 rounded hover:bg-white/10 transition-colors"
+							title="Open Last Document Graph"
 							style={{ color: theme.colors.accent }}
 						>
 							<GitBranch className="w-3.5 h-3.5" />
-						</GhostIconButton>
+						</button>
 					)}
-					<GhostIconButton
+					<button
 						onClick={() => setShowHiddenFiles(!showHiddenFiles)}
-						tooltip={showHiddenFiles ? 'Hide dotfiles' : 'Show dotfiles'}
+						className="p-1 rounded hover:bg-white/10 transition-colors"
+						title={showHiddenFiles ? 'Hide dotfiles' : 'Show dotfiles'}
 						style={{
 							color: showHiddenFiles ? theme.colors.accent : theme.colors.textDim,
 							backgroundColor: showHiddenFiles ? `${theme.colors.accent}20` : 'transparent',
 						}}
 					>
 						{showHiddenFiles ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-					</GhostIconButton>
-					<GhostIconButton
+					</button>
+					<button
 						ref={refreshButtonRef}
 						onClick={handleRefresh}
 						onMouseEnter={handleRefreshMouseEnter}
 						onMouseLeave={handleRefreshMouseLeave}
-						tooltip={
+						className="p-1 rounded hover:bg-white/10 transition-colors"
+						title={
 							autoRefreshInterval > 0
 								? `Auto-refresh every ${autoRefreshInterval}s`
 								: 'Refresh file tree'
@@ -1127,27 +1185,29 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 						}}
 					>
 						<RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-					</GhostIconButton>
-					<GhostIconButton
-						onClick={() => expandAllFolders(session.id, session)}
-						tooltip="Expand all folders"
+					</button>
+					<button
+						onClick={() => expandAllFolders(session.id, session, setSessions)}
+						className="p-1 rounded hover:bg-white/10 transition-colors"
+						title="Expand all folders"
 						style={{ color: theme.colors.textDim }}
 					>
 						<div className="flex flex-col items-center -space-y-1.5">
 							<ChevronUp className="w-3.5 h-3.5" />
 							<ChevronDown className="w-3.5 h-3.5" />
 						</div>
-					</GhostIconButton>
-					<GhostIconButton
-						onClick={() => collapseAllFolders(session.id)}
-						tooltip="Collapse all folders"
+					</button>
+					<button
+						onClick={() => collapseAllFolders(session.id, setSessions)}
+						className="p-1 rounded hover:bg-white/10 transition-colors"
+						title="Collapse all folders"
 						style={{ color: theme.colors.textDim }}
 					>
 						<div className="flex flex-col items-center -space-y-1.5">
 							<ChevronDown className="w-3.5 h-3.5" />
 							<ChevronUp className="w-3.5 h-3.5" />
 						</div>
-					</GhostIconButton>
+					</button>
 				</div>
 			</div>
 
@@ -1164,7 +1224,9 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 							theme={theme}
 							onRetryNow={() => {
 								// Clear retry time and trigger immediate refresh
-								updateSessionWith(session.id, (s) => ({ ...s, fileTreeRetryAt: undefined }));
+								setSessions((prev) =>
+									prev.map((s) => (s.id === session.id ? { ...s, fileTreeRetryAt: undefined } : s))
+								);
 							}}
 						/>
 					) : (
@@ -1172,7 +1234,7 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 							{/* Only show "Select New Directory" for terminal sessions, not agent sessions */}
 							{session.toolType === 'terminal' && (
 								<button
-									onClick={() => updateSessionWorkingDirectory()}
+									onClick={() => updateSessionWorkingDirectory(session.id, setSessions)}
 									className="flex items-center gap-2 px-3 py-2 rounded border hover:bg-white/5 transition-colors text-xs"
 									style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
 								>
@@ -1209,12 +1271,15 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 					{!session.fileTreeLoading &&
 						(!session.fileTree || session.fileTree.length === 0) &&
 						!fileTreeFilter && (
-							<EmptyState
-								theme={theme}
-								icon={<Folder className="w-8 h-8" />}
-								message="No files found"
-								className="gap-2 py-8"
-							/>
+							<div className="flex flex-col items-center justify-center gap-2 py-8">
+								<Folder className="w-8 h-8 opacity-30" style={{ color: theme.colors.textDim }} />
+								<div
+									className="text-xs opacity-50 text-center"
+									style={{ color: theme.colors.textDim }}
+								>
+									No files found
+								</div>
+							</div>
 						)}
 					{flattenedTree.length > 0 && (
 						<div

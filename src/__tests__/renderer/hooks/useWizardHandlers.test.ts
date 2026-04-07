@@ -18,7 +18,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
-import { createMockSession as _createMockSession } from '../../helpers/mockSession';
 
 // ============================================================================
 // Mocks
@@ -67,8 +66,8 @@ vi.mock('../../../shared/formatters', () => ({
 	formatRelativeTime: vi.fn(() => '5 minutes ago'),
 }));
 
-vi.mock('../../../shared/maestro-paths', () => ({
-	PLAYBOOKS_DIR: '.maestro/playbooks',
+vi.mock('../../../renderer/components/Wizard', () => ({
+	AUTO_RUN_FOLDER_NAME: '.maestro/playbooks',
 }));
 
 vi.mock('../../../renderer/components/BatchRunnerModal', () => ({
@@ -86,25 +85,64 @@ import { gitService } from '../../../renderer/services/git';
 import { validateNewSession } from '../../../renderer/utils/sessionValidation';
 import { parseSynopsis } from '../../../shared/synopsis';
 import type { Session, AITab } from '../../../renderer/types';
-import { createMockAITab } from '../../helpers/mockTab';
 
 // ============================================================================
 // Test Helpers
 // ============================================================================
 
-// Wrapper: old factory included a default tab and specific defaults
+const createMockTab = (overrides: Partial<AITab> = {}): AITab => ({
+	id: 'tab-1',
+	agentSessionId: 'agent-session-1',
+	name: 'Tab 1',
+	starred: false,
+	logs: [],
+	inputValue: '',
+	stagedImages: [],
+	createdAt: Date.now() - 60000,
+	state: 'idle',
+	saveToHistory: true,
+	showThinking: 'off',
+	...overrides,
+});
+
 const createMockSession = (overrides: Partial<Session> = {}): Session =>
-	_createMockSession({
+	({
+		id: 'session-1',
 		name: 'Test Agent',
+		toolType: 'claude-code',
+		state: 'idle',
 		cwd: '/projects/test',
 		fullPath: '/projects/test',
 		projectRoot: '/projects/test',
+		isGitRepo: false,
+		aiLogs: [],
+		shellLogs: [],
+		workLog: [],
+		contextUsage: 0,
+		inputMode: 'ai',
+		aiPid: 0,
+		terminalPid: 0,
 		port: 3000,
-		aiTabs: [createMockAITab({ agentSessionId: 'agent-session-1' })],
+		isLive: false,
+		changedFiles: [],
+		fileTree: [],
+		fileExplorerExpanded: [],
+		fileExplorerScrollPos: 0,
+		fileTreeAutoRefreshInterval: 180,
+		shellCwd: '/projects/test',
+		aiCommandHistory: [],
+		shellCommandHistory: [],
+		executionQueue: [],
+		activeTimeMs: 0,
+		aiTabs: [createMockTab()],
 		activeTabId: 'tab-1',
+		closedTabHistory: [],
+		filePreviewTabs: [],
+		activeFileTabId: null,
 		unifiedTabOrder: [{ type: 'ai' as const, id: 'tab-1' }],
+		unifiedClosedTabHistory: [],
 		...overrides,
-	});
+	}) as Session;
 
 const createMockDeps = (overrides: Partial<UseWizardHandlersDeps> = {}): UseWizardHandlersDeps => ({
 	inlineWizardContext: {
@@ -229,17 +267,19 @@ const createMatchingInlineWizardTabState = (wizardState: any) => ({
 });
 
 const setupMaestroMocks = () => {
-	Object.assign(window.maestro.claude, {
-		getCommands: vi.fn().mockResolvedValue([]),
-		getSkills: vi.fn().mockResolvedValue([]),
-	});
-	Object.assign(window.maestro.agents, {
-		discoverSlashCommands: vi.fn().mockResolvedValue([]),
-		get: vi.fn().mockResolvedValue({ id: 'claude-code', name: 'Claude Code' }),
-	});
-	Object.assign(window.maestro.stats, {
-		recordSessionCreated: vi.fn(),
-	});
+	(window as any).maestro = {
+		claude: {
+			getCommands: vi.fn().mockResolvedValue([]),
+			getSkills: vi.fn().mockResolvedValue([]),
+		},
+		agents: {
+			discoverSlashCommands: vi.fn().mockResolvedValue([]),
+			get: vi.fn().mockResolvedValue({ id: 'claude-code', name: 'Claude Code' }),
+		},
+		stats: {
+			recordSessionCreated: vi.fn(),
+		},
+	};
 };
 
 // ============================================================================
@@ -431,7 +471,7 @@ describe('useWizardHandlers', () => {
 		});
 
 		it('clears wizard state when wizard is no longer active on tab', async () => {
-			const tab = createMockAITab({
+			const tab = createMockTab({
 				wizardState: {
 					isActive: true,
 					isWaiting: false,
@@ -548,7 +588,7 @@ describe('useWizardHandlers', () => {
 		});
 
 		it('clears thinking content and tool executions before sending', async () => {
-			const tab = createMockAITab({
+			const tab = createMockTab({
 				wizardState: {
 					isActive: true,
 					isWaiting: false,
@@ -654,7 +694,7 @@ describe('useWizardHandlers', () => {
 				thinkingContent: '',
 				toolExecutions: [],
 			};
-			const tab = createMockAITab({ wizardState: wizState });
+			const tab = createMockTab({ wizardState: wizState });
 			const session = createMockSession({ aiTabs: [tab] });
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 
@@ -710,7 +750,7 @@ describe('useWizardHandlers', () => {
 				thinkingContent: '',
 				toolExecutions: [],
 			};
-			const tab = createMockAITab({ wizardState: wizState });
+			const tab = createMockTab({ wizardState: wizState });
 			const session = createMockSession({ aiTabs: [tab] });
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 
@@ -767,7 +807,7 @@ describe('useWizardHandlers', () => {
 				thinkingContent: '',
 				toolExecutions: [],
 			};
-			const tab = createMockAITab({ wizardState: wizState });
+			const tab = createMockTab({ wizardState: wizState });
 			const session = createMockSession({ aiTabs: [tab] });
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 
@@ -823,7 +863,7 @@ describe('useWizardHandlers', () => {
 				thinkingContent: '',
 				toolExecutions: [],
 			};
-			const tab = createMockAITab({ wizardState: wizState });
+			const tab = createMockTab({ wizardState: wizState });
 			const session = createMockSession({ aiTabs: [tab] });
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 
@@ -912,7 +952,7 @@ describe('useWizardHandlers', () => {
 		});
 
 		it('shows error log when no agent session exists', async () => {
-			const tab = createMockAITab({ agentSessionId: null });
+			const tab = createMockTab({ agentSessionId: null });
 			const session = createMockSession({ aiTabs: [tab] });
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 
@@ -930,10 +970,7 @@ describe('useWizardHandlers', () => {
 		});
 
 		it('adds time-scoped prompt when lastSynopsisTime exists', async () => {
-			const tab = createMockAITab({
-				agentSessionId: 'agent-session-1',
-				lastSynopsisTime: Date.now() - 300000,
-			});
+			const tab = createMockTab({ lastSynopsisTime: Date.now() - 300000 });
 			const session = createMockSession({ aiTabs: [tab] });
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 
@@ -1484,7 +1521,7 @@ describe('useWizardHandlers', () => {
 				thinkingContent: '',
 				subfolderName: 'api-project',
 			};
-			const tab = createMockAITab({ wizardState: wizState });
+			const tab = createMockTab({ wizardState: wizState });
 			const session = createMockSession({ aiTabs: [tab] });
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 
@@ -1546,7 +1583,7 @@ describe('useWizardHandlers', () => {
 				thinkingContent: '',
 				agentSessionId: 'wizard-agent-session-123',
 			};
-			const tab = createMockAITab({ wizardState: wizState });
+			const tab = createMockTab({ wizardState: wizState });
 			const session = createMockSession({ aiTabs: [tab] });
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 
@@ -1639,7 +1676,7 @@ describe('useWizardHandlers', () => {
 				showWizardThinking: false,
 				thinkingContent: 'old content',
 			};
-			const tab = createMockAITab({ wizardState: wizState });
+			const tab = createMockTab({ wizardState: wizState });
 			const session = createMockSession({ aiTabs: [tab] });
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 
@@ -1683,7 +1720,7 @@ describe('useWizardHandlers', () => {
 				showWizardThinking: true,
 				thinkingContent: 'existing thinking',
 			};
-			const tab = createMockAITab({ wizardState: wizState });
+			const tab = createMockTab({ wizardState: wizState });
 			const session = createMockSession({ aiTabs: [tab] });
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 

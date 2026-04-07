@@ -14,10 +14,8 @@
  */
 
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { useEventListener } from '../../hooks/utils/useEventListener';
 import { RefreshCw, Plus, Trash2, HelpCircle, ChevronDown } from 'lucide-react';
 import type { Theme, AgentConfig, AgentConfigOption } from '../../types';
-import { GhostIconButton } from '../ui/GhostIconButton';
 
 // Counter for generating stable IDs for env vars
 let envVarIdCounter = 0;
@@ -79,9 +77,8 @@ function ModelTextInput({
 	}, [availableModels, filterText]);
 
 	// Close dropdown when clicking outside
-	useEventListener(
-		'mousedown',
-		(e: MouseEvent) => {
+	useEffect(() => {
+		const handleClickOutside = (e: MouseEvent) => {
 			if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
 				setShowDropdown(false);
 				// Reset to committed value if we were filtering
@@ -90,9 +87,12 @@ function ModelTextInput({
 					setIsFiltering(false);
 				}
 			}
-		},
-		showDropdown ? document : null
-	);
+		};
+		if (showDropdown) {
+			document.addEventListener('mousedown', handleClickOutside);
+			return () => document.removeEventListener('mousedown', handleClickOutside);
+		}
+	}, [showDropdown, isFiltering]);
 
 	const isModelField = option.key === 'model';
 	const hasModels = availableModels.length > 0;
@@ -267,6 +267,9 @@ export interface AgentConfigPanelProps {
 	availableModels?: string[];
 	loadingModels?: boolean;
 	onRefreshModels?: () => void;
+	// Dynamic config options (for select fields with dynamic: true)
+	dynamicOptions?: Record<string, string[]>;
+	loadingDynamicOptions?: boolean;
 	// Agent refresh
 	onRefreshAgent?: () => void;
 	refreshingAgent?: boolean;
@@ -301,6 +304,8 @@ export function AgentConfigPanel({
 	availableModels = [],
 	loadingModels = false,
 	onRefreshModels,
+	dynamicOptions = {},
+	loadingDynamicOptions = false,
 	onRefreshAgent,
 	refreshingAgent = false,
 	compact = false,
@@ -388,15 +393,15 @@ export function AgentConfigPanel({
 				>
 					<span>{isSshEnabled ? 'Remote Command' : 'Path'}</span>
 					{onRefreshAgent && !isSshEnabled && (
-						<GhostIconButton
+						<button
 							onClick={onRefreshAgent}
-							className="flex items-center gap-1"
-							tooltip="Re-detect agent path"
+							className="p-1 rounded hover:bg-white/10 transition-colors flex items-center gap-1"
+							title="Re-detect agent path"
 							style={{ color: theme.colors.textDim }}
 						>
 							<RefreshCw className={`w-3 h-3 ${refreshingAgent ? 'animate-spin' : ''}`} />
 							<span className="text-xs">Detect</span>
-						</GhostIconButton>
+						</button>
 					)}
 				</label>
 				<div className="flex gap-2">
@@ -667,28 +672,50 @@ export function AgentConfigPanel({
 								</span>
 							</label>
 						)}
-						{option.type === 'select' && option.options && (
-							<select
-								value={agentConfig[option.key] ?? option.default ?? ''}
-								onChange={(e) => {
-									onConfigChange(option.key, e.target.value);
-									callOnConfigBlurSafely(option.key, e.target.value);
-								}}
-								onClick={(e) => e.stopPropagation()}
-								className="w-full p-2 rounded border bg-transparent outline-none text-xs cursor-pointer"
-								style={{
-									borderColor: theme.colors.border,
-									color: theme.colors.textMain,
-									backgroundColor: theme.colors.bgMain,
-								}}
-							>
-								{option.options.map((opt) => (
-									<option key={opt} value={opt} style={{ backgroundColor: theme.colors.bgMain }}>
-										{opt}
-									</option>
-								))}
-							</select>
-						)}
+						{option.type === 'select' &&
+							(() => {
+								// Dynamic selects get their options from IPC discovery
+								const opts =
+									option.dynamic && dynamicOptions[option.key]?.length
+										? dynamicOptions[option.key]
+										: option.options;
+								if (!opts || opts.length === 0) {
+									if (option.dynamic && loadingDynamicOptions) {
+										return (
+											<p className="text-xs" style={{ color: theme.colors.textDim }}>
+												Loading options...
+											</p>
+										);
+									}
+									return null;
+								}
+								return (
+									<select
+										value={agentConfig[option.key] ?? option.default ?? ''}
+										onChange={(e) => {
+											onConfigChange(option.key, e.target.value);
+											callOnConfigBlurSafely(option.key, e.target.value);
+										}}
+										onClick={(e) => e.stopPropagation()}
+										className="w-full p-2 rounded border bg-transparent outline-none text-xs cursor-pointer"
+										style={{
+											borderColor: theme.colors.border,
+											color: theme.colors.textMain,
+											backgroundColor: theme.colors.bgMain,
+										}}
+									>
+										{opts.map((opt) => (
+											<option
+												key={opt}
+												value={opt}
+												style={{ backgroundColor: theme.colors.bgMain }}
+											>
+												{opt || '(default)'}
+											</option>
+										))}
+									</select>
+								);
+							})()}
 						<p className="text-xs opacity-50 mt-2">{option.description}</p>
 					</div>
 				))}

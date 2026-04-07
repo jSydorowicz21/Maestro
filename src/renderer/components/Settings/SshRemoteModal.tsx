@@ -23,17 +23,33 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useEventListener } from '../../hooks/utils/useEventListener';
-import { useFocusAfterRender } from '../../hooks/utils/useFocusAfterRender';
-import { Server, Plus, Trash2, CheckCircle, XCircle, FileCode, ChevronDown } from 'lucide-react';
+import {
+	Server,
+	Plus,
+	Trash2,
+	CheckCircle,
+	XCircle,
+	Loader2,
+	FileCode,
+	ChevronDown,
+} from 'lucide-react';
 import type { Theme } from '../../types';
 import type { SshRemoteConfig, SshRemoteTestResult } from '../../../shared/types';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
 import { Modal, ModalFooter } from '../ui/Modal';
 import { FormInput } from '../ui/FormInput';
-import { Spinner } from '../ui';
 
-import type { SshConfigHost } from '../../../shared/types';
+/**
+ * SSH config host entry from ~/.ssh/config
+ */
+interface SshConfigHost {
+	host: string;
+	hostName?: string;
+	port?: number;
+	user?: string;
+	identityFile?: string;
+	proxyJump?: string;
+}
 
 /**
  * Environment variable entry with stable ID for editing
@@ -181,24 +197,23 @@ export function SshRemoteModal({
 	}, [isOpen, initialConfig]);
 
 	// Close dropdown when clicking outside
-	useEventListener(
-		'mousedown',
-		(event: MouseEvent) => {
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
 			if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
 				setShowSshConfigDropdown(false);
 			}
-		},
-		document
-	);
+		};
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => document.removeEventListener('mousedown', handleClickOutside);
+	}, []);
 
-	// Focus filter input when dropdown opens
-	useFocusAfterRender(filterInputRef, showSshConfigDropdown, 0);
-
-	// Reset filter and highlight when dropdown opens
+	// Reset filter and highlight when dropdown opens, focus filter input
 	useEffect(() => {
 		if (showSshConfigDropdown) {
 			setSshConfigFilter('');
 			setSshConfigHighlightIndex(0);
+			// Focus filter input after dropdown renders
+			setTimeout(() => filterInputRef.current?.focus(), 0);
 		}
 	}, [showSshConfigDropdown]);
 
@@ -450,7 +465,7 @@ export function SshRemoteModal({
 						>
 							{testing ? (
 								<>
-									<Spinner />
+									<Loader2 className="w-4 h-4 animate-spin" />
 									Testing...
 								</>
 							) : (
@@ -544,7 +559,7 @@ export function SshRemoteModal({
 							>
 								{sshConfigLoading ? (
 									<span className="flex items-center gap-2">
-										<Spinner size="xs" />
+										<Loader2 className="w-3 h-3 animate-spin" />
 										Loading...
 									</span>
 								) : (

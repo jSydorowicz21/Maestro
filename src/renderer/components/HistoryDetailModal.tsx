@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { useEventListener } from '../hooks/utils/useEventListener';
 import {
 	X,
 	Bot,
@@ -16,14 +15,13 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	AlertTriangle,
-	Cloud,
 	Server,
 } from 'lucide-react';
 import type { Theme, HistoryEntry } from '../types';
 import type { FileNode } from '../types/fileTree';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
-import { formatElapsedTime, formatTimestamp } from '../utils/formatters';
+import { formatElapsedTime } from '../utils/formatters';
 import { stripAnsiCodes } from '../../shared/stringUtils';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { generateTerminalProseStyles } from '../utils/markdownConfig';
@@ -31,7 +29,6 @@ import { calculateContextDisplay } from '../utils/contextUsage';
 import { getContextColor } from '../utils/theme';
 import { DoubleCheck } from './History';
 import { safeClipboardWrite } from '../utils/clipboard';
-import { GhostIconButton } from './ui/GhostIconButton';
 
 interface HistoryDetailModalProps {
 	theme: Theme;
@@ -68,8 +65,10 @@ export function HistoryDetailModal({
 	projectRoot,
 	onFileClick,
 }: HistoryDetailModalProps) {
-	useModalLayer(MODAL_PRIORITIES.CONFIRM, 'History Detail', onClose);
-
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
+	const layerIdRef = useRef<string>();
+	const onCloseRef = useRef(onClose);
+	onCloseRef.current = onClose;
 	const [copiedSessionId, setCopiedSessionId] = useState(false);
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 	const deleteButtonRef = useRef<HTMLButtonElement>(null);
@@ -100,6 +99,36 @@ export function HistoryDetailModal({
 		}
 	}, [hasNext, filteredEntries, currentIndex, onNavigate]);
 
+	// Register layer on mount
+	useEffect(() => {
+		const id = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.CONFIRM, // Use same priority as confirm modal
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'strict',
+			onEscape: () => {
+				onCloseRef.current();
+			},
+		});
+		layerIdRef.current = id;
+
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [registerLayer, unregisterLayer]);
+
+	// Keep escape handler up to date
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, () => {
+				onCloseRef.current();
+			});
+		}
+	}, [onClose, updateLayerHandler]);
+
 	// Focus delete button when confirmation modal appears
 	useEffect(() => {
 		if (showDeleteConfirm && deleteButtonRef.current) {
@@ -108,18 +137,34 @@ export function HistoryDetailModal({
 	}, [showDeleteConfirm]);
 
 	// Keyboard navigation for prev/next with arrow keys
-	useEventListener('keydown', (e: KeyboardEvent) => {
-		// Don't handle if delete confirmation is showing
-		if (showDeleteConfirm) return;
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			// Don't handle if delete confirmation is showing
+			if (showDeleteConfirm) return;
 
-		if (e.key === 'ArrowLeft') {
-			e.preventDefault();
-			goToPrev();
-		} else if (e.key === 'ArrowRight') {
-			e.preventDefault();
-			goToNext();
-		}
-	});
+			if (e.key === 'ArrowLeft') {
+				e.preventDefault();
+				goToPrev();
+			} else if (e.key === 'ArrowRight') {
+				e.preventDefault();
+				goToNext();
+			}
+		};
+
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
+	}, [goToPrev, goToNext, showDeleteConfirm]);
+
+	// Format timestamp
+	const formatTime = (timestamp: number) => {
+		const date = new Date(timestamp);
+		return date.toLocaleString([], {
+			month: 'short',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit',
+		});
+	};
 
 	// Get pill color based on type
 	const getPillColor = () => {
@@ -178,9 +223,12 @@ export function HistoryDetailModal({
 					style={{ borderColor: theme.colors.border }}
 				>
 					{/* Close button - absolute top right */}
-					<GhostIconButton onClick={onClose} className="absolute top-4 right-4">
+					<button
+						onClick={onClose}
+						className="absolute top-4 right-4 p-1 rounded hover:bg-white/10 transition-colors"
+					>
 						<X className="w-5 h-5" style={{ color: theme.colors.textDim }} />
-					</GhostIconButton>
+					</button>
 
 					<div className="flex flex-col gap-3 pr-8">
 						{/* Agent Name - shown as prominent header when available (from Director's Notes) */}
@@ -257,34 +305,20 @@ export function HistoryDetailModal({
 								{entry.type}
 							</span>
 
-							{/* Remote origin pills - shown for entries from other hosts */}
+							{/* Remote hostname pill - shown for entries from other hosts */}
 							{entry.hostname && (
-								<>
-									<span
-										className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
-										style={{
-											backgroundColor: theme.colors.accent + '15',
-											color: theme.colors.accent,
-											border: `1px solid ${theme.colors.accent}30`,
-										}}
-										title="Entry synced from remote host"
-									>
-										<Cloud className="w-2.5 h-2.5" />
-										Remote
-									</span>
-									<span
-										className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold"
-										style={{
-											backgroundColor: theme.colors.bgActivity,
-											color: theme.colors.textDim,
-											border: `1px solid ${theme.colors.border}`,
-										}}
-										title={`Origin: ${entry.hostname}`}
-									>
-										<Server className="w-2.5 h-2.5" />
-										{entry.hostname}
-									</span>
-								</>
+								<span
+									className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold"
+									style={{
+										backgroundColor: theme.colors.bgActivity,
+										color: theme.colors.textDim,
+										border: `1px solid ${theme.colors.border}`,
+									}}
+									title={`Origin: ${entry.hostname}`}
+								>
+									<Server className="w-2.5 h-2.5" />
+									{entry.hostname}
+								</span>
 							)}
 
 							{/* Agent Name Pill - shown inline when agentName exists but isn't already in the header */}
@@ -351,7 +385,7 @@ export function HistoryDetailModal({
 
 							{/* Timestamp */}
 							<span className="text-xs" style={{ color: theme.colors.textDim }}>
-								{formatTimestamp(entry.timestamp, 'datetime')}
+								{formatTime(entry.timestamp)}
 							</span>
 
 							{/* CUE metadata */}

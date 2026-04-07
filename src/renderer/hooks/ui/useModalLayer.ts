@@ -1,28 +1,17 @@
 /**
- * useModalLayer - Reusable hook for modal/overlay layer stack registration
+ * useModalLayer - Reusable hook for modal layer stack registration
  *
- * This hook encapsulates the common pattern of registering a layer with the
+ * This hook encapsulates the common pattern of registering a modal with the
  * centralized layer stack. It handles:
- * - Layer registration on mount (modal or overlay)
+ * - Layer registration on mount
  * - Layer unregistration on unmount
  * - Handler updates when the escape callback changes
- * - Type-appropriate defaults (modals: strict focus trap, blocks lower layers;
- *   overlays: no focus trap, does not block lower layers)
  *
  * Usage:
  * ```tsx
- * // Modal (default)
  * function MyModal({ onClose }: { onClose: () => void }) {
  *   useModalLayer(MODAL_PRIORITIES.MY_MODAL, 'My Modal', onClose);
- *   return <div>...</div>;
- * }
  *
- * // Overlay
- * function MyOverlay({ onClose }: { onClose: () => void }) {
- *   useModalLayer(MODAL_PRIORITIES.MY_OVERLAY, 'My Overlay', onClose, {
- *     type: 'overlay',
- *     allowClickOutside: true,
- *   });
  *   return <div>...</div>;
  * }
  * ```
@@ -43,53 +32,40 @@
 
 import { useEffect, useRef } from 'react';
 import { useLayerStack } from '../../contexts/LayerStackContext';
-import type { FocusTrapMode, LayerType } from '../../types/layer';
+import type { FocusTrapMode } from '../../types/layer';
 
 export interface UseModalLayerOptions {
-	/** Whether the layer is currently active. When false, the layer is not registered. Defaults to true */
-	isOpen?: boolean;
-	/** Layer type. Defaults to 'modal' */
-	type?: LayerType;
-	/** Whether the modal has unsaved changes (modal-only) */
+	/** Whether the modal has unsaved changes */
 	isDirty?: boolean;
-	/** Callback to confirm closing when dirty - return false to prevent close (modal-only) */
+	/** Callback to confirm closing when dirty - return false to prevent close */
 	onBeforeClose?: () => boolean | Promise<boolean>;
-	/** Focus trap behavior. Defaults to 'strict' for modals, 'none' for overlays */
+	/** Focus trap behavior. Defaults to 'strict' */
 	focusTrap?: FocusTrapMode;
-	/** Whether this layer blocks interaction with layers below. Defaults to true for modals, false for overlays */
+	/** Whether this layer blocks interaction with layers below. Defaults to true */
 	blocksLowerLayers?: boolean;
-	/** Whether this layer captures keyboard focus. Defaults to true for modals, false for overlays */
+	/** Whether this layer captures keyboard focus. Defaults to true */
 	capturesFocus?: boolean;
-	/** Whether clicking outside the overlay should close it (overlay-only). Defaults to true */
-	allowClickOutside?: boolean;
 }
 
 /**
- * Register a modal or overlay with the layer stack
+ * Register a modal with the layer stack
  *
- * @param priority - Layer priority from MODAL_PRIORITIES constant
- * @param ariaLabel - Accessibility label for the layer
+ * @param priority - Modal priority from MODAL_PRIORITIES constant
+ * @param ariaLabel - Accessibility label for the modal
  * @param onEscape - Callback when Escape is pressed (typically onClose)
  * @param options - Additional options for layer configuration
  *
  * @example
- * // Simple modal (default)
+ * // Simple usage
  * useModalLayer(MODAL_PRIORITIES.SETTINGS, 'Settings', onClose);
  *
  * @example
- * // Modal with dirty check
+ * // With options
  * useModalLayer(MODAL_PRIORITIES.EDITOR, 'Editor', onClose, {
  *   isDirty: hasUnsavedChanges,
  *   onBeforeClose: async () => {
  *     return await confirmDiscard();
  *   }
- * });
- *
- * @example
- * // Overlay layer
- * useModalLayer(MODAL_PRIORITIES.FILE_PREVIEW, 'File Preview', onClose, {
- *   type: 'overlay',
- *   allowClickOutside: false,
  * });
  */
 export function useModalLayer(
@@ -99,63 +75,39 @@ export function useModalLayer(
 	options: UseModalLayerOptions = {}
 ): void {
 	const {
-		isOpen = true,
-		type = 'modal',
 		isDirty,
 		onBeforeClose,
-		allowClickOutside = true,
+		focusTrap = 'strict',
+		blocksLowerLayers = true,
+		capturesFocus = true,
 	} = options;
-
-	// Defaults differ by layer type
-	const isOverlay = type === 'overlay';
-	const focusTrap = options.focusTrap ?? (isOverlay ? 'none' : 'strict');
-	const blocksLowerLayers = options.blocksLowerLayers ?? !isOverlay;
-	const capturesFocus = options.capturesFocus ?? !isOverlay;
 
 	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
 	const layerIdRef = useRef<string>();
 
-	// Register layer on mount (only when isOpen is true)
+	// Register layer on mount
 	useEffect(() => {
-		if (!isOpen) return;
-
-		const layerConfig = isOverlay
-			? {
-					type: 'overlay' as const,
-					priority,
-					blocksLowerLayers,
-					capturesFocus,
-					focusTrap,
-					ariaLabel,
-					allowClickOutside,
-					onEscape,
-				}
-			: {
-					type: 'modal' as const,
-					priority,
-					blocksLowerLayers,
-					capturesFocus,
-					focusTrap,
-					ariaLabel,
-					isDirty,
-					onBeforeClose,
-					onEscape,
-				};
-
-		const id = registerLayer(layerConfig);
+		const id = registerLayer({
+			type: 'modal',
+			priority,
+			blocksLowerLayers,
+			capturesFocus,
+			focusTrap,
+			ariaLabel,
+			isDirty,
+			onBeforeClose,
+			onEscape,
+		});
 		layerIdRef.current = id;
 
 		return () => {
 			if (layerIdRef.current) {
 				unregisterLayer(layerIdRef.current);
-				layerIdRef.current = undefined;
 			}
 		};
 	}, [
-		isOpen,
 		registerLayer,
 		unregisterLayer,
-		isOverlay,
 		priority,
 		ariaLabel,
 		blocksLowerLayers,
@@ -163,13 +115,12 @@ export function useModalLayer(
 		focusTrap,
 		isDirty,
 		onBeforeClose,
-		allowClickOutside,
 	]);
 
 	// Update handler when onEscape changes (without re-registering)
 	useEffect(() => {
-		if (isOpen && layerIdRef.current) {
+		if (layerIdRef.current) {
 			updateLayerHandler(layerIdRef.current, onEscape);
 		}
-	}, [isOpen, onEscape, updateLayerHandler]);
+	}, [onEscape, updateLayerHandler]);
 }

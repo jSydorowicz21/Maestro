@@ -1,13 +1,12 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, FileText, Variable, ChevronDown, ChevronRight } from 'lucide-react';
 import type { Theme } from '../types';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { TEMPLATE_VARIABLES } from '../utils/templateVariables';
 import { useTemplateAutocomplete } from '../hooks';
 import { TemplateAutocompleteDropdown } from './TemplateAutocompleteDropdown';
 import { estimateTokenCount } from '../../shared/formatters';
-import { GhostIconButton } from './ui/GhostIconButton';
 
 interface AgentPromptComposerModalProps {
 	isOpen: boolean;
@@ -27,6 +26,7 @@ export function AgentPromptComposerModal({
 	const [value, setValue] = useState(initialValue);
 	const [variablesExpanded, setVariablesExpanded] = useState(false);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const { registerLayer, unregisterLayer } = useLayerStack();
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
 	const onSubmitRef = useRef(onSubmit);
@@ -66,20 +66,29 @@ export function AgentPromptComposerModal({
 		}
 	}, [isOpen]);
 
-	// Escape handler for layer stack
-	const handleEscape = useCallback(() => {
-		if (autocompleteState.isOpen) {
-			closeAutocomplete();
-			return;
+	// Register with layer stack for Escape handling
+	useEffect(() => {
+		if (isOpen) {
+			const id = registerLayer({
+				type: 'modal',
+				priority: MODAL_PRIORITIES.AGENT_PROMPT_COMPOSER,
+				blocksLowerLayers: true,
+				capturesFocus: true,
+				focusTrap: 'strict',
+				onEscape: () => {
+					// If autocomplete is open, close it instead of the modal
+					if (autocompleteState.isOpen) {
+						closeAutocomplete();
+						return;
+					}
+					// Save the current value back before closing
+					onSubmitRef.current(valueRef.current);
+					onCloseRef.current();
+				},
+			});
+			return () => unregisterLayer(id);
 		}
-		onSubmitRef.current(valueRef.current);
-		onCloseRef.current();
-	}, [autocompleteState.isOpen, closeAutocomplete]);
-
-	useModalLayer(MODAL_PRIORITIES.AGENT_PROMPT_COMPOSER, 'Agent Prompt Editor', handleEscape, {
-		isOpen,
-		focusTrap: 'strict',
-	});
+	}, [isOpen, registerLayer, unregisterLayer, autocompleteState.isOpen, closeAutocomplete]);
 
 	if (!isOpen) return null;
 
@@ -142,9 +151,13 @@ export function AgentPromptComposerModal({
 						</span>
 					</div>
 					<div className="flex items-center gap-3">
-						<GhostIconButton size="md" onClick={handleDone} tooltip="Close (Escape)">
+						<button
+							onClick={handleDone}
+							className="p-1.5 rounded hover:bg-white/10 transition-colors"
+							title="Close (Escape)"
+						>
 							<X className="w-5 h-5" style={{ color: theme.colors.textDim }} />
-						</GhostIconButton>
+						</button>
 					</div>
 				</div>
 

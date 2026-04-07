@@ -14,19 +14,15 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
-import { Search, ArrowRight, X, Circle } from 'lucide-react';
-import { EmptyState, Spinner } from './ui';
+import { Search, ArrowRight, X, Loader2, Circle } from 'lucide-react';
 import type { Theme, Session, AITab, ToolType } from '../types';
 import type { MergeResult } from '../types/contextMerge';
 import { fuzzyMatchWithScore } from '../utils/search';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { formatTokensCompact } from '../utils/formatters';
-import { estimateTokensFromLogs } from '../../shared/formatters';
 import { getAgentIcon } from '../constants/agentIcons';
 import { ScreenReaderAnnouncement, useAnnouncement } from './Wizard/ScreenReaderAnnouncement';
-import { GhostIconButton } from './ui/GhostIconButton';
 
 /**
  * Session availability status for display in the selection list
@@ -111,6 +107,15 @@ function getSessionDisplayName(session: Session): string {
 }
 
 /**
+ * Estimate token count from log entries
+ * Uses a simple heuristic: ~4 characters per token (average for English text)
+ */
+function estimateTokens(logs: { text: string }[]): number {
+	const totalChars = logs.reduce((sum, log) => sum + (log.text?.length || 0), 0);
+	return Math.round(totalChars / 4);
+}
+
+/**
  * Get display name for a tab
  */
 function getTabDisplayName(tab: AITab): string {
@@ -153,19 +158,57 @@ export function SendToAgentModal({
 
 	// Refs
 	const inputRef = useRef<HTMLInputElement>(null);
+	const layerIdRef = useRef<string>();
+	const onCloseRef = useRef(onClose);
 	const selectedItemRef = useRef<HTMLButtonElement>(null);
+
+	// Keep onClose ref up to date
+	useEffect(() => {
+		onCloseRef.current = onClose;
+	});
 
 	const handleSearchQueryChange = useCallback((value: string) => {
 		setSearchQuery(value);
 		setSelectedIndex(0);
 	}, []);
 
-	useModalLayer(MODAL_PRIORITIES.SEND_TO_AGENT, 'Send Context to Agent', onClose, {
-		isOpen,
-	});
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
 
-	// Focus input when modal opens
-	useFocusAfterRender(inputRef, isOpen, 50);
+	// Register layer on mount
+	useEffect(() => {
+		if (!isOpen) return;
+
+		layerIdRef.current = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.SEND_TO_AGENT,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'strict',
+			ariaLabel: 'Send Context to Agent',
+			onEscape: () => onCloseRef.current(),
+		});
+
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [isOpen, registerLayer, unregisterLayer]);
+
+	// Update handler when onClose changes
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, () => onCloseRef.current());
+		}
+	}, [updateLayerHandler]);
+
+	// Focus input on mount
+	useEffect(() => {
+		if (isOpen) {
+			const timer = setTimeout(() => inputRef.current?.focus(), 50);
+			return () => clearTimeout(timer);
+		}
+	}, [isOpen]);
 
 	// Reset state when modal opens
 	useEffect(() => {
@@ -184,7 +227,7 @@ export function SendToAgentModal({
 
 	const sourceTokens = useMemo(() => {
 		if (!sourceTab) return 0;
-		return estimateTokensFromLogs(sourceTab.logs);
+		return estimateTokens(sourceTab.logs);
 	}, [sourceTab]);
 
 	// Build list of sessions with status (excluding the source session and terminal-only sessions)
@@ -427,13 +470,15 @@ export function SendToAgentModal({
 							Send Context to Agent
 						</h2>
 					</div>
-					<GhostIconButton
+					<button
+						type="button"
 						onClick={onClose}
+						className="p-1 rounded hover:bg-white/10 transition-colors"
 						style={{ color: theme.colors.textDim }}
 						aria-label="Close dialog"
 					>
 						<X className="w-4 h-4" aria-hidden="true" />
-					</GhostIconButton>
+					</button>
 				</div>
 
 				{/* Description for screen readers */}
@@ -481,11 +526,13 @@ export function SendToAgentModal({
 						aria-label="Available sessions"
 					>
 						{filteredSessions.length === 0 ? (
-							<EmptyState
-								theme={theme}
-								message={searchQuery ? 'No matching sessions found' : 'No other sessions available'}
-								className="p-4"
-							/>
+							<div
+								className="p-4 text-center text-sm"
+								style={{ color: theme.colors.textDim }}
+								role="status"
+							>
+								{searchQuery ? 'No matching sessions found' : 'No other sessions available'}
+							</div>
 						) : (
 							<div className="space-y-1" role="presentation">
 								{filteredSessions.map((session, index) => {
@@ -565,7 +612,7 @@ export function SendToAgentModal({
 												aria-hidden="true"
 											>
 												{session.status === 'idle' && <Circle className="w-2 h-2 fill-current" />}
-												{session.status === 'busy' && <Spinner size="xs" />}
+												{session.status === 'busy' && <Loader2 className="w-3 h-3 animate-spin" />}
 												{getStatusLabel(session.status)}
 											</div>
 
@@ -685,7 +732,7 @@ export function SendToAgentModal({
 					>
 						{isSending ? (
 							<>
-								<Spinner aria-hidden="true" />
+								<Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
 								Sending...
 							</>
 						) : (

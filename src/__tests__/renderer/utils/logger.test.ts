@@ -6,18 +6,22 @@ describe('logger', () => {
 	let originalMaestro: typeof window.maestro;
 
 	beforeEach(() => {
-		// Save original maestro (needed for restore after undefined/null tests)
+		// Save original maestro
 		originalMaestro = window.maestro;
 
 		// Create mock log function
 		logSpy = vi.fn();
 
-		// Override window.maestro.logger with local mock (setup.ts provides base)
-		Object.assign(window.maestro.logger, { log: logSpy });
+		// Set up window.maestro mock with logger
+		(window as any).maestro = {
+			logger: {
+				log: logSpy,
+			},
+		};
 	});
 
 	afterEach(() => {
-		// Restore original maestro (needed after undefined/null tests)
+		// Restore original maestro
 		(window as any).maestro = originalMaestro;
 	});
 

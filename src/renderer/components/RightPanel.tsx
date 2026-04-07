@@ -10,13 +10,13 @@ import React, {
 import {
 	PanelRightClose,
 	PanelRightOpen,
+	Loader2,
 	GitBranch,
 	Skull,
 	AlertTriangle,
 	Play,
 	XCircle,
 } from 'lucide-react';
-import { Spinner } from './ui';
 import type { Session, Theme, RightPanelTab, BatchRunState } from '../types';
 import type { FileTreeChanges } from '../utils/fileExplorer';
 import { FileExplorerPanel } from './FileExplorerPanel';
@@ -31,9 +31,7 @@ import { useUIStore } from '../stores/uiStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useFileExplorerStore } from '../stores/fileExplorerStore';
 import { useBatchStore } from '../stores/batchStore';
-import { updateSessionWith } from '../stores/sessionStore';
-import { useActiveSession } from '../hooks/session/useActiveSession';
-import { formatElapsedTime } from '../../shared/formatters';
+import { useSessionStore } from '../stores/sessionStore';
 
 export interface RightPanelHandle {
 	refreshHistoryPanel: () => void;
@@ -55,11 +53,25 @@ interface RightPanelProps {
 	fileTreeFilterInputRef: React.RefObject<HTMLInputElement>;
 
 	// File explorer handlers
-	toggleFolder: (path: string, activeSessionId: string) => void;
+	toggleFolder: (
+		path: string,
+		activeSessionId: string,
+		setSessions: React.Dispatch<React.SetStateAction<Session[]>>
+	) => void;
 	handleFileClick: (node: any, path: string, activeSession: Session) => Promise<void>;
-	expandAllFolders: (activeSessionId: string, activeSession: Session) => void;
-	collapseAllFolders: (activeSessionId: string) => void;
-	updateSessionWorkingDirectory: () => Promise<void>;
+	expandAllFolders: (
+		activeSessionId: string,
+		activeSession: Session,
+		setSessions: React.Dispatch<React.SetStateAction<Session[]>>
+	) => void;
+	collapseAllFolders: (
+		activeSessionId: string,
+		setSessions: React.Dispatch<React.SetStateAction<Session[]>>
+	) => void;
+	updateSessionWorkingDirectory: (
+		activeSessionId: string,
+		setSessions: React.Dispatch<React.SetStateAction<Session[]>>
+	) => Promise<void>;
 	refreshFileTree: (sessionId: string) => Promise<FileTreeChanges | undefined>;
 	onAutoRefreshChange?: (interval: number) => void;
 	onShowFlash?: (message: string) => void;
@@ -104,7 +116,11 @@ interface RightPanelProps {
 export const RightPanel = memo(
 	forwardRef<RightPanelHandle, RightPanelProps>(function RightPanel(props, ref) {
 		// === State from stores (direct subscriptions — no prop drilling) ===
-		const session = useActiveSession();
+		const session = useSessionStore(
+			(s) => s.sessions.find((x) => x.id === s.activeSessionId) ?? null
+		);
+		const setSessions = useSessionStore((s) => s.setSessions);
+
 		const rightPanelOpen = useUIStore((s) => s.rightPanelOpen);
 		const activeRightTab = useUIStore((s) => s.activeRightTab);
 		const activeFocus = useUIStore((s) => s.activeFocus);
@@ -131,6 +147,16 @@ export const RightPanel = memo(
 		const autoRunDocumentTree = useBatchStore((s) => s.documentTree);
 		const autoRunIsLoadingDocuments = useBatchStore((s) => s.isLoadingDocuments);
 		const autoRunDocumentTaskCounts = useBatchStore((s) => s.documentTaskCounts);
+
+		// Direct store subscription for error state — the prop chain passes error state
+		// through updateBatchStateAndBroadcast/UPDATE_PROGRESS which drops error fields.
+		const sessionId = session?.id;
+		const errorPaused = useBatchStore(
+			useCallback((s) => s.batchRunStates[sessionId ?? '']?.errorPaused ?? false, [sessionId])
+		);
+		const batchError = useBatchStore(
+			useCallback((s) => s.batchRunStates[sessionId ?? '']?.error, [sessionId])
+		);
 
 		// === Props (domain-hook handlers + theme + batch state + refs) ===
 		const {
@@ -258,7 +284,20 @@ export const RightPanel = memo(
 			});
 		}, []);
 
-		const formatElapsed = formatElapsedTime;
+		// Format elapsed time from milliseconds
+		const formatElapsed = useCallback((ms: number) => {
+			const seconds = Math.floor(ms / 1000);
+			const minutes = Math.floor(seconds / 60);
+			const hours = Math.floor(minutes / 60);
+
+			if (hours > 0) {
+				return `${hours}h ${minutes % 60}m`;
+			} else if (minutes > 0) {
+				return `${minutes}m ${seconds % 60}s`;
+			} else {
+				return `${seconds}s`;
+			}
+		}, []);
 
 		// Update elapsed time display using wall clock time from startTime
 		// Uses an interval to update every second while running
@@ -444,7 +483,11 @@ export const RightPanel = memo(
 						// Only track scroll position for file explorer tab
 						if (activeRightTab === 'files') {
 							const scrollTop = e.currentTarget.scrollTop;
-							updateSessionWith(session.id, (s) => ({ ...s, fileExplorerScrollPos: scrollTop }));
+							setSessions((prev) =>
+								prev.map((s) =>
+									s.id === session.id ? { ...s, fileExplorerScrollPos: scrollTop } : s
+								)
+							);
 						}
 					}}
 				>
@@ -474,6 +517,7 @@ export const RightPanel = memo(
 							collapseAllFolders={collapseAllFolders}
 							updateSessionWorkingDirectory={updateSessionWorkingDirectory}
 							refreshFileTree={refreshFileTree}
+							setSessions={setSessions}
 							onAutoRefreshChange={onAutoRefreshChange}
 							onShowFlash={onShowFlash}
 							showHiddenFiles={showHiddenFiles}
@@ -518,23 +562,22 @@ export const RightPanel = memo(
 					<div
 						className="mx-4 mb-4 px-4 py-3 rounded border flex-shrink-0"
 						style={{
-							backgroundColor: currentSessionBatchState.errorPaused
-								? `${theme.colors.error}15`
-								: theme.colors.bgActivity,
-							borderColor: currentSessionBatchState.errorPaused
-								? theme.colors.error
-								: theme.colors.warning,
+							backgroundColor: errorPaused ? `${theme.colors.error}15` : theme.colors.bgActivity,
+							borderColor: errorPaused ? theme.colors.error : theme.colors.warning,
 						}}
 					>
 						{/* Header with status and elapsed time */}
 						<div className="flex items-center justify-between mb-2">
 							<div className="flex items-center gap-2">
-								{currentSessionBatchState.errorPaused ? (
+								{errorPaused ? (
 									<AlertTriangle className="w-4 h-4" style={{ color: theme.colors.error }} />
 								) : (
-									<Spinner style={{ color: theme.colors.warning }} />
+									<Loader2
+										className="w-4 h-4 animate-spin"
+										style={{ color: theme.colors.warning }}
+									/>
 								)}
-								{currentSessionBatchState.errorPaused ? (
+								{errorPaused ? (
 									<button
 										onClick={() => setActiveRightTab('autorun')}
 										className="text-xs font-bold uppercase cursor-pointer hover:underline"
@@ -668,7 +711,7 @@ export const RightPanel = memo(
 												: 0
 									}%`,
 									backgroundColor:
-										currentSessionBatchState.isStopping || currentSessionBatchState.errorPaused
+										currentSessionBatchState.isStopping || errorPaused
 											? theme.colors.error
 											: theme.colors.warning,
 								}}
@@ -680,13 +723,11 @@ export const RightPanel = memo(
 							<span
 								className="text-[10px] min-w-0 flex-1 truncate"
 								style={{
-									color: currentSessionBatchState.errorPaused
-										? theme.colors.error
-										: theme.colors.textDim,
+									color: errorPaused ? theme.colors.error : theme.colors.textDim,
 								}}
 							>
-								{currentSessionBatchState.errorPaused
-									? currentSessionBatchState.error?.message || 'Paused due to error'
+								{errorPaused
+									? batchError?.message || 'Paused due to error'
 									: currentSessionBatchState.isStopping
 										? 'Waiting for current task to complete before stopping...'
 										: currentSessionBatchState.totalTasksAcrossAllDocs > 0
@@ -694,9 +735,9 @@ export const RightPanel = memo(
 											: `${currentSessionBatchState.completedTasks} of ${currentSessionBatchState.totalTasks} tasks completed`}
 							</span>
 							{/* Resume/Abort buttons when error-paused */}
-							{currentSessionBatchState.errorPaused && (
+							{errorPaused && (
 								<div className="flex items-center gap-1.5 shrink-0">
-									{currentSessionBatchState.error?.recoverable && onResumeAfterError && (
+									{batchError?.recoverable && onResumeAfterError && (
 										<button
 											onClick={onResumeAfterError}
 											className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors hover:opacity-80"

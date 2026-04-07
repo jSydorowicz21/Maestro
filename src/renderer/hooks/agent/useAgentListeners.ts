@@ -27,8 +27,9 @@ import type {
 	UsageStats,
 } from '../../types';
 import { notifyToast } from '../../stores/notificationStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import type { HistoryEntryInput } from './useAgentSessionManagement';
-import { useSessionStore, updateAiTab, updateSessionWith } from '../../stores/sessionStore';
+import { useSessionStore } from '../../stores/sessionStore';
 import { useModalStore } from '../../stores/modalStore';
 import { gitService } from '../../services/git';
 import { generateId } from '../../utils/ids';
@@ -50,7 +51,6 @@ import { parseSynopsis } from '../../../shared/synopsis';
 import { autorunSynopsisPrompt } from '../../../prompts';
 import type { RightPanelHandle } from '../../components/RightPanel';
 import { useGroupChatStore } from '../../stores/groupChatStore';
-import { captureException } from '../../utils/sentry';
 
 // ============================================================================
 // Types
@@ -107,6 +107,7 @@ export interface UseAgentListenersDeps {
 				response?: string;
 				agentSessionId?: string;
 				usageStats?: UsageStats;
+				contextUsage?: number;
 		  }>)
 		| null
 	>;
@@ -238,9 +239,6 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 				console.error(
 					'[onData] No target tab found - session has no aiTabs, this should not happen'
 				);
-				captureException(new Error('No target tab found in onData'), {
-					extra: { context: 'useAgentListeners.onData', sessionId: actualSessionId },
-				});
 				return;
 			}
 
@@ -252,21 +250,24 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 			// Clear error state if session had an error but is now receiving successful data
 			const sessionForErrorCheck = getSessions().find((s) => s.id === actualSessionId);
 			if (sessionForErrorCheck?.agentError) {
-				updateSessionWith(actualSessionId, (s) => ({
-					...s,
-					agentError: undefined,
-					agentErrorTabId: undefined,
-					agentErrorPaused: false,
-					state: 'busy' as SessionState,
-					aiTabs: s.aiTabs.map((tab) =>
-						tab.id === targetTabId ? { ...tab, agentError: undefined } : tab
-					),
-				}));
+				setSessions((prev) =>
+					prev.map((s) => {
+						if (s.id !== actualSessionId) return s;
+						const updatedAiTabs = s.aiTabs.map((tab) =>
+							tab.id === targetTabId ? { ...tab, agentError: undefined } : tab
+						);
+						return {
+							...s,
+							agentError: undefined,
+							agentErrorTabId: undefined,
+							agentErrorPaused: false,
+							state: 'busy' as SessionState,
+							aiTabs: updatedAiTabs,
+						};
+					})
+				);
 				window.maestro.agentError.clearError(actualSessionId).catch((err) => {
 					console.error('Failed to clear agent error on successful data:', err);
-					captureException(err, {
-						extra: { context: 'useAgentListeners.clearAgentError', sessionId: actualSessionId },
-					});
 				});
 			}
 
@@ -333,9 +334,6 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						}
 					} catch (error) {
 						console.error('[onExit] Failed to verify process status:', error);
-						captureException(error, {
-							extra: { context: 'useAgentListeners.onExit.verifyProcessStatus' },
-						});
 					}
 				}
 
@@ -506,7 +504,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 					}
 				}
 
-				// Complex multi-branch exit logic (error/queue/idle paths with tab state) - kept inline
+				// Update state (pure function - no side effects)
 				setSessions((prev) =>
 					prev.map((s) => {
 						if (s.id !== actualSessionId) return s;
@@ -522,6 +520,9 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 																...tab,
 																state: 'idle' as const,
 																thinkingStartTime: undefined,
+																// Clear stale agentSessionId so the next spawn
+																// starts a fresh session instead of trying --resume
+																agentSessionId: null,
 															}
 														: tab;
 												} else {
@@ -530,6 +531,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 																...tab,
 																state: 'idle' as const,
 																thinkingStartTime: undefined,
+																agentSessionId: null,
 															}
 														: tab;
 												}
@@ -575,6 +577,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 										return {
 											...tab,
 											state: 'idle' as const,
+											agentSessionId: null,
 										};
 									}
 									return tab;
@@ -619,6 +622,9 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 															...tab,
 															state: 'idle' as const,
 															thinkingStartTime: undefined,
+															// Preserve agentSessionId for session resume —
+															// stale IDs are cleared by onAgentError when
+															// session_not_found is detected
 														}
 													: tab;
 											} else {
@@ -853,18 +859,28 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 									fullResponse: parsed.fullSynopsis,
 									agentSessionId: synopsisData!.agentSessionId,
 									usageStats: result.usageStats,
+									contextUsage: result.contextUsage,
 									sessionId: synopsisData!.sessionId,
 									projectPath: synopsisData!.cwd,
 									sessionName: synopsisData!.tabName,
 									elapsedTimeMs: synopsisData!.taskDuration,
 								});
 
-								if (synopsisData!.tabId) {
-									updateAiTab(synopsisData!.sessionId, synopsisData!.tabId, (tab) => ({
-										...tab,
-										lastSynopsisTime: synopsisTime,
-									}));
-								}
+								setSessions((prev) =>
+									prev.map((s) => {
+										if (s.id !== synopsisData!.sessionId) return s;
+										return {
+											...s,
+											aiTabs: s.aiTabs.map((tab) => {
+												if (tab.id !== synopsisData!.tabId) return tab;
+												return {
+													...tab,
+													lastSynopsisTime: synopsisTime,
+												};
+											}),
+										};
+									})
+								);
 
 								notifyToast({
 									type: 'info',
@@ -878,6 +894,17 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 									tabName: synopsisData!.tabName,
 									skipCustomNotification: true,
 								});
+
+								// Speak synopsis via TTS if audio feedback is enabled
+								// (mirrors the batch processor pattern in useBatchProcessor.ts)
+								const { audioFeedbackEnabled, audioFeedbackCommand } = useSettingsStore.getState();
+								if (audioFeedbackEnabled && audioFeedbackCommand && parsed.shortSummary) {
+									window.maestro.notification
+										.speak(parsed.shortSummary, audioFeedbackCommand)
+										.catch((err) => {
+											console.error('[onProcessExit] Failed to speak synopsis:', err);
+										});
+								}
 
 								if (deps.rightPanelRef.current) {
 									deps.rightPanelRef.current.refreshHistoryPanel();
@@ -895,9 +922,6 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						})
 						.catch((err) => {
 							console.error('[onProcessExit] Synopsis failed:', err);
-							captureException(err, {
-								extra: { context: 'useAgentListeners.onProcessExit.synopsis' },
-							});
 						});
 				}
 			}
@@ -916,19 +940,13 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 				const actualSessionId = parsed.actualSessionId;
 				const tabId = parsed.tabId ?? undefined;
 
-				// Complex multi-tab update with side effects (registerSessionOrigin) - kept inline
 				setSessions((prev) => {
 					const session = prev.find((s) => s.id === actualSessionId);
 					if (!session) return prev;
 
 					window.maestro.agentSessions
 						.registerSessionOrigin(session.projectRoot, agentSessionId, 'user')
-						.catch((err) => {
-							console.error('[onSessionId] Failed to register session origin:', err);
-							captureException(err, {
-								extra: { context: 'useAgentListeners.onSessionId.registerOrigin' },
-							});
-						});
+						.catch((err) => console.error('[onSessionId] Failed to register session origin:', err));
 
 					return prev.map((s) => {
 						if (s.id !== actualSessionId) return s;
@@ -949,9 +967,6 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 							console.error(
 								'[onSessionId] No target tab found - session has no aiTabs, storing at session level only'
 							);
-							captureException(new Error('No target tab in onSessionId'), {
-								extra: { context: 'useAgentListeners.onSessionId', sessionId: actualSessionId },
-							});
 							return { ...s, agentSessionId };
 						}
 
@@ -1223,38 +1238,45 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 					agentError: isSessionNotFound ? undefined : agentError,
 				};
 
-				updateSessionWith(actualSessionId, (s) => {
-					const targetTab = tabIdFromSession
-						? s.aiTabs.find((tab) => tab.id === tabIdFromSession)
-						: getActiveTab(s);
-					const updatedAiTabs = targetTab
-						? s.aiTabs.map((tab) =>
-								tab.id === targetTab.id
-									? {
-											...tab,
-											logs: [...tab.logs, errorLogEntry],
-											agentError: isSessionNotFound ? undefined : agentError,
-										}
-									: tab
-							)
-						: s.aiTabs;
+				setSessions((prev) =>
+					prev.map((s) => {
+						if (s.id !== actualSessionId) return s;
 
-					if (isSessionNotFound) {
+						const targetTab = tabIdFromSession
+							? s.aiTabs.find((tab) => tab.id === tabIdFromSession)
+							: getActiveTab(s);
+						const updatedAiTabs = targetTab
+							? s.aiTabs.map((tab) =>
+									tab.id === targetTab.id
+										? {
+												...tab,
+												logs: [...tab.logs, errorLogEntry],
+												agentError: isSessionNotFound ? undefined : agentError,
+												// Clear stale agentSessionId on session_not_found so the next
+												// spawn starts a fresh session instead of retrying --resume
+												...(isSessionNotFound ? { agentSessionId: null } : {}),
+											}
+										: tab
+								)
+							: s.aiTabs;
+
+						if (isSessionNotFound) {
+							return {
+								...s,
+								aiTabs: updatedAiTabs,
+							};
+						}
+
 						return {
 							...s,
+							agentError,
+							agentErrorTabId: targetTab?.id,
+							agentErrorPaused: true,
+							state: 'error' as SessionState,
 							aiTabs: updatedAiTabs,
 						};
-					}
-
-					return {
-						...s,
-						agentError,
-						agentErrorTabId: targetTab?.id,
-						agentErrorPaused: true,
-						state: 'error' as SessionState,
-						aiTabs: updatedAiTabs,
-					};
-				});
+					})
+				);
 
 				// Check if there's an active batch run and pause it
 				if (deps.getBatchStateRef.current && deps.pauseBatchOnErrorRef.current) {
@@ -1350,7 +1372,6 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						buffer.clear();
 						thinkingChunkRafIdRef.current = null;
 
-						// Complex multi-session, multi-tab buffer processing - kept inline
 						setSessions((prev) =>
 							prev.map((s) => {
 								let hasChanges = false;
@@ -1502,12 +1523,6 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 								}
 							} catch (err) {
 								console.error(`[SSH] Failed to check git repo status for ${actualSessionId}:`, err);
-								captureException(err, {
-									extra: {
-										context: 'useAgentListeners.sshGitRepoCheck',
-										sessionId: actualSessionId,
-									},
-								});
 							}
 						})();
 					}
@@ -1533,25 +1548,36 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 				const actualSessionId = aiTabMatch[1];
 				const tabId = aiTabMatch[2];
 
-				// Check if the tab has thinking enabled before updating
-				const session = getSessions().find((s) => s.id === actualSessionId);
-				const targetTab = session?.aiTabs.find((t) => t.id === tabId);
-				if (!targetTab?.showThinking || targetTab.showThinking === 'off') return;
+				setSessions((prev) =>
+					prev.map((s) => {
+						if (s.id !== actualSessionId) return s;
 
-				const toolLog: LogEntry = {
-					id: `tool-${Date.now()}-${toolEvent.toolName}`,
-					timestamp: toolEvent.timestamp,
-					source: 'tool',
-					text: toolEvent.toolName,
-					metadata: {
-						toolState: toolEvent.state as NonNullable<LogEntry['metadata']>['toolState'],
-					},
-				};
+						const targetTab = s.aiTabs.find((t) => t.id === tabId);
+						if (!targetTab?.showThinking || targetTab.showThinking === 'off') return s;
 
-				updateAiTab(actualSessionId, tabId, (tab) => ({
-					...tab,
-					logs: [...tab.logs, toolLog],
-				}));
+						const toolLog: LogEntry = {
+							id: `tool-${Date.now()}-${toolEvent.toolName}`,
+							timestamp: toolEvent.timestamp,
+							source: 'tool',
+							text: toolEvent.toolName,
+							metadata: {
+								toolState: toolEvent.state as NonNullable<LogEntry['metadata']>['toolState'],
+							},
+						};
+
+						return {
+							...s,
+							aiTabs: s.aiTabs.map((tab) =>
+								tab.id === tabId
+									? {
+											...tab,
+											logs: [...tab.logs, toolLog],
+										}
+									: tab
+							),
+						};
+					})
+				);
 			}
 		);
 

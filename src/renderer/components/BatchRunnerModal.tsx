@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import {
 	X,
 	RotateCcw,
@@ -14,11 +13,10 @@ import {
 	Download,
 	Upload,
 	LayoutGrid,
+	Loader2,
 } from 'lucide-react';
-import { GhostIconButton } from './ui/GhostIconButton';
-import { Spinner } from './ui';
 import type { Theme, BatchDocumentEntry, BatchRunConfig, WorktreeRunTarget } from '../types';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { TEMPLATE_VARIABLES } from '../utils/templateVariables';
 import { PlaybookDeleteConfirmModal } from './PlaybookDeleteConfirmModal';
@@ -26,7 +24,7 @@ import { PlaybookNameModal } from './PlaybookNameModal';
 import { AgentPromptComposerModal } from './AgentPromptComposerModal';
 import { DocumentsPanel } from './DocumentsPanel';
 import { WorktreeRunSection } from './WorktreeRunSection';
-import { useSessionStore, selectSessionById } from '../stores/sessionStore';
+import { useSessionStore } from '../stores/sessionStore';
 import { useUIStore } from '../stores/uiStore';
 import { getModalActions } from '../stores/modalStore';
 import {
@@ -110,7 +108,7 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 	// Worktree run target state
 	const [worktreeTarget, setWorktreeTarget] = useState<WorktreeRunTarget | null>(null);
 	const [isPreparingWorktree, setIsPreparingWorktree] = useState(false);
-	const activeSession = useSessionStore(selectSessionById(sessionId));
+	const activeSession = useSessionStore((state) => state.sessions.find((s) => s.id === sessionId));
 	const sessions = useSessionStore((state) => state.sessions);
 	const worktreeChildren = useMemo(
 		() => sessions.filter((s) => s.parentSessionId === sessionId),
@@ -250,24 +248,8 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 		onApplyPlaybook: handleApplyPlaybook,
 	});
 
-	const handleEscape = useCallback(() => {
-		if (showDeleteConfirmModal) {
-			handleCancelDeletePlaybook();
-		} else if (showSavePlaybookModal) {
-			setShowSavePlaybookModal(false);
-		} else {
-			handleCloseWithConfirmation();
-		}
-	}, [
-		showDeleteConfirmModal,
-		showSavePlaybookModal,
-		handleCancelDeletePlaybook,
-		handleCloseWithConfirmation,
-	]);
-
-	useModalLayer(MODAL_PRIORITIES.BATCH_RUNNER, 'Auto Run Configuration', handleEscape, {
-		focusTrap: 'strict',
-	});
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
+	const layerIdRef = useRef<string>();
 
 	// Use ref for getDocumentTaskCount to avoid dependency issues
 	const getDocumentTaskCountRef = useRef(getDocumentTaskCount);
@@ -309,8 +291,65 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 	const hasValidPrompt = validateAgentPromptHasTaskReference(prompt);
 	const isPromptEmpty = !prompt || !prompt.trim();
 
+	// Register layer on mount
+	useEffect(() => {
+		const id = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.BATCH_RUNNER,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'strict',
+			onEscape: () => {
+				if (showDeleteConfirmModal) {
+					handleCancelDeletePlaybook();
+				} else if (showSavePlaybookModal) {
+					setShowSavePlaybookModal(false);
+				} else {
+					handleCloseWithConfirmation();
+				}
+			},
+		});
+		layerIdRef.current = id;
+
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [
+		registerLayer,
+		unregisterLayer,
+		showSavePlaybookModal,
+		showDeleteConfirmModal,
+		handleCancelDeletePlaybook,
+		handleCloseWithConfirmation,
+	]);
+
+	// Update handler when dependencies change
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, () => {
+				if (showDeleteConfirmModal) {
+					handleCancelDeletePlaybook();
+				} else if (showSavePlaybookModal) {
+					setShowSavePlaybookModal(false);
+				} else {
+					handleCloseWithConfirmation();
+				}
+			});
+		}
+	}, [
+		handleCloseWithConfirmation,
+		updateLayerHandler,
+		showSavePlaybookModal,
+		showDeleteConfirmModal,
+		handleCancelDeletePlaybook,
+	]);
+
 	// Focus textarea on mount
-	useFocusAfterRender(textareaRef, true, 100);
+	useEffect(() => {
+		setTimeout(() => textareaRef.current?.focus(), 100);
+	}, []);
 
 	const handleReset = () => {
 		showConfirmation('Reset the prompt to the default? Your customizations will be lost.', () => {
@@ -471,25 +510,25 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 														>
 															{pb.documents.length} doc{pb.documents.length !== 1 ? 's' : ''}
 														</span>
-														<GhostIconButton
+														<button
 															onClick={(e) => {
 																e.stopPropagation();
 																handleExportPlaybook(pb);
 															}}
-															className="shrink-0"
+															className="p-1 rounded hover:bg-white/10 transition-colors shrink-0"
 															style={{ color: theme.colors.textDim }}
-															tooltip="Export playbook"
+															title="Export playbook"
 														>
 															<Download className="w-3 h-3" />
-														</GhostIconButton>
-														<GhostIconButton
+														</button>
+														<button
 															onClick={(e) => handleDeletePlaybook(pb, e)}
-															className="shrink-0"
+															className="p-1 rounded hover:bg-white/10 transition-colors shrink-0"
 															style={{ color: theme.colors.textDim }}
-															tooltip="Delete playbook"
+															title="Delete playbook"
 														>
 															<X className="w-3 h-3" />
-														</GhostIconButton>
+														</button>
 													</div>
 												))}
 											</div>
@@ -736,15 +775,14 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 								}}
 								placeholder="Enter the system prompt for auto-run..."
 							/>
-							<GhostIconButton
+							<button
 								onClick={() => setPromptComposerOpen(true)}
-								size="md"
-								className="absolute top-2 right-2"
+								className="absolute top-2 right-2 p-1.5 rounded hover:bg-white/10 transition-colors"
 								style={{ color: theme.colors.textDim }}
-								tooltip="Expand editor"
+								title="Expand editor"
 							>
 								<Maximize2 className="w-4 h-4" />
-							</GhostIconButton>
+							</button>
 						</div>
 						{/* Prompt validation warning */}
 						{isPromptEmpty && (
@@ -866,7 +904,11 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 														: 'Start auto-run'
 							}
 						>
-							{isPreparingWorktree ? <Spinner /> : <Play className="w-4 h-4" />}
+							{isPreparingWorktree ? (
+								<Loader2 className="w-4 h-4 animate-spin" />
+							) : (
+								<Play className="w-4 h-4" />
+							)}
 							{isPreparingWorktree ? 'Preparing Worktree...' : 'Go'}
 						</button>
 					</div>

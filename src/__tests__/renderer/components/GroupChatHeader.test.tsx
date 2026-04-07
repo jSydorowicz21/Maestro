@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { GroupChatHeader } from '../../../renderer/components/GroupChatHeader';
 import type { Theme, Shortcut } from '../../../renderer/types';
-import { mockTheme } from '../../helpers/mockTheme';
 
 vi.mock('lucide-react', () => ({
 	Info: ({ className }: { className?: string }) => (
@@ -25,7 +24,23 @@ vi.mock('lucide-react', () => ({
 			$
 		</span>
 	),
+	StopCircle: ({ className }: { className?: string }) => (
+		<span data-testid="stop-circle-icon" className={className}>
+			⏹
+		</span>
+	),
 }));
+
+const mockTheme = {
+	colors: {
+		bgSidebar: '#1e1e1e',
+		border: '#333',
+		textMain: '#fff',
+		textDim: '#999',
+		success: '#4caf50',
+	},
+} as Theme;
+
 const mockShortcuts: Record<string, Shortcut> = {
 	toggleRightPanel: { id: 'toggleRightPanel', label: 'Toggle right panel', keys: ['Cmd', 'B'] },
 };
@@ -34,6 +49,8 @@ const defaultProps = {
 	theme: mockTheme,
 	name: 'Test Chat',
 	participantCount: 3,
+	state: 'idle' as const,
+	onStopAll: vi.fn(),
 	onRename: vi.fn(),
 	onShowInfo: vi.fn(),
 	rightPanelOpen: false,
@@ -86,5 +103,24 @@ describe('GroupChatHeader', () => {
 	it('uses singular "participant" for count of 1', () => {
 		render(<GroupChatHeader {...defaultProps} participantCount={1} />);
 		expect(screen.getByText('1 participant')).toBeTruthy();
+	});
+
+	it('shows Stop All button when state is not idle', () => {
+		render(<GroupChatHeader {...defaultProps} state="moderator-thinking" />);
+		expect(screen.getByText('Stop All')).toBeTruthy();
+	});
+
+	it('hides Stop All button when state is idle', () => {
+		render(<GroupChatHeader {...defaultProps} state="idle" />);
+		expect(screen.queryByText('Stop All')).toBeNull();
+	});
+
+	it('calls onStopAll when Stop All button is clicked', () => {
+		const onStopAll = vi.fn();
+		render(
+			<GroupChatHeader {...defaultProps} state="participants-working" onStopAll={onStopAll} />
+		);
+		fireEvent.click(screen.getByText('Stop All'));
+		expect(onStopAll).toHaveBeenCalledOnce();
 	});
 });

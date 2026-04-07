@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { ChevronUp, ChevronDown, X } from 'lucide-react';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import type { Theme } from '../../shared/theme-types';
 
@@ -24,14 +24,11 @@ export const TerminalSearchBar = memo(function TerminalSearchBar({
 	const inputRef = useRef<HTMLInputElement>(null);
 	const [query, setQuery] = useState('');
 	const [hasResults, setHasResults] = useState(true);
+	const { registerLayer, unregisterLayer } = useLayerStack();
+	const onCloseRef = useRef(onClose);
+	onCloseRef.current = onClose;
 	const onSearchRef = useRef(onSearch);
 	onSearchRef.current = onSearch;
-
-	// Register with layer stack for Escape handling
-	useModalLayer(MODAL_PRIORITIES.SLASH_AUTOCOMPLETE, 'Terminal Search', onClose, {
-		isOpen,
-		type: 'overlay',
-	});
 
 	// Auto-focus input when opened; clear search state in terminal engine when closed
 	useEffect(() => {
@@ -47,6 +44,22 @@ export const TerminalSearchBar = memo(function TerminalSearchBar({
 			onSearchRef.current('');
 		}
 	}, [isOpen]);
+
+	// Register with layer stack for Escape handling
+	useEffect(() => {
+		if (isOpen) {
+			const id = registerLayer({
+				type: 'overlay',
+				priority: MODAL_PRIORITIES.SLASH_AUTOCOMPLETE,
+				blocksLowerLayers: false,
+				capturesFocus: false,
+				focusTrap: 'none',
+				allowClickOutside: true,
+				onEscape: () => onCloseRef.current(),
+			});
+			return () => unregisterLayer(id);
+		}
+	}, [isOpen, registerLayer, unregisterLayer]);
 
 	// Search as user types
 	const handleQueryChange = (value: string) => {

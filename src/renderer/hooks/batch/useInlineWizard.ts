@@ -698,7 +698,6 @@ export function useInlineWizard(): UseInlineWizardReturn {
 			} catch (error) {
 				// Handle any errors during initialization
 				const errorMessage = error instanceof Error ? error.message : 'Failed to initialize wizard';
-				// Expected: wizard initialization can fail for many user-input reasons
 				console.error('[useInlineWizard] startWizard error:', error);
 
 				setTabState(effectiveTabId, (prev) => ({
@@ -901,7 +900,6 @@ export function useInlineWizard(): UseInlineWizardReturn {
 				}
 			} catch (error) {
 				const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-				// Expected: wizard message sending can fail for many user-input reasons
 				console.error('[useInlineWizard] sendMessage error:', error);
 
 				setTabState(tabId, (prev) => ({
@@ -1396,7 +1394,6 @@ export function useInlineWizard(): UseInlineWizardReturn {
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : 'Unknown error during document generation';
-				// Expected: wizard document generation can fail for many user-input reasons
 				console.error('[useInlineWizard] generateDocuments error:', error);
 
 				// Clear streaming state on error

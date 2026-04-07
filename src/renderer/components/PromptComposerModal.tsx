@@ -12,16 +12,16 @@ import {
 	Users,
 } from 'lucide-react';
 import type { Theme, ThinkingMode, Session, Group } from '../types';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { estimateTokenCount } from '../../shared/formatters';
+import { getReadOnlyModeLabel, getReadOnlyModeTooltip } from '../../shared/agentMetadata';
 import {
 	formatShortcutKeys,
 	formatEnterToSend,
 	formatEnterToSendTooltip,
 } from '../utils/shortcutFormatter';
 import { normalizeMentionName } from '../utils/participantColors';
-import { GhostIconButton } from './ui/GhostIconButton';
 
 const EMPTY_STAGED_IMAGES: string[] = [];
 
@@ -54,6 +54,7 @@ interface PromptComposerModalProps {
 	onToggleTabSaveToHistory?: () => void;
 	tabReadOnlyMode?: boolean;
 	onToggleTabReadOnlyMode?: () => void;
+	agentId?: string;
 	tabShowThinking?: ThinkingMode;
 	onToggleTabShowThinking?: () => void;
 	supportsThinking?: boolean;
@@ -80,6 +81,7 @@ export function PromptComposerModal({
 	onToggleTabSaveToHistory,
 	tabReadOnlyMode = false,
 	onToggleTabReadOnlyMode,
+	agentId,
 	tabShowThinking = 'off',
 	onToggleTabShowThinking,
 	supportsThinking = false,
@@ -96,6 +98,7 @@ export function PromptComposerModal({
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const mentionListRef = useRef<HTMLDivElement>(null);
 	const selectedMentionRef = useRef<HTMLButtonElement>(null);
+	const { registerLayer, unregisterLayer } = useLayerStack();
 	const hasMentions = sessions != null && sessions.length > 0;
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
@@ -126,20 +129,29 @@ export function PromptComposerModal({
 		}
 	}, [isOpen]);
 
-	// Layer stack registration for Escape handling
-	const handleEscape = useCallback(() => {
-		if (showMentionsRef.current) {
-			setShowMentions(false);
-			return;
+	// Register with layer stack for Escape handling
+	useEffect(() => {
+		if (isOpen) {
+			const id = registerLayer({
+				type: 'modal',
+				priority: MODAL_PRIORITIES.PROMPT_COMPOSER,
+				blocksLowerLayers: true,
+				capturesFocus: true,
+				focusTrap: 'strict',
+				onEscape: () => {
+					// If mention dropdown is open, close it instead of the modal
+					if (showMentionsRef.current) {
+						setShowMentions(false);
+						return;
+					}
+					// Save the current value back before closing
+					onSubmitRef.current(valueRef.current);
+					onCloseRef.current();
+				},
+			});
+			return () => unregisterLayer(id);
 		}
-		onSubmitRef.current(valueRef.current);
-		onCloseRef.current();
-	}, []);
-
-	useModalLayer(MODAL_PRIORITIES.PROMPT_COMPOSER, 'Prompt Composer', handleEscape, {
-		isOpen,
-		focusTrap: 'strict',
-	});
+	}, [isOpen, registerLayer, unregisterLayer]);
 
 	// Build mentionable items from sessions and groups (same logic as GroupChatInput)
 	const mentionItems = useMemo(() => {
@@ -441,16 +453,16 @@ export function PromptComposerModal({
 						</span>
 					</div>
 					<div className="flex items-center gap-3">
-						<GhostIconButton
-							size="md"
+						<button
 							onClick={() => {
 								onSubmit(value);
 								onClose();
 							}}
-							tooltip="Close (Escape)"
+							className="p-1.5 rounded hover:bg-white/10 transition-colors"
+							title="Close (Escape)"
 						>
 							<X className="w-5 h-5" style={{ color: theme.colors.textDim }} />
-						</GhostIconButton>
+						</button>
 					</div>
 				</div>
 
@@ -583,14 +595,13 @@ export function PromptComposerModal({
 						{/* Image attachment button */}
 						{setStagedImages && (
 							<>
-								<GhostIconButton
-									size="md"
+								<button
 									onClick={() => fileInputRef.current?.click()}
-									className="opacity-60 hover:opacity-100"
-									tooltip="Attach Image"
+									className="p-1.5 rounded hover:bg-white/10 transition-colors opacity-60 hover:opacity-100"
+									title="Attach Image"
 								>
 									<ImageIcon className="w-4 h-4" style={{ color: theme.colors.textDim }} />
-								</GhostIconButton>
+								</button>
 								<input
 									ref={fileInputRef}
 									type="file"
@@ -647,10 +658,14 @@ export function PromptComposerModal({
 										? `1px solid ${theme.colors.warning}50`
 										: '1px solid transparent',
 								}}
-								title="Toggle read-only mode (Claude won't modify files)"
+								title={
+									agentId
+										? getReadOnlyModeTooltip(agentId)
+										: "Toggle Read-Only mode (agent won't modify files)"
+								}
 							>
 								<Eye className="w-3 h-3" />
-								<span>Read-only</span>
+								<span>{agentId ? getReadOnlyModeLabel(agentId) : 'Read-Only'}</span>
 							</button>
 						)}
 

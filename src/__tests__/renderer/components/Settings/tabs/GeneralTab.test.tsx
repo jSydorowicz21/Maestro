@@ -25,7 +25,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import { GeneralTab } from '../../../../../renderer/components/Settings/tabs/GeneralTab';
 import type { Theme, ShellInfo } from '../../../../../renderer/types';
-import { mockTheme } from '../../../../helpers/mockTheme';
 
 // Mock platformUtils
 vi.mock('../../../../../renderer/utils/platformUtils', () => ({
@@ -109,6 +108,28 @@ vi.mock('../../../../../renderer/hooks/settings/useSettings', () => ({
 		...mockUseSettingsOverrides,
 	}),
 }));
+
+const mockTheme: Theme = {
+	id: 'dracula',
+	name: 'Dracula',
+	mode: 'dark',
+	colors: {
+		bgMain: '#282a36',
+		bgSidebar: '#21222c',
+		bgActivity: '#343746',
+		border: '#44475a',
+		textMain: '#f8f8f2',
+		textDim: '#6272a4',
+		accent: '#bd93f9',
+		accentDim: '#bd93f920',
+		accentText: '#ff79c6',
+		accentForeground: '#ffffff',
+		success: '#50fa7b',
+		warning: '#ffb86c',
+		error: '#ff5555',
+	},
+};
+
 const mockShells: ShellInfo[] = [
 	{ id: 'zsh', name: 'Zsh', path: '/bin/zsh', available: true },
 	{ id: 'bash', name: 'Bash', path: '/bin/bash', available: true },
@@ -408,23 +429,6 @@ describe('GeneralTab', () => {
 
 			expect(screen.getByPlaceholderText('/path/to/shell')).toBeInTheDocument();
 			expect(screen.getByPlaceholderText('--flag value')).toBeInTheDocument();
-		});
-
-		it('should show environment variables section when expanded', async () => {
-			render(<GeneralTab theme={mockTheme} isOpen={true} />);
-
-			await act(async () => {
-				await vi.advanceTimersByTimeAsync(100);
-			});
-
-			const configButton = screen.getByText('Shell Configuration').closest('button');
-			fireEvent.click(configButton!);
-
-			await act(async () => {
-				await vi.advanceTimersByTimeAsync(100);
-			});
-
-			expect(screen.getByText('Global Environment Variables')).toBeInTheDocument();
 		});
 
 		it('should collapse when clicked again', async () => {

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
-import { useEventListener } from '../../hooks/utils/useEventListener';
 import {
 	Wand2,
 	Plus,
@@ -16,7 +15,6 @@ import {
 	Trash2,
 	Bot,
 } from 'lucide-react';
-import { EmptyState } from '../ui';
 import type { Session, Group, Theme } from '../../types';
 import { getBadgeForTime } from '../../constants/conductorBadges';
 import { SessionItem } from '../SessionItem';
@@ -24,7 +22,7 @@ import { GroupChatList } from '../GroupChatList';
 import { useLiveOverlay, useResizablePanel } from '../../hooks';
 import { useGitFileStatus } from '../../contexts/GitStatusContext';
 import { useUIStore } from '../../stores/uiStore';
-import { useSessionStore, updateSessionWith } from '../../stores/sessionStore';
+import { useSessionStore } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useBatchStore, selectActiveBatchSessionIds } from '../../stores/batchStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -47,6 +45,7 @@ interface SessionListProps {
 	// Computed values (not in stores — remain as props)
 	theme: Theme;
 	sortedSessions: Session[];
+	navIndexMap?: Map<string, number>;
 	isLiveMode: boolean;
 	webInterfaceUrl: string | null;
 	showSessionJumpNumbers?: boolean;
@@ -216,6 +215,7 @@ function SessionListInner(props: SessionListProps) {
 	const {
 		theme,
 		sortedSessions,
+		navIndexMap,
 		isLiveMode,
 		webInterfaceUrl,
 		toggleGlobalLive,
@@ -266,7 +266,7 @@ function SessionListInner(props: SessionListProps) {
 	const { onResizeStart: onSidebarResizeStart, transitionClass: sidebarTransitionClass } =
 		useResizablePanel({
 			width: leftSidebarWidthState,
-			minWidth: 256,
+			minWidth: 280,
 			maxWidth: 600,
 			settingsKey: 'leftSidebarWidth',
 			setWidth: setLeftSidebarWidthState,
@@ -277,6 +277,10 @@ function SessionListInner(props: SessionListProps) {
 	const setSessionFilterOpen = useUIStore((s) => s.setSessionFilterOpen);
 	const showUnreadAgentsOnly = useUIStore((s) => s.showUnreadAgentsOnly);
 	const toggleShowUnreadAgentsOnly = useUIStore((s) => s.toggleShowUnreadAgentsOnly);
+	const hasUnreadAgents = useMemo(
+		() => sessions.some((s) => s.aiTabs?.some((tab) => tab.hasUnread) || s.state === 'busy'),
+		[sessions]
+	);
 	const [menuOpen, setMenuOpen] = useState(false);
 
 	// Live overlay state (extracted hook)
@@ -310,9 +314,14 @@ function SessionListInner(props: SessionListProps) {
 	const ignoreNextBlurRef = useRef(false);
 
 	// Toggle bookmark for a session - memoized to prevent SessionItem re-renders
-	const toggleBookmark = useCallback((sessionId: string) => {
-		updateSessionWith(sessionId, (s) => ({ ...s, bookmarked: !s.bookmarked }));
-	}, []);
+	const toggleBookmark = useCallback(
+		(sessionId: string) => {
+			setSessions((prev) =>
+				prev.map((s) => (s.id === sessionId ? { ...s, bookmarked: !s.bookmarked } : s))
+			);
+		},
+		[setSessions]
+	);
 
 	// Context menu handlers - memoized to prevent SessionItem re-renders
 	const handleContextMenu = useCallback((e: React.MouseEvent, sessionId: string) => {
@@ -321,9 +330,14 @@ function SessionListInner(props: SessionListProps) {
 		setContextMenu({ x: e.clientX, y: e.clientY, sessionId });
 	}, []);
 
-	const handleMoveToGroup = useCallback((sessionId: string, groupId: string) => {
-		updateSessionWith(sessionId, (s) => ({ ...s, groupId: groupId || undefined }));
-	}, []);
+	const handleMoveToGroup = useCallback(
+		(sessionId: string, groupId: string) => {
+			setSessions((prev) =>
+				prev.map((s) => (s.id === sessionId ? { ...s, groupId: groupId || undefined } : s))
+			);
+		},
+		[setSessions]
+	);
 
 	const handleDeleteSession = (sessionId: string) => {
 		// Use the parent's delete handler if provided (includes proper cleanup)
@@ -351,20 +365,21 @@ function SessionListInner(props: SessionListProps) {
 	};
 
 	// Close menu when clicking outside
-	useEventListener(
-		'mousedown',
-		(e: MouseEvent) => {
+	useEffect(() => {
+		const handleClickOutside = (e: MouseEvent) => {
 			if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
 				setMenuOpen(false);
 			}
-		},
-		menuOpen ? document : null
-	);
+		};
+		if (menuOpen) {
+			document.addEventListener('mousedown', handleClickOutside);
+			return () => document.removeEventListener('mousedown', handleClickOutside);
+		}
+	}, [menuOpen]);
 
 	// Close overlays/menus with Escape key
-	useEventListener(
-		'keydown',
-		(e: KeyboardEvent) => {
+	useEffect(() => {
+		const handleEscKey = (e: KeyboardEvent) => {
 			if (e.key === 'Escape') {
 				if (liveOverlayOpen) {
 					setLiveOverlayOpen(false);
@@ -374,26 +389,34 @@ function SessionListInner(props: SessionListProps) {
 					e.stopPropagation();
 				}
 			}
-		},
-		liveOverlayOpen || menuOpen ? document : null
-	);
+		};
+		if (liveOverlayOpen || menuOpen) {
+			document.addEventListener('keydown', handleEscKey);
+			return () => document.removeEventListener('keydown', handleEscKey);
+		}
+	}, [liveOverlayOpen, menuOpen]);
 
 	// Listen for tour UI actions to control hamburger menu state
-	useEventListener('tour:action', (event: Event) => {
-		const customEvent = event as CustomEvent<{ type: string; value?: string }>;
-		const { type } = customEvent.detail;
+	useEffect(() => {
+		const handleTourAction = (event: Event) => {
+			const customEvent = event as CustomEvent<{ type: string; value?: string }>;
+			const { type } = customEvent.detail;
 
-		switch (type) {
-			case 'openHamburgerMenu':
-				setMenuOpen(true);
-				break;
-			case 'closeHamburgerMenu':
-				setMenuOpen(false);
-				break;
-			default:
-				break;
-		}
-	});
+			switch (type) {
+				case 'openHamburgerMenu':
+					setMenuOpen(true);
+					break;
+				case 'closeHamburgerMenu':
+					setMenuOpen(false);
+					break;
+				default:
+					break;
+			}
+		};
+
+		window.addEventListener('tour:action', handleTourAction);
+		return () => window.removeEventListener('tour:action', handleTourAction);
+	}, []);
 
 	// Get git file change counts per session from focused context
 	// Using useGitFileStatus instead of full useGitStatus reduces re-renders
@@ -458,6 +481,20 @@ function SessionListInner(props: SessionListProps) {
 		return map;
 	}, [sessions, toggleBookmark]);
 
+	// Helper: compute navIndexMap key for a session based on render context
+	const getNavKey = (variant: string, session: Session, groupId?: string): string => {
+		if (variant === 'bookmark') return `bookmark:${session.id}`;
+		if (variant === 'group' && groupId) return `group:${groupId}:${session.id}`;
+		return `ungrouped:${session.id}`;
+	};
+
+	// Helper: compute navIndexMap key for a worktree child based on render context
+	const getChildNavKey = (variant: string, childId: string, groupId?: string): string => {
+		if (variant === 'bookmark') return `bookmark:wt:${childId}`;
+		if (variant === 'group' && groupId) return `group:${groupId}:wt:${childId}`;
+		return `ungrouped:wt:${childId}`;
+	};
+
 	// Helper component: Renders a session item with its worktree children (if any)
 	const renderSessionWithWorktrees = (
 		session: Session,
@@ -482,7 +519,9 @@ function SessionListInner(props: SessionListProps) {
 		const hasWorktrees = worktreeChildren.length > 0;
 		// Force expand worktrees when filtering by unread
 		const worktreesExpanded = showUnreadAgentsOnly ? true : (session.worktreesExpanded ?? true);
-		const globalIdx = sortedSessionIndexById.get(session.id) ?? -1;
+		// Use navIndexMap for keyboard selection (context-aware: distinguishes bookmark vs group instances)
+		const navKey = getNavKey(variant, session, options.groupId);
+		const globalIdx = navIndexMap?.get(navKey) ?? sortedSessionIndexById.get(session.id) ?? -1;
 		const isKeyboardSelected = activeFocus === 'sidebar' && globalIdx === selectedSidebarIndex;
 
 		// In flat/ungrouped view, wrap sessions with worktrees in a left-bordered container
@@ -559,7 +598,9 @@ function SessionListInner(props: SessionListProps) {
 								? worktreeChildren
 								: sortedWorktreeChildrenByParentId.get(session.id) || []
 							).map((child) => {
-								const childGlobalIdx = sortedSessionIndexById.get(child.id) ?? -1;
+								const childNavKey = getChildNavKey(variant, child.id, options.groupId);
+								const childGlobalIdx =
+									navIndexMap?.get(childNavKey) ?? sortedSessionIndexById.get(child.id) ?? -1;
 								const isChildKeyboardSelected =
 									activeFocus === 'sidebar' && childGlobalIdx === selectedSidebarIndex;
 								return (
@@ -839,7 +880,7 @@ function SessionListInner(props: SessionListProps) {
 			{/* SIDEBAR CONTENT: EXPANDED */}
 			{leftSidebarOpen ? (
 				<div
-					className="flex-1 overflow-y-auto py-2 select-none scrollbar-thin flex flex-col"
+					className="flex-1 min-h-0 flex flex-col overflow-y-auto py-2 select-none scrollbar-thin"
 					data-tour="session-list"
 				>
 					{/* Session Filter */}
@@ -865,12 +906,13 @@ function SessionListInner(props: SessionListProps) {
 
 					{/* Empty state for unread agents filter */}
 					{showUnreadAgentsOnly && sortedFilteredSessions.length === 0 && (
-						<EmptyState
-							theme={theme}
-							icon={<Bot className="w-8 h-8" />}
-							message="No unread or working agents"
-							className="flex-1 gap-3 px-4"
-						/>
+						<div
+							className="flex-1 flex flex-col items-center justify-center gap-3 px-4"
+							style={{ color: theme.colors.textDim }}
+						>
+							<Bot className="w-8 h-8 opacity-30" />
+							<span className="text-xs italic">No unread or working agents</span>
+						</div>
 					)}
 
 					{/* BOOKMARKS SECTION - hidden when filtering by unread agents */}
@@ -1253,6 +1295,7 @@ function SessionListInner(props: SessionListProps) {
 				hasNoSessions={sessions.length === 0}
 				shortcuts={shortcuts}
 				showUnreadAgentsOnly={showUnreadAgentsOnly}
+				hasUnreadAgents={hasUnreadAgents}
 				addNewSession={addNewSession}
 				openFeedback={props.openFeedback}
 				setLeftSidebarOpen={setLeftSidebarOpen}

@@ -5,8 +5,6 @@ import { generateId } from '../../utils/ids';
 import { buildSharedHistoryContext } from '../../utils/sessionHelpers';
 import type { RightPanelHandle } from '../../components/RightPanel';
 import { FALLBACK_CONTEXT_WINDOW } from '../../../shared/agentConstants';
-import { updateSessionWith } from '../../stores/sessionStore';
-import { captureException } from '../../utils/sentry';
 
 /**
  * History entry for the addHistoryEntry function.
@@ -27,6 +25,8 @@ export interface HistoryEntryInput {
 	success?: boolean;
 	/** Task execution time in milliseconds */
 	elapsedTimeMs?: number;
+	/** Context usage percentage from the agent run (used when activeSession context isn't available) */
+	contextUsage?: number;
 }
 
 /**
@@ -35,6 +35,8 @@ export interface HistoryEntryInput {
 export interface UseAgentSessionManagementDeps {
 	/** Current active session (null if none selected) */
 	activeSession: Session | null;
+	/** Session state setter */
+	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	/** Agent session ID setter */
 	setActiveAgentSessionId: (id: string | null) => void;
 	/** Agent sessions browser open state setter */
@@ -83,6 +85,7 @@ export function useAgentSessionManagement(
 ): UseAgentSessionManagementReturn {
 	const {
 		activeSession,
+		setSessions,
 		setActiveAgentSessionId,
 		setAgentSessionsOpen,
 		rightPanelRef,
@@ -125,7 +128,13 @@ export function useAgentSessionManagement(
 					sessionId: targetSessionId,
 					sessionName: sessionName,
 					projectPath: targetProjectPath,
-					...(shouldIncludeContextUsage ? { contextUsage: activeSession?.contextUsage } : {}),
+					// Prefer active session's live context percentage; fall back to entry's own estimate
+					...(() => {
+						const ctx = shouldIncludeContextUsage
+							? (activeSession?.contextUsage ?? entry.contextUsage)
+							: entry.contextUsage;
+						return ctx != null ? { contextUsage: ctx } : {};
+					})(),
 					// Only include usageStats if explicitly provided (per-task tracking)
 					// Never use cumulative session stats - they're lifetime totals
 					usageStats: entry.usageStats,
@@ -179,13 +188,19 @@ export function useAgentSessionManagement(
 			);
 			if (existingTab) {
 				// Switch to the existing tab instead of creating a duplicate
-				updateSessionWith(activeSession.id, (s) => ({
-					...s,
-					activeTabId: existingTab.id,
-					activeFileTabId: null,
-					activeTerminalTabId: null,
-					inputMode: 'ai',
-				}));
+				setSessions((prev) =>
+					prev.map((s) =>
+						s.id === activeSession.id
+							? {
+									...s,
+									activeTabId: existingTab.id,
+									activeFileTabId: null,
+									activeTerminalTabId: null,
+									inputMode: 'ai',
+								}
+							: s
+					)
+				);
 				setActiveAgentSessionId(agentSessionId);
 				return;
 			}
@@ -272,25 +287,28 @@ export function useAgentSessionManagement(
 
 				// Update the session and switch to AI mode
 				// IMPORTANT: Use functional update to get fresh session state and avoid race conditions
-				updateSessionWith(activeSession.id, (s) => {
-					// Create tab from the CURRENT session state (not stale closure value)
-					const result = createTab(s, {
-						agentSessionId,
-						logs: messages,
-						name,
-						starred: isStarred,
-						usageStats: finalUsageStats,
-						saveToHistory: defaultSaveToHistory,
-						showThinking: defaultShowThinking,
-					});
-					if (!result) return s;
+				setSessions((prev) =>
+					prev.map((s) => {
+						if (s.id !== activeSession.id) return s;
 
-					return { ...result.session, activeFileTabId: null, inputMode: 'ai' };
-				});
+						// Create tab from the CURRENT session state (not stale closure value)
+						const result = createTab(s, {
+							agentSessionId,
+							logs: messages,
+							name,
+							starred: isStarred,
+							usageStats: finalUsageStats,
+							saveToHistory: defaultSaveToHistory,
+							showThinking: defaultShowThinking,
+						});
+						if (!result) return s;
+
+						return { ...result.session, activeFileTabId: null, inputMode: 'ai' };
+					})
+				);
 				setActiveAgentSessionId(agentSessionId);
 			} catch (error) {
 				console.error('Failed to resume session:', error);
-				captureException(error, { extra: { context: 'useAgentSessionManagement.resumeSession' } });
 			}
 		},
 		[
@@ -298,6 +316,7 @@ export function useAgentSessionManagement(
 			activeSession?.id,
 			activeSession?.aiTabs,
 			activeSession?.toolType,
+			setSessions,
 			setActiveAgentSessionId,
 			defaultSaveToHistory,
 			defaultShowThinking,

@@ -9,7 +9,6 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { useEventListener } from '../hooks/utils/useEventListener';
 import {
 	PartyPopper,
 	Rocket,
@@ -22,10 +21,9 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { Theme } from '../types';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
-import { formatDurationVerbose as formatDuration } from '../../shared/formatters';
 
 // 15 minutes in milliseconds - threshold for "Standing Ovation" variation
 const STANDING_OVATION_THRESHOLD_MS = 15 * 60 * 1000;
@@ -61,6 +59,33 @@ interface FirstRunCelebrationProps {
 }
 
 /**
+ * Format milliseconds into a human-readable duration string
+ */
+function formatDuration(ms: number): string {
+	const seconds = Math.floor(ms / 1000);
+	const minutes = Math.floor(seconds / 60);
+	const hours = Math.floor(minutes / 60);
+
+	if (hours > 0) {
+		const remainingMinutes = minutes % 60;
+		if (remainingMinutes > 0) {
+			return `${hours} hour${hours > 1 ? 's' : ''} ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''}`;
+		}
+		return `${hours} hour${hours > 1 ? 's' : ''}`;
+	}
+
+	if (minutes > 0) {
+		const remainingSeconds = seconds % 60;
+		if (remainingSeconds > 0) {
+			return `${minutes} minute${minutes > 1 ? 's' : ''} ${remainingSeconds} second${remainingSeconds > 1 ? 's' : ''}`;
+		}
+		return `${minutes} minute${minutes > 1 ? 's' : ''}`;
+	}
+
+	return `${seconds} second${seconds > 1 ? 's' : ''}`;
+}
+
+/**
  * FirstRunCelebration - Modal celebrating the user's first Auto Run completion
  */
 export function FirstRunCelebration({
@@ -74,6 +99,8 @@ export function FirstRunCelebration({
 	disableConfetti = false,
 }: FirstRunCelebrationProps): JSX.Element {
 	const containerRef = useRef<HTMLDivElement>(null);
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
+	const layerIdRef = useRef<string>();
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
 
@@ -171,20 +198,46 @@ export function FirstRunCelebration({
 	}, [isClosing, fireConfetti]);
 
 	// Handle keyboard events
-	useEventListener('keydown', (e: KeyboardEvent) => {
-		if (e.key === 'Enter' || e.key === 'Escape') {
-			e.preventDefault();
-			handleClose();
-		}
-	});
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === 'Enter' || e.key === 'Escape') {
+				e.preventDefault();
+				handleClose();
+			}
+		};
+
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
+	}, [handleClose]);
 
 	// Register with layer stack
-	useModalLayer(MODAL_PRIORITIES.STANDING_OVATION, 'First Auto Run Celebration', handleClose);
-
-	// Focus container on mount
 	useEffect(() => {
+		const id = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.STANDING_OVATION, // Use same high priority as standing ovation
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'strict',
+			ariaLabel: 'First Auto Run Celebration',
+			onEscape: () => handleClose(),
+		});
+		layerIdRef.current = id;
+
 		containerRef.current?.focus();
-	}, []);
+
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [registerLayer, unregisterLayer, handleClose]);
+
+	// Update escape handler when handleClose changes
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, handleClose);
+		}
+	}, [updateLayerHandler, handleClose]);
 
 	return (
 		<>

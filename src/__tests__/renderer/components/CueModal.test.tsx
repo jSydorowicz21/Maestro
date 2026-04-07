@@ -15,7 +15,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { CueModal } from '../../../renderer/components/CueModal';
 import type { Theme } from '../../../renderer/types';
-import { mockTheme } from '../../helpers/mockTheme';
 
 // Mock LayerStackContext
 const mockRegisterLayer = vi.fn(() => 'layer-cue-modal');
@@ -25,7 +24,6 @@ vi.mock('../../../renderer/contexts/LayerStackContext', () => ({
 	useLayerStack: () => ({
 		registerLayer: mockRegisterLayer,
 		unregisterLayer: mockUnregisterLayer,
-		updateLayerHandler: vi.fn(),
 	}),
 }));
 
@@ -63,7 +61,6 @@ vi.mock('../../../renderer/stores/sessionStore', () => ({
 		};
 		return selector(mockState);
 	},
-	updateSessionWith: vi.fn(),
 }));
 
 // Mock modalStore getModalActions
@@ -74,6 +71,12 @@ vi.mock('../../../renderer/stores/modalStore', () => ({
 		openCueYamlEditor: mockOpenCueYamlEditor,
 		showConfirmation: mockShowConfirmation,
 	}),
+	useModalStore: vi.fn((selector: (s: any) => any) =>
+		selector({
+			modals: new Map([['cueModal', { open: true, data: undefined }]]),
+		})
+	),
+	selectModalData: (id: string) => (state: any) => state.modals.get(id)?.data,
 }));
 
 // Mock window.maestro.cue
@@ -113,6 +116,28 @@ let mockUseCueReturn = { ...defaultUseCueReturn };
 vi.mock('../../../renderer/hooks/useCue', () => ({
 	useCue: () => mockUseCueReturn,
 }));
+
+const mockTheme: Theme = {
+	id: 'dracula',
+	name: 'Dracula',
+	mode: 'dark',
+	colors: {
+		bgMain: '#282a36',
+		bgSidebar: '#21222c',
+		bgActivity: '#343746',
+		textMain: '#f8f8f2',
+		textDim: '#6272a4',
+		accent: '#bd93f9',
+		accentForeground: '#f8f8f2',
+		border: '#44475a',
+		success: '#50fa7b',
+		warning: '#ffb86c',
+		error: '#ff5555',
+		scrollbar: '#44475a',
+		scrollbarHover: '#6272a4',
+	},
+};
+
 const mockSession = {
 	sessionId: 'sess-1',
 	sessionName: 'Test Session',

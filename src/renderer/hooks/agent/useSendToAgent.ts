@@ -36,8 +36,6 @@ import { createMergedSession } from '../../utils/tabHelpers';
 import { classifyTransferError } from '../../components/TransferErrorModal';
 import { generateId } from '../../utils/ids';
 import { useOperationStore } from '../../stores/operationStore';
-import { useSessionStore } from '../../stores/sessionStore';
-import { estimateTokensFromLogs } from '../../../shared/formatters';
 import type { TransferState, TransferLastRequest } from '../../stores/operationStore';
 
 // Re-export types from the canonical store location
@@ -48,6 +46,15 @@ export type { TransferState } from '../../stores/operationStore';
  * Default: 100,000 tokens (safe for most models)
  */
 const MAX_CONTEXT_TOKENS_WARNING = 100000;
+
+/**
+ * Estimate token count from log entries
+ * Uses a simple heuristic: ~4 characters per token (average for English text)
+ */
+function estimateTokensFromLogs(logs: { text: string }[]): number {
+	const totalChars = logs.reduce((sum, log) => sum + (log.text?.length || 0), 0);
+	return Math.round(totalChars / 4);
+}
 
 /**
  * Request to transfer context to another agent
@@ -512,6 +519,8 @@ export function useSendToAgent(): UseSendToAgentResult {
 export interface UseSendToAgentWithSessionsDeps {
 	/** All sessions in the app */
 	sessions: Session[];
+	/** Session setter for updating app state */
+	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	/** Callback after transfer creates a new session. Receives session ID and name for notification purposes. */
 	onSessionCreated?: (sessionId: string, sessionName: string) => void;
 	/** Callback to switch to the new session after transfer */
@@ -550,6 +559,7 @@ export interface UseSendToAgentWithSessionsResult extends UseSendToAgentResult {
  *   cancelTransfer,
  * } = useSendToAgentWithSessions({
  *   sessions,
+ *   setSessions,
  *   onSessionCreated: (id, name) => toast(`Created ${name}`),
  *   onNavigateToSession: (id) => setActiveSessionId(id),
  * });
@@ -557,7 +567,7 @@ export interface UseSendToAgentWithSessionsResult extends UseSendToAgentResult {
 export function useSendToAgentWithSessions(
 	deps: UseSendToAgentWithSessionsDeps
 ): UseSendToAgentWithSessionsResult {
-	const { sessions, onSessionCreated, onNavigateToSession } = deps;
+	const { sessions, setSessions, onSessionCreated, onNavigateToSession } = deps;
 	const baseHook = useSendToAgent();
 
 	/**
@@ -661,7 +671,7 @@ Please confirm you've reviewed this context and let me know you're ready to cont
 				}
 
 				// Add new session to state
-				useSessionStore.getState().setSessions((prev) => [...prev, newSession]);
+				setSessions((prev) => [...prev, newSession]);
 
 				// Log transfer operation to history
 				const targetAgentName = getAgentDisplayName(targetAgent);
@@ -701,7 +711,7 @@ Please confirm you've reviewed this context and let me know you're ready to cont
 
 			return result;
 		},
-		[sessions, onSessionCreated, onNavigateToSession, baseHook]
+		[sessions, setSessions, onSessionCreated, onNavigateToSession, baseHook]
 	);
 
 	return {

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { subscribeToActivity } from '../../utils/activityBus';
-import { useEventListener } from '../utils/useEventListener';
 
 const ACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes of inactivity = idle
 const TICK_INTERVAL_MS = 1000; // Update every second
@@ -76,9 +75,8 @@ export function useHandsOnTimeTracker(addTotalActiveTimeMs: (delta: number) => v
 	}, []);
 
 	// Handle visibility changes - persist and pause when hidden
-	useEventListener(
-		'visibilitychange',
-		() => {
+	useEffect(() => {
+		const handleVisibilityChange = () => {
 			if (document.hidden) {
 				// Persist accumulated time when user switches away
 				persistAccumulatedTime();
@@ -87,9 +85,14 @@ export function useHandsOnTimeTracker(addTotalActiveTimeMs: (delta: number) => v
 				// Restart if user was active
 				startInterval();
 			}
-		},
-		document
-	);
+		};
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+		};
+	}, [startInterval, stopInterval, persistAccumulatedTime]);
 
 	// Listen to global activity events via shared activity bus
 	// (Consolidates keydown/mousedown/wheel/touchstart/click into a single set of passive listeners
@@ -118,12 +121,20 @@ export function useHandsOnTimeTracker(addTotalActiveTimeMs: (delta: number) => v
 	}, [stopInterval, persistAccumulatedTime]);
 
 	// Persist on beforeunload (app closing)
-	useEventListener('beforeunload', () => {
-		// Synchronous - can't use async here
-		if (accumulatedTimeRef.current > 0) {
-			const timeToAdd = accumulatedTimeRef.current;
-			accumulatedTimeRef.current = 0;
-			addTotalActiveTimeMsRef.current(timeToAdd);
-		}
-	});
+	useEffect(() => {
+		const handleBeforeUnload = () => {
+			// Synchronous - can't use async here
+			if (accumulatedTimeRef.current > 0) {
+				const timeToAdd = accumulatedTimeRef.current;
+				accumulatedTimeRef.current = 0;
+				addTotalActiveTimeMsRef.current(timeToAdd);
+			}
+		};
+
+		window.addEventListener('beforeunload', handleBeforeUnload);
+
+		return () => {
+			window.removeEventListener('beforeunload', handleBeforeUnload);
+		};
+	}, []);
 }

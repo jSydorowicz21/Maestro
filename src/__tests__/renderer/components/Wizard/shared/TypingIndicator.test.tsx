@@ -1,7 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { TypingIndicator } from '../../../../../renderer/components/Wizard/shared/TypingIndicator';
-import { mockTheme } from '../../../../helpers/mockTheme';
+
+const mockTheme = {
+	colors: {
+		bgActivity: '#1a1a2e',
+		accent: '#00d4ff',
+		textMain: '#ffffff',
+		textDim: '#888888',
+	},
+} as any;
+
 describe('TypingIndicator', () => {
 	let rafCallbacks: ((timestamp: number) => void)[];
 	let originalRaf: typeof requestAnimationFrame;

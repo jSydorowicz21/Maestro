@@ -6,7 +6,29 @@ import type {
 	GroupChatHistoryEntry,
 	Theme,
 } from '../../../renderer/types';
-import { mockTheme } from '../../helpers/mockTheme';
+
+// Mock theme for testing
+const mockTheme: Theme = {
+	id: 'dracula',
+	name: 'Dracula',
+	mode: 'dark',
+	colors: {
+		bgMain: '#282a36',
+		bgSidebar: '#21222c',
+		bgActivity: '#1e1f29',
+		border: '#44475a',
+		textMain: '#f8f8f2',
+		textDim: '#6272a4',
+		accent: '#bd93f9',
+		accentDim: 'rgba(189, 147, 249, 0.1)',
+		accentText: '#bd93f9',
+		accentForeground: '#282a36',
+		success: '#50fa7b',
+		warning: '#f1fa8c',
+		error: '#ff5555',
+	},
+};
+
 // Mock data factories
 function createMockGroupChat(overrides?: Partial<GroupChat>): GroupChat {
 	return {
@@ -177,10 +199,10 @@ describe('groupChatExport', () => {
 
 				const html = generateGroupChatExportHtml(groupChat, messages, [], {}, mockTheme);
 
-				expect(html).toContain(`--bg-primary: ${mockTheme.colors.bgMain}`);
-				expect(html).toContain(`--bg-secondary: ${mockTheme.colors.bgSidebar}`);
-				expect(html).toContain(`--text-primary: ${mockTheme.colors.textMain}`);
-				expect(html).toContain(`--accent: ${mockTheme.colors.accent}`);
+				expect(html).toContain('--bg-primary: #282a36');
+				expect(html).toContain('--bg-secondary: #21222c');
+				expect(html).toContain('--text-primary: #f8f8f2');
+				expect(html).toContain('--accent: #bd93f9');
 			});
 
 			it('includes theme name in footer', () => {
@@ -189,7 +211,7 @@ describe('groupChatExport', () => {
 
 				const html = generateGroupChatExportHtml(groupChat, messages, [], {}, mockTheme);
 
-				expect(html).toContain(`Theme: ${mockTheme.name}`);
+				expect(html).toContain('Theme: Dracula');
 			});
 
 			it('uses different theme colors when provided', () => {

@@ -1,6 +1,16 @@
 import { useState, useRef, useCallback } from 'react';
-import type { SessionMessage } from '../../../main/agents/session-storage';
-export type { SessionMessage };
+
+/**
+ * Session message from Claude session JSONL files
+ */
+export interface SessionMessage {
+	type: string;
+	role?: string;
+	content: string;
+	timestamp: string;
+	uuid: string;
+	toolUse?: any;
+}
 
 /**
  * Agent session metadata (used for session browser)
@@ -150,7 +160,6 @@ export function useSessionViewer({
 				setHasMoreMessages(result.hasMore);
 				setMessagesOffset(offset + result.messages.length);
 			} catch (error) {
-				// Expected: message loading can fail transiently
 				console.error('Failed to load messages:', error);
 			} finally {
 				setMessagesLoading(false);

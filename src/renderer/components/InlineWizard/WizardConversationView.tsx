@@ -430,10 +430,7 @@ export function WizardConversationView({
 	// Guard to distinguish programmatic scrolls from user scrolls
 	const isProgrammaticScrollRef = useRef(false);
 
-	// Detect user scroll to decide whether to auto-scroll.
-	// NOTE: Uses useEffect instead of useEventListener because the listener
-	// targets containerRef.current, which is null during render. The useEffect
-	// runs after mount when the ref is available.
+	// Detect user scroll to decide whether to auto-scroll
 	useEffect(() => {
 		const container = containerRef.current;
 		if (!container) return;

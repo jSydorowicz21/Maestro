@@ -8,8 +8,8 @@
  * Side effects (logging, audio TTS, OS notifications, auto-dismiss timers)
  * live in the notifyToast() wrapper function, not in the store itself.
  *
+ * Can be used outside React via getNotificationState() / getNotificationActions().
  * notifyToast() is callable from anywhere (React components, services, orchestrators).
- * Non-React code can access state via useNotificationStore.getState().
  */
 
 import { create } from 'zustand';
@@ -38,6 +38,8 @@ export interface Toast {
 	actionLabel?: string; // Label for the action link (defaults to URL)
 	// Skip custom notification command for this toast (used for synopsis messages)
 	skipCustomNotification?: boolean;
+	// Generic click handler — if set, clicking the toast invokes this callback
+	onClick?: () => void;
 }
 
 export interface NotificationConfig {
@@ -73,6 +75,22 @@ export interface NotificationStoreActions {
 }
 
 export type NotificationStore = NotificationStoreState & NotificationStoreActions;
+
+// ============================================================================
+// Selectors
+// ============================================================================
+
+export function selectToasts(s: NotificationStoreState): Toast[] {
+	return s.toasts;
+}
+
+export function selectToastCount(s: NotificationStoreState): number {
+	return s.toasts.length;
+}
+
+export function selectConfig(s: NotificationStoreState): NotificationConfig {
+	return s.config;
+}
 
 // ============================================================================
 // Store
@@ -129,6 +147,11 @@ let toastIdCounter = 0;
 
 /** Active auto-dismiss timers keyed by toast ID. Cleared on manual removal. */
 const autoDismissTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** Reset the toast ID counter (for tests). */
+export function resetToastIdCounter(): void {
+	toastIdCounter = 0;
+}
 
 /**
  * Fire a toast notification. Handles:
@@ -216,7 +239,6 @@ export function notifyToast(toast: Omit<Toast, 'id' | 'timestamp'>): string {
 	if (willTriggerCustomNotification) {
 		if (typeof window !== 'undefined' && window.maestro?.notification?.speak) {
 			window.maestro.notification.speak(toast.message, config.audioFeedbackCommand).catch((err) => {
-				// Expected: audio/TTS may not be available on all platforms
 				console.error('[notificationStore] Custom notification failed:', err);
 			});
 		}
@@ -250,7 +272,6 @@ export function notifyToast(toast: Omit<Toast, 'id' | 'timestamp'>): string {
 			window.maestro.notification
 				.show(notifTitle, notifBody, toast.sessionId, toast.tabId)
 				.catch((err) => {
-					// Expected: OS notification API may be unavailable or permission denied
 					console.error('[notificationStore] Failed to show OS notification:', err);
 				});
 		}
@@ -266,4 +287,31 @@ export function notifyToast(toast: Omit<Toast, 'id' | 'timestamp'>): string {
 	}
 
 	return id;
+}
+
+// ============================================================================
+// Non-React access
+// ============================================================================
+
+/**
+ * Get current notification state snapshot.
+ * Use outside React (services, orchestrators, IPC handlers).
+ */
+export function getNotificationState() {
+	return useNotificationStore.getState();
+}
+
+/**
+ * Get stable notification action references outside React.
+ */
+export function getNotificationActions() {
+	const state = useNotificationStore.getState();
+	return {
+		addToast: state.addToast,
+		removeToast: state.removeToast,
+		clearToasts: state.clearToasts,
+		setDefaultDuration: state.setDefaultDuration,
+		setAudioFeedback: state.setAudioFeedback,
+		setOsNotifications: state.setOsNotifications,
+	};
 }

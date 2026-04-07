@@ -11,7 +11,7 @@
  * 2. Error recovery actions — clearError, restart, retry, newSession, authenticate
  * 3. Agent lifecycle actions — kill, interrupt
  *
- * Can be used outside React via useAgentStore.getState().
+ * Can be used outside React via useAgentStore.getState() / getAgentActions().
  */
 
 import { create } from 'zustand';
@@ -28,9 +28,8 @@ import type {
 } from '../types';
 import { createTab, getActiveTab } from '../utils/tabHelpers';
 import { getStdinFlags } from '../utils/spawnHelpers';
-import { captureException } from '../utils/sentry';
 import { generateId } from '../utils/ids';
-import { useSessionStore, updateSessionWith, updateAiTab, selectSessionById } from './sessionStore';
+import { useSessionStore } from './sessionStore';
 import { DEFAULT_IMAGE_ONLY_PROMPT } from '../hooks/input/useInputProcessing';
 import { maestroSystemPrompt } from '../../prompts';
 import { substituteTemplateVariables } from '../utils/templateVariables';
@@ -133,14 +132,17 @@ export type AgentStore = AgentStoreState & AgentStoreActions;
  * Find a session by ID from sessionStore.
  */
 function getSession(sessionId: string): Session | undefined {
-	return selectSessionById(sessionId)(useSessionStore.getState());
+	return useSessionStore.getState().sessions.find((s) => s.id === sessionId);
 }
 
 /**
  * Update a specific session in sessionStore using an updater function.
- * Delegates to the standalone updateSessionWith helper from sessionStore.
  */
-const updateSession = updateSessionWith;
+function updateSession(sessionId: string, updater: (s: Session) => Session): void {
+	useSessionStore
+		.getState()
+		.setSessions((prev) => prev.map((s) => (s.id === sessionId ? updater(s) : s)));
+}
 
 // ============================================================================
 // Store Implementation
@@ -178,7 +180,6 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 			};
 		});
 		// Close the agent error modal if open
-		// Expected: agent error modal may already be cleared or process dead
 		window.maestro.agentError.clearError(sessionId).catch((err) => {
 			console.error('Failed to clear agent error:', err);
 		});
@@ -236,9 +237,6 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 		const session = getSession(sessionId);
 		if (!session) {
 			console.error('[processQueuedItem] Session not found:', sessionId);
-			captureException(new Error('[processQueuedItem] Session not found'), {
-				extra: { sessionId },
-			});
 			return;
 		}
 
@@ -252,12 +250,17 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 				{ sessionId, itemTabId: item.tabId }
 			);
 			// Reset session to idle since we're aborting this queued item
-			updateSessionWith(sessionId, (s) => ({
-				...s,
-				state: 'idle' as SessionState,
-				busySource: undefined,
-				thinkingStartTime: undefined,
-			}));
+			useSessionStore.getState().setSessions((prev) =>
+				prev.map((s) => {
+					if (s.id !== sessionId) return s;
+					return {
+						...s,
+						state: 'idle' as SessionState,
+						busySource: undefined,
+						thinkingStartTime: undefined,
+					};
+				})
+			);
 			return;
 		}
 
@@ -267,12 +270,6 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 			console.error(
 				'[processQueuedItem] No target tab found — session has no aiTabs. Aborting spawn.',
 				{ sessionId, itemTabId: item.tabId }
-			);
-			captureException(
-				new Error('[processQueuedItem] No target tab found - session has no aiTabs'),
-				{
-					extra: { sessionId, itemTabId: item.tabId },
-				}
 			);
 			return;
 		}
@@ -324,6 +321,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 						groupId: session.groupId,
 						activeTabId: targetTab.id,
 						conductorProfile: deps.conductorProfile,
+						readOnlyMode: isReadOnly,
 					});
 				}
 
@@ -361,6 +359,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 					sessionCustomArgs: session.customArgs,
 					sessionCustomEnvVars: session.customEnvVars,
 					sessionCustomModel: session.customModel,
+					sessionCustomEffort: session.customEffort,
 					sessionCustomContextWindow: session.customContextWindow,
 					sessionSshRemoteConfig: session.sessionSshRemoteConfig,
 					sendPromptViaStdin,
@@ -418,6 +417,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 							groupId: session.groupId,
 							activeTabId: targetTab.id,
 							conductorProfile: deps.conductorProfile,
+							readOnlyMode: isReadOnly,
 						});
 					}
 
@@ -464,6 +464,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 						sessionCustomArgs: session.customArgs,
 						sessionCustomEnvVars: session.customEnvVars,
 						sessionCustomModel: session.customModel,
+						sessionCustomEffort: session.customEffort,
 						sessionCustomContextWindow: session.customContextWindow,
 						sessionSshRemoteConfig: session.sessionSshRemoteConfig,
 						sendPromptViaStdin: cmdSendViaStdin,
@@ -475,61 +476,70 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 						source: 'system',
 						text: `Unknown command: ${item.command}`,
 					});
-					updateSessionWith(sessionId, (s) => ({
-						...s,
-						state: 'idle' as SessionState,
-						busySource: undefined,
-						thinkingStartTime: undefined,
-						aiTabs: s.aiTabs?.map((tab) =>
-							tab.id === item.tabId
-								? { ...tab, state: 'idle' as const, thinkingStartTime: undefined }
-								: tab
-						),
-					}));
+					useSessionStore.getState().setSessions((prev) =>
+						prev.map((s) => {
+							if (s.id !== sessionId) return s;
+							const updatedAiTabs = s.aiTabs?.map((tab) =>
+								tab.id === item.tabId
+									? {
+											...tab,
+											state: 'idle' as const,
+											thinkingStartTime: undefined,
+										}
+									: tab
+							);
+							return {
+								...s,
+								state: 'idle' as SessionState,
+								busySource: undefined,
+								thinkingStartTime: undefined,
+								aiTabs: updatedAiTabs,
+							};
+						})
+					);
 				}
 			}
 		} catch (error: any) {
 			console.error('[processQueuedItem] Failed to process queued item:', error);
-			captureException(error, {
-				extra: { operation: 'processQueuedItem', sessionId, itemType: item.type },
-			});
 			const errorLogEntry: LogEntry = {
 				id: generateId(),
 				timestamp: Date.now(),
 				source: 'system',
 				text: `Error: Failed to process queued ${item.type} - ${error.message}`,
 			};
-			updateSessionWith(sessionId, (s) => {
-				const activeTab = getActiveTab(s);
-				if (!activeTab) {
-					console.error(
-						'[processQueuedItem error] No active tab found - session has no aiTabs, this should not happen'
-					);
-					captureException(new Error('[processQueuedItem] No active tab in error recovery path'), {
-						extra: { sessionId },
-					});
-				}
-				const updatedAiTabs =
-					s.aiTabs?.length > 0
-						? s.aiTabs.map((tab) =>
-								tab.id === s.activeTabId
-									? {
-											...tab,
-											state: 'idle' as const,
-											thinkingStartTime: undefined,
-											logs: [...tab.logs, errorLogEntry],
-										}
-									: tab
-							)
-						: s.aiTabs;
-				return {
-					...s,
-					state: 'idle' as SessionState,
-					busySource: undefined,
-					thinkingStartTime: undefined,
-					aiTabs: updatedAiTabs,
-				};
-			});
+			useSessionStore.getState().setSessions((prev) =>
+				prev.map((s) => {
+					if (s.id !== sessionId) return s;
+					const activeTab = getActiveTab(s);
+					const updatedAiTabs =
+						s.aiTabs?.length > 0
+							? s.aiTabs.map((tab) =>
+									tab.id === s.activeTabId
+										? {
+												...tab,
+												state: 'idle' as const,
+												thinkingStartTime: undefined,
+												logs: [...tab.logs, errorLogEntry],
+											}
+										: tab
+								)
+							: s.aiTabs;
+
+					if (!activeTab) {
+						console.error(
+							'[processQueuedItem error] No active tab found - session has no aiTabs, this should not happen'
+						);
+					}
+
+					return {
+						...s,
+						state: 'idle',
+						busySource: undefined,
+						thinkingStartTime: undefined,
+						aiTabs: updatedAiTabs,
+					};
+				})
+			);
 		}
 	},
 
@@ -550,3 +560,44 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 		}
 	},
 }));
+
+// ============================================================================
+// Selectors
+// ============================================================================
+
+/** Select the list of available (detected) agents */
+export const selectAvailableAgents = (state: AgentStore): AgentConfig[] => state.availableAgents;
+
+/** Select whether agent detection has completed */
+export const selectAgentsDetected = (state: AgentStore): boolean => state.agentsDetected;
+
+// ============================================================================
+// Non-React Access
+// ============================================================================
+
+/**
+ * Get the current agent store state snapshot.
+ * Use outside React (services, orchestrators, IPC handlers).
+ */
+export function getAgentState() {
+	return useAgentStore.getState();
+}
+
+/**
+ * Get stable agent action references outside React.
+ */
+export function getAgentActions() {
+	const state = useAgentStore.getState();
+	return {
+		refreshAgents: state.refreshAgents,
+		getAgentConfig: state.getAgentConfig,
+		processQueuedItem: state.processQueuedItem,
+		clearAgentError: state.clearAgentError,
+		startNewSessionAfterError: state.startNewSessionAfterError,
+		retryAfterError: state.retryAfterError,
+		restartAgentAfterError: state.restartAgentAfterError,
+		authenticateAfterError: state.authenticateAfterError,
+		killAgent: state.killAgent,
+		interruptAgent: state.interruptAgent,
+	};
+}

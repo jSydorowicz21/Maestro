@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, memo, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Star, Pencil } from 'lucide-react';
-import { Spinner } from '../ui';
+import { X, Star, Pencil, Loader2 } from 'lucide-react';
 import type { AITab as AITabType, Theme } from '../../types';
 import { safeClipboardWrite } from '../../utils/clipboard';
 import { buildSessionDeepLink } from '../../../shared/deep-link-urls';
@@ -484,7 +483,10 @@ export const AITab = memo(function AITab({
 			{/* Show regardless of busy state since tab naming runs in parallel with the main request */}
 			{tab.isGeneratingName && (
 				<span title="Generating tab name...">
-					<Spinner size="xs" className="shrink-0" style={{ color: theme.colors.textDim }} />
+					<Loader2
+						className="w-3 h-3 shrink-0 animate-spin"
+						style={{ color: theme.colors.textDim }}
+					/>
 				</span>
 			)}
 
@@ -492,7 +494,7 @@ export const AITab = memo(function AITab({
 			{tab.state !== 'busy' && tab.hasUnread && (
 				<div
 					className="w-2 h-2 rounded-full shrink-0"
-					style={{ backgroundColor: theme.colors.accent }}
+					style={{ backgroundColor: theme.colors.error }}
 					title="New messages"
 				/>
 			)}

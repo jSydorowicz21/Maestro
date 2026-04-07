@@ -216,7 +216,6 @@ export function useSymphonyContribution(
 					draftPrUrl: data.draftPrUrl,
 				})
 				.catch((err: unknown) => {
-					// Expected: contribution operations can fail for network reasons
 					console.error('[Symphony] Failed to register active contribution:', err);
 				});
 

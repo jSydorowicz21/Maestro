@@ -33,12 +33,14 @@ const mockOpenExternal = vi.fn();
 const mockClipboardWriteText = vi.fn();
 
 beforeEach(() => {
-	Object.assign(window.maestro.git, {
-		createGist: mockCreateGist,
-	});
-	Object.assign(window.maestro.shell, {
-		openExternal: mockOpenExternal,
-	});
+	(window as any).maestro = {
+		git: {
+			createGist: mockCreateGist,
+		},
+		shell: {
+			openExternal: mockOpenExternal,
+		},
+	};
 	// Mock navigator.clipboard
 	Object.assign(navigator, {
 		clipboard: {

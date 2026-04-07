@@ -12,7 +12,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
-import { createMockSession as _createMockSession } from '../../helpers/mockSession';
 
 // ============================================================================
 // Mocks — must be declared before importing the hook
@@ -55,7 +54,6 @@ import {
 	type UseTabExportHandlersDeps,
 } from '../../../renderer/hooks/tabs/useTabExportHandlers';
 import type { Session, AITab, LogEntry, Theme } from '../../../renderer/types';
-import { createMockTheme } from '../../helpers/mockTheme';
 
 // ============================================================================
 // Helpers
@@ -89,17 +87,63 @@ function createMockTab(overrides: Partial<AITab> = {}): AITab {
 	} as AITab;
 }
 
-// Wrapper: old factory included a default tab with specific defaults
 function createMockSession(overrides: Partial<Session> = {}): Session {
-	return _createMockSession({
+	return {
 		id: 'session-1',
 		name: 'Test Agent',
+		toolType: 'claude-code',
+		state: 'idle',
+		cwd: '/test/project',
+		fullPath: '/test/project',
+		projectRoot: '/test/project',
+		aiLogs: [],
+		shellLogs: [],
+		workLog: [],
+		contextUsage: 0,
+		inputMode: 'ai',
+		aiPid: 0,
+		terminalPid: 0,
+		port: 0,
+		isLive: false,
+		changedFiles: [],
+		isGitRepo: false,
+		fileTree: [],
+		fileExplorerExpanded: [],
+		fileExplorerScrollPos: 0,
+		executionQueue: [],
+		activeTimeMs: 0,
 		aiTabs: [createMockTab()],
 		activeTabId: 'tab-1',
+		closedTabHistory: [],
+		filePreviewTabs: [],
+		activeFileTabId: null,
 		unifiedTabOrder: [{ type: 'ai' as const, id: 'tab-1' }],
+		unifiedClosedTabHistory: [],
+		terminalTabs: [],
+		activeTerminalTabId: null,
 		...overrides,
-	});
+	} as Session;
 }
+
+function createMockTheme(): Theme {
+	return {
+		id: 'dark',
+		name: 'Dark',
+		mode: 'dark',
+		colors: {
+			background: '#1e1e1e',
+			surface: '#252526',
+			text: '#d4d4d4',
+			primary: '#007acc',
+			secondary: '#3c3c3c',
+			border: '#454545',
+			error: '#f44747',
+			success: '#4ec9b0',
+			warning: '#dcdcaa',
+		},
+	} as unknown as Theme;
+}
+
 function createDeps(overrides: Partial<UseTabExportHandlersDeps> = {}): UseTabExportHandlersDeps {
 	const session = createMockSession();
 	return {

@@ -6,6 +6,7 @@ import {
 	ChevronRight,
 	Clipboard,
 	Copy,
+	Loader2,
 	Globe,
 	Save,
 	Edit,
@@ -13,11 +14,9 @@ import {
 	GitGraph,
 	ExternalLink,
 } from 'lucide-react';
-import { Spinner } from '../ui';
 import { captureException } from '../../utils/sentry';
 import { formatShortcutKeys } from '../../utils/shortcutFormatter';
 import { formatFileSize, formatDateTime } from './filePreviewUtils';
-import { GhostIconButton } from '../ui/GhostIconButton';
 import { formatTokenCount } from '../../utils/tokenCounter';
 
 interface FilePreviewHeaderProps {
@@ -147,7 +146,7 @@ export const FilePreviewHeader = React.memo(function FilePreviewHeader({
 								}
 							>
 								{isSaving ? (
-									<Spinner size="xs" className="w-3.5 h-3.5" />
+									<Loader2 className="w-3.5 h-3.5 animate-spin" />
 								) : (
 									<Save className="w-3.5 h-3.5" />
 								)}
@@ -309,15 +308,15 @@ export const FilePreviewHeader = React.memo(function FilePreviewHeader({
 									}, 150);
 								}}
 							>
-								<GhostIconButton
+								<button
 									onClick={onNavigateBack}
 									disabled={!canGoBack}
-									className="disabled:opacity-30 disabled:cursor-default"
+									className="p-1 rounded hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-default"
 									style={{ color: canGoBack ? theme.colors.textMain : theme.colors.textDim }}
-									tooltip={`Go back (${formatShortcutKeys(['Meta', 'ArrowLeft'])})`}
+									title={`Go back (${formatShortcutKeys(['Meta', 'ArrowLeft'])})`}
 								>
 									<ChevronLeft className="w-4 h-4" />
-								</GhostIconButton>
+								</button>
 								{/* Back history popup */}
 								{showBackPopup && backHistory && backHistory.length > 0 && (
 									<div
@@ -366,15 +365,15 @@ export const FilePreviewHeader = React.memo(function FilePreviewHeader({
 									}, 150);
 								}}
 							>
-								<GhostIconButton
+								<button
 									onClick={onNavigateForward}
 									disabled={!canGoForward}
-									className="disabled:opacity-30 disabled:cursor-default"
+									className="p-1 rounded hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-default"
 									style={{ color: canGoForward ? theme.colors.textMain : theme.colors.textDim }}
-									tooltip={`Go forward (${formatShortcutKeys(['Meta', 'ArrowRight'])})`}
+									title={`Go forward (${formatShortcutKeys(['Meta', 'ArrowRight'])})`}
 								>
 									<ChevronRight className="w-4 h-4" />
-								</GhostIconButton>
+								</button>
 								{/* Forward history popup */}
 								{showForwardPopup && forwardHistory && forwardHistory.length > 0 && (
 									<div

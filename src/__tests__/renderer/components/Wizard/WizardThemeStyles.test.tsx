@@ -190,15 +190,8 @@ describe('Wizard Theme Styles', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 
-		// Apply mock overrides on the centralized mock from setup.ts
-		Object.assign(window.maestro.agents, mockMaestro.agents);
-		Object.assign(window.maestro.git, mockMaestro.git);
-		Object.assign(window.maestro.dialog, mockMaestro.dialog);
-		Object.assign(window.maestro.settings, mockMaestro.settings);
-		Object.assign(window.maestro.autorun, mockMaestro.autorun);
-		Object.assign(window.maestro.fs, mockMaestro.fs);
-		Object.assign(window.maestro.sshRemote, mockMaestro.sshRemote);
-		Object.assign(window.maestro.sessions, mockMaestro.sessions);
+		// Setup window.maestro mock
+		(window as any).maestro = mockMaestro;
 
 		// Setup default mock responses
 		mockMaestro.agents.detect.mockResolvedValue([

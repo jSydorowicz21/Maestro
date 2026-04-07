@@ -15,10 +15,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { SessionList } from '../../../renderer/components/SessionList';
 import type { Session, Group, Theme } from '../../../renderer/types';
-import { createMockSession } from '../../helpers/mockSession';
 import { useUIStore } from '../../../renderer/stores/uiStore';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
-import { useSettingsStore } from '../../../renderer/stores/settingsStore';
+import { useSettingsStore, DEFAULT_AUTO_RUN_STATS } from '../../../renderer/stores/settingsStore';
 import { useBatchStore } from '../../../renderer/stores/batchStore';
 import { useModalStore } from '../../../renderer/stores/modalStore';
 import type { BatchRunState } from '../../../renderer/types';
@@ -72,6 +71,7 @@ vi.mock('lucide-react', () => ({
 	Command: () => <span data-testid="icon-command" />,
 	MessageSquare: () => <span data-testid="icon-message-square" />,
 	MessageSquarePlus: () => <span data-testid="icon-message-square-plus" />,
+	Bell: () => <span data-testid="icon-bell" />,
 	Zap: ({ title, style }: { title?: string; style?: Record<string, string> }) => (
 		<span data-testid="icon-zap" title={title} style={style} />
 	),
@@ -161,6 +161,30 @@ const defaultShortcuts: Record<string, any> = {
 	filterUnreadAgents: { keys: ['meta', 'shift', 'u'], description: 'Filter unread agents' },
 };
 
+// Create mock session
+const createMockSession = (overrides: Partial<Session> = {}): Session => ({
+	id: `session-${Math.random().toString(36).substr(2, 9)}`,
+	name: 'Test Session',
+	toolType: 'claude-code',
+	state: 'idle',
+	inputMode: 'ai',
+	cwd: '/home/user/project',
+	projectRoot: '/home/user/project',
+	aiPid: 12345,
+	terminalPid: 12346,
+	aiLogs: [],
+	shellLogs: [],
+	isGitRepo: true,
+	fileTree: [],
+	fileExplorerExpanded: [],
+	messageQueue: [],
+	contextUsage: 30,
+	activeTimeMs: 60000,
+	terminalTabs: [],
+	activeTerminalTabId: null,
+	...overrides,
+});
+
 // Create mock group
 const createMockGroup = (overrides: Partial<Group> = {}): Group => ({
 	id: `group-${Math.random().toString(36).substr(2, 9)}`,
@@ -235,7 +259,7 @@ describe('SessionList', () => {
 			shortcuts: defaultShortcuts,
 			leftSidebarWidth: 300,
 			ungroupedCollapsed: false,
-			autoRunStats: { ...useSettingsStore.getState().autoRunStats },
+			autoRunStats: { ...DEFAULT_AUTO_RUN_STATS },
 		});
 		useBatchStore.setState({ batchRunStates: {} });
 		// Reset tunnel mock
@@ -498,19 +522,7 @@ describe('SessionList', () => {
 		it('shows OFFLINE text when sidebar width equals minimum threshold (256px) without autoRunStats', () => {
 			// Without autoRunStats, threshold is 256px so text shows at exactly 256px
 			useUIStore.setState({ leftSidebarOpen: true });
-			useSettingsStore.setState({
-				leftSidebarWidth: 256,
-				autoRunStats: {
-					cumulativeTimeMs: 0,
-					longestRunMs: 0,
-					longestRunTimestamp: 0,
-					totalRuns: 0,
-					currentBadgeLevel: 0,
-					lastBadgeUnlockLevel: 0,
-					lastAcknowledgedBadgeLevel: 0,
-					badgeHistory: [],
-				},
-			});
+			useSettingsStore.setState({ leftSidebarWidth: 256 });
 			const props = createDefaultProps({
 				isLiveMode: false,
 			});
@@ -561,19 +573,7 @@ describe('SessionList', () => {
 		it('shows LIVE text when sidebar width equals minimum threshold (256px) without autoRunStats', () => {
 			// Without autoRunStats, threshold is 256px so text shows at exactly 256px
 			useUIStore.setState({ leftSidebarOpen: true });
-			useSettingsStore.setState({
-				leftSidebarWidth: 256,
-				autoRunStats: {
-					cumulativeTimeMs: 0,
-					longestRunMs: 0,
-					longestRunTimestamp: 0,
-					totalRuns: 0,
-					currentBadgeLevel: 0,
-					lastBadgeUnlockLevel: 0,
-					lastAcknowledgedBadgeLevel: 0,
-					badgeHistory: [],
-				},
-			});
+			useSettingsStore.setState({ leftSidebarWidth: 256 });
 			const props = createDefaultProps({
 				isLiveMode: true,
 				webInterfaceUrl: 'http://localhost:3000',
@@ -724,7 +724,7 @@ describe('SessionList', () => {
 			const sessions = [createMockSession({ id: 's1', name: 'Test Session', bookmarked: false })];
 			useSessionStore.setState({ sessions: sessions });
 			useUIStore.setState({ leftSidebarOpen: true });
-			const setStateSpy = vi.spyOn(useSessionStore, 'setState');
+			const setSessions = vi.spyOn(useSessionStore.getState(), 'setSessions');
 			const props = createDefaultProps({
 				sortedSessions: sessions,
 			});
@@ -738,7 +738,7 @@ describe('SessionList', () => {
 			const bookmarkButtons = screen.getAllByTitle(/bookmark/i);
 			fireEvent.click(bookmarkButtons[0]);
 
-			expect(setStateSpy).toHaveBeenCalled();
+			expect(setSessions).toHaveBeenCalled();
 		});
 	});
 
@@ -1051,7 +1051,7 @@ describe('SessionList', () => {
 			const sessions = [createMockSession({ id: 's1', name: 'Bookmark Me', bookmarked: false })];
 			useSessionStore.setState({ sessions: sessions });
 			useUIStore.setState({ leftSidebarOpen: true });
-			const setStateSpy = vi.spyOn(useSessionStore, 'setState');
+			const setSessions = vi.spyOn(useSessionStore.getState(), 'setSessions');
 			const props = createDefaultProps({
 				sortedSessions: sessions,
 			});
@@ -1062,7 +1062,7 @@ describe('SessionList', () => {
 
 			fireEvent.click(screen.getByText('Add Bookmark'));
 
-			expect(setStateSpy).toHaveBeenCalled();
+			expect(setSessions).toHaveBeenCalled();
 		});
 
 		it('opens newInstance modal directly on duplicate (skips newAgentChoice)', () => {
@@ -1886,7 +1886,7 @@ describe('SessionList', () => {
 				groups: [group],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
-			const setStateSpy = vi.spyOn(useSessionStore, 'setState');
+			const setSessions = vi.spyOn(useSessionStore.getState(), 'setSessions');
 			const props = createDefaultProps({
 				sortedSessions: sessions,
 			});
@@ -1908,7 +1908,7 @@ describe('SessionList', () => {
 			const submenuButton = groupButtons.find((el) => el.closest('button')?.closest('.absolute'));
 			fireEvent.click(submenuButton || groupButtons[groupButtons.length - 1]);
 
-			expect(setStateSpy).toHaveBeenCalled();
+			expect(setSessions).toHaveBeenCalled();
 		});
 	});
 
@@ -3001,14 +3001,14 @@ describe('SessionList', () => {
 				useSettingsStore.setState({ leftSidebarWidth: 300 });
 			}); // Reset for second drag
 
-			// Try to drag below min (256px)
+			// Try to drag below min (280px)
 			fireEvent.mouseDown(resizeHandle!, { clientX: 300 });
 			fireEvent.mouseMove(document, { clientX: 100 });
 			// State is only updated on mouseUp for performance
 			fireEvent.mouseUp(document);
 
-			// Should be clamped to 256
-			expect(setLeftSidebarWidthState).toHaveBeenCalledWith(256);
+			// Should be clamped to 280
+			expect(setLeftSidebarWidthState).toHaveBeenCalledWith(280);
 		});
 	});
 

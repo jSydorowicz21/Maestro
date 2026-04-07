@@ -12,8 +12,7 @@
  * - Proper cleanup on unmount
  */
 
-import { useRef, useCallback } from 'react';
-import { useEventListener } from '../utils/useEventListener';
+import { useRef, useEffect, useCallback } from 'react';
 
 /**
  * Configuration options for the time tracking hook
@@ -113,10 +112,9 @@ export function useTimeTracking(options: UseTimeTrackingOptions): UseTimeTrackin
 	// Track which sessions are being tracked
 	const trackingSessionsRef = useRef<Set<string>>(new Set());
 
-	// Visibility change handler - uses refs for latest values so no deps needed
-	useEventListener(
-		'visibilitychange',
-		() => {
+	// Visibility change handler effect
+	useEffect(() => {
+		const handleVisibilityChange = () => {
 			const now = Date.now();
 
 			// Only update sessions that are currently being tracked
@@ -143,9 +141,11 @@ export function useTimeTracking(options: UseTimeTrackingOptions): UseTimeTrackin
 					);
 				}
 			}
-		},
-		document
-	);
+		};
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+		return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+	}, []); // Empty deps - handler uses refs for latest values
 
 	/**
 	 * Start tracking time for a session

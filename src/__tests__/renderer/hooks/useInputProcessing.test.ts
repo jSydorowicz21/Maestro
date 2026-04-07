@@ -17,6 +17,7 @@ vi.mock('../../../renderer/hooks/agent/useAgentCapabilities', async () => {
 });
 
 import { useInputProcessing } from '../../../renderer/hooks/input/useInputProcessing';
+import { useSettingsStore } from '../../../renderer/stores/settingsStore';
 import type {
 	Session,
 	AITab,
@@ -24,7 +25,6 @@ import type {
 	BatchRunState,
 	QueuedItem,
 } from '../../../renderer/types';
-import { createMockSession } from '../../helpers/mockSession';
 
 // Create a mock AITab
 const createMockTab = (overrides: Partial<AITab> = {}): AITab => ({
@@ -40,6 +40,41 @@ const createMockTab = (overrides: Partial<AITab> = {}): AITab => ({
 	saveToHistory: true,
 	...overrides,
 });
+
+// Create a mock Session
+const createMockSession = (overrides: Partial<Session> = {}): Session => {
+	const baseTab = createMockTab();
+
+	return {
+		id: 'session-1',
+		name: 'Test Session',
+		toolType: 'claude-code',
+		state: 'idle',
+		cwd: '/test/project',
+		fullPath: '/test/project',
+		projectRoot: '/test/project',
+		aiLogs: [],
+		shellLogs: [],
+		workLog: [],
+		contextUsage: 0,
+		inputMode: 'ai',
+		aiPid: 1234,
+		terminalPid: 5678,
+		port: 0,
+		isLive: false,
+		changedFiles: [],
+		isGitRepo: false,
+		fileTree: [],
+		fileExplorerExpanded: [],
+		fileExplorerScrollPos: 0,
+		aiTabs: [baseTab],
+		activeTabId: baseTab.id,
+		closedTabHistory: [],
+		executionQueue: [],
+		activeTimeMs: 0,
+		...overrides,
+	} as Session;
+};
 
 // Default batch state (not running)
 const defaultBatchState: BatchRunState = {
@@ -71,26 +106,40 @@ describe('useInputProcessing', () => {
 	const mockOnHistoryCommand = vi.fn().mockResolvedValue(undefined);
 	const mockInputRef = { current: null } as React.RefObject<HTMLTextAreaElement | null>;
 
+	// Store original window.maestro
+	const originalMaestro = { ...window.maestro };
+
 	beforeEach(() => {
 		vi.clearAllMocks();
 		mockGetBatchState.mockReturnValue(defaultBatchState);
 
-		Object.assign(window.maestro.process, {
-			spawn: vi.fn().mockResolvedValue(undefined),
-			write: vi.fn().mockResolvedValue(undefined),
-			runCommand: vi.fn().mockResolvedValue(undefined),
-		});
-		Object.assign(window.maestro.agents, {
-			get: vi.fn().mockResolvedValue({
-				id: 'claude-code',
-				command: 'claude',
-				path: '/usr/local/bin/claude',
-				args: ['--print', '--verbose'],
-			}),
-		});
-		Object.assign(window.maestro.web, {
-			broadcastUserInput: vi.fn().mockResolvedValue(undefined),
-		});
+		// Mock window.maestro.process.spawn
+		window.maestro = {
+			...window.maestro,
+			process: {
+				...window.maestro?.process,
+				spawn: vi.fn().mockResolvedValue(undefined),
+				write: vi.fn().mockResolvedValue(undefined),
+				runCommand: vi.fn().mockResolvedValue(undefined),
+			},
+			agents: {
+				...window.maestro?.agents,
+				get: vi.fn().mockResolvedValue({
+					id: 'claude-code',
+					command: 'claude',
+					path: '/usr/local/bin/claude',
+					args: ['--print', '--verbose'],
+				}),
+			},
+			web: {
+				...window.maestro?.web,
+				broadcastUserInput: vi.fn().mockResolvedValue(undefined),
+			},
+		} as typeof window.maestro;
+	});
+
+	afterEach(() => {
+		Object.assign(window.maestro, originalMaestro);
 	});
 
 	// Helper to create hook dependencies
@@ -828,6 +877,108 @@ describe('useInputProcessing', () => {
 		});
 	});
 
+	describe('forced parallel execution', () => {
+		it('bypasses queue when forceParallel is true and setting is enabled', async () => {
+			useSettingsStore.setState({ forcedParallelExecution: true } as any);
+
+			const busySession = createMockSession({
+				state: 'busy',
+				aiTabs: [createMockTab({ state: 'busy' })],
+			});
+			const deps = createDeps({
+				activeSession: busySession,
+				sessionsRef: { current: [busySession] },
+				inputValue: 'forced message',
+			});
+			const { result } = renderHook(() => useInputProcessing(deps));
+
+			await act(async () => {
+				await result.current.processInput(undefined, { forceParallel: true });
+			});
+
+			// Should NOT queue — should process immediately (spawn called)
+			expect(window.maestro.process.spawn).toHaveBeenCalled();
+		});
+
+		it('bypasses queue when forceParallel is true and AutoRun is active', async () => {
+			useSettingsStore.setState({ forcedParallelExecution: true } as any);
+
+			const runningBatchState: BatchRunState = {
+				...defaultBatchState,
+				isRunning: true,
+			};
+			mockGetBatchState.mockReturnValue(runningBatchState);
+
+			const session = createMockSession({ state: 'busy' });
+			const deps = createDeps({
+				activeSession: session,
+				sessionsRef: { current: [session] },
+				inputValue: 'forced during autorun',
+				activeBatchRunState: runningBatchState,
+			});
+			const { result } = renderHook(() => useInputProcessing(deps));
+
+			await act(async () => {
+				await result.current.processInput(undefined, { forceParallel: true });
+			});
+
+			// Should process immediately, not queue
+			expect(window.maestro.process.spawn).toHaveBeenCalled();
+		});
+
+		it('still queues when forceParallel is true but setting is disabled', async () => {
+			useSettingsStore.setState({ forcedParallelExecution: false } as any);
+
+			const busySession = createMockSession({
+				state: 'busy',
+				aiTabs: [createMockTab({ state: 'busy' })],
+			});
+			const deps = createDeps({
+				activeSession: busySession,
+				inputValue: 'should be queued',
+			});
+			const { result } = renderHook(() => useInputProcessing(deps));
+
+			await act(async () => {
+				await result.current.processInput(undefined, { forceParallel: true });
+			});
+
+			// Should add to execution queue because setting is off
+			expect(mockSetSessions).toHaveBeenCalled();
+			const setSessionsCall = mockSetSessions.mock.calls[0][0];
+			const updatedSessions = setSessionsCall([busySession]);
+			expect(updatedSessions[0].executionQueue.length).toBe(1);
+		});
+
+		it('queues normally when forceParallel is absent and session is busy', async () => {
+			useSettingsStore.setState({ forcedParallelExecution: true } as any);
+
+			const busySession = createMockSession({
+				state: 'busy',
+				aiTabs: [createMockTab({ state: 'busy' })],
+			});
+			const deps = createDeps({
+				activeSession: busySession,
+				inputValue: 'regular message',
+			});
+			const { result } = renderHook(() => useInputProcessing(deps));
+
+			await act(async () => {
+				await result.current.processInput(); // No forceParallel option
+			});
+
+			// Should queue normally
+			expect(mockSetSessions).toHaveBeenCalled();
+			const setSessionsCall = mockSetSessions.mock.calls[0][0];
+			const updatedSessions = setSessionsCall([busySession]);
+			expect(updatedSessions[0].executionQueue.length).toBe(1);
+		});
+
+		afterEach(() => {
+			useSettingsStore.setState({ forcedParallelExecution: false } as any);
+		});
+	});
+
 	describe('flushBatchedUpdates', () => {
 		it('calls flushBatchedUpdates before processing', async () => {
 			const deps = createDeps({ inputValue: 'test message' });
@@ -968,11 +1119,12 @@ describe('useInputProcessing', () => {
 			mockGenerateTabName.mockResolvedValue('Generated Tab Name');
 
 			// Add tabNaming mock to window.maestro
-			Object.assign(window.maestro, {
+			window.maestro = {
+				...window.maestro,
 				tabNaming: {
 					generateTabName: mockGenerateTabName,
 				},
-			});
+			} as typeof window.maestro;
 		});
 
 		it('triggers tab naming for new AI session with text message', async () => {

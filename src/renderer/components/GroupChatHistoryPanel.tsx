@@ -7,9 +7,7 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { useEventListener } from '../hooks/utils/useEventListener';
 import { Check, Send, MessageSquare, Layers, AlertTriangle } from 'lucide-react';
-import { EmptyState } from './ui';
 import type { Theme } from '../types';
 import { useContextMenuPosition } from '../hooks/ui/useContextMenuPosition';
 import type {
@@ -17,7 +15,6 @@ import type {
 	GroupChatHistoryEntryType,
 } from '../../shared/group-chat-types';
 import { stripMarkdown } from '../utils/textProcessing';
-import { formatTimestamp } from '../../shared/formatters';
 import { useUIStore } from '../stores/uiStore';
 
 // Lookback period options for the activity graph
@@ -183,7 +180,13 @@ function GroupChatActivityGraph({
 	};
 
 	// Close context menu when clicking elsewhere
-	useEventListener('click', () => setContextMenu(null), contextMenu ? document : null);
+	useEffect(() => {
+		const handleClick = () => setContextMenu(null);
+		if (contextMenu) {
+			document.addEventListener('click', handleClick);
+			return () => document.removeEventListener('click', handleClick);
+		}
+	}, [contextMenu]);
 
 	// Generate labels for the x-axis
 	const getAxisLabels = () => {
@@ -565,6 +568,23 @@ export function GroupChatHistoryPanel({
 		}
 	};
 
+	// Format timestamp
+	const formatTime = (timestamp: number) => {
+		const date = new Date(timestamp);
+		const now = new Date();
+		const isToday = date.toDateString() === now.toDateString();
+
+		if (isToday) {
+			return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+		} else {
+			return (
+				date.toLocaleDateString([], { month: 'short', day: 'numeric' }) +
+				' ' +
+				date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+			);
+		}
+	};
+
 	return (
 		<div
 			className="flex-1 flex flex-col overflow-hidden p-3"
@@ -642,20 +662,19 @@ export function GroupChatHistoryPanel({
 				{isLoading ? (
 					<div className="text-center py-8 text-xs opacity-50">Loading history...</div>
 				) : filteredEntries.length === 0 ? (
-					<EmptyState
-						theme={theme}
-						message={
-							entries.length === 0
-								? 'No task history yet.'
-								: searchFilter
-									? `No entries match "${searchFilter}"`
-									: 'No entries match the selected filters.'
-						}
-						description={
-							entries.length === 0 ? 'Entries will appear when agents complete tasks.' : undefined
-						}
-						className="py-8"
-					/>
+					<div className="text-center py-8 text-xs opacity-50">
+						{entries.length === 0 ? (
+							<>
+								No task history yet.
+								<br />
+								Entries will appear when agents complete tasks.
+							</>
+						) : searchFilter ? (
+							`No entries match "${searchFilter}"`
+						) : (
+							'No entries match the selected filters.'
+						)}
+					</div>
 				) : (
 					filteredEntries.map((entry) => {
 						const participantColor =
@@ -689,7 +708,7 @@ export function GroupChatHistoryPanel({
 									</span>
 									{/* Timestamp */}
 									<span className="text-[10px]" style={{ color: theme.colors.textDim }}>
-										{formatTimestamp(entry.timestamp)}
+										{formatTime(entry.timestamp)}
 									</span>
 								</div>
 

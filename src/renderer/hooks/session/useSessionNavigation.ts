@@ -1,7 +1,6 @@
 import { useCallback, MutableRefObject } from 'react';
 import type { Session } from '../../types';
 import type { NavHistoryEntry } from './useNavigationHistory';
-import { updateSessionWith } from '../../stores/sessionStore';
 
 /**
  * Dependencies required by the useSessionNavigation hook
@@ -13,6 +12,8 @@ export interface UseSessionNavigationDeps {
 	navigateForward: () => NavHistoryEntry | null;
 	/** Session state setter (setActiveSessionIdInternal in App.tsx) */
 	setActiveSessionId: (id: string) => void;
+	/** Session list state setter */
+	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	/** Ref for tracking cycle position during session cycling */
 	cyclePositionRef: MutableRefObject<number>;
 	/** Navigate to a group chat (loads messages, starts moderator) */
@@ -57,6 +58,7 @@ export function useSessionNavigation(
 		navigateBack,
 		navigateForward,
 		setActiveSessionId,
+		setSessions,
 		cyclePositionRef,
 		onNavigateToGroupChat,
 	} = deps;
@@ -80,19 +82,23 @@ export function useSessionNavigation(
 
 			if (entry.tabId) {
 				const targetTabId = entry.tabId;
-				updateSessionWith(entry.sessionId!, (s) => {
-					if (!s.aiTabs?.some((t) => t.id === targetTabId)) return s;
-					return {
-						...s,
-						activeTabId: targetTabId,
-						activeFileTabId: null,
-						activeTerminalTabId: null,
-						inputMode: 'ai' as const,
-					};
-				});
+				setSessions((prev) =>
+					prev.map((s) => {
+						if (s.id === entry.sessionId && s.aiTabs?.some((t) => t.id === targetTabId)) {
+							return {
+								...s,
+								activeTabId: targetTabId,
+								activeFileTabId: null,
+								activeTerminalTabId: null,
+								inputMode: 'ai' as const,
+							};
+						}
+						return s;
+					})
+				);
 			}
 		},
-		[sessions, setActiveSessionId, cyclePositionRef, onNavigateToGroupChat]
+		[sessions, setActiveSessionId, cyclePositionRef, setSessions, onNavigateToGroupChat]
 	);
 
 	// Navigate back in history (through sessions, tabs, and group chats)

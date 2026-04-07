@@ -91,7 +91,6 @@ export function useSshRemotes(): UseSshRemotesReturn {
 				setError(result.error || 'Failed to load SSH remote configurations');
 			}
 		} catch (err) {
-			// Expected: SSH remote config loading can fail for user configuration issues
 			console.error('[useSshRemotes] Failed to load configs:', err);
 			setError(err instanceof Error ? err.message : 'Failed to load SSH remote configurations');
 		}
@@ -106,11 +105,9 @@ export function useSshRemotes(): UseSshRemotesReturn {
 			if (result.success) {
 				setDefaultIdState(result.id ?? null);
 			} else {
-				// Expected: SSH default ID lookup can fail for user configuration issues
 				console.error('[useSshRemotes] Failed to load default ID:', result.error);
 			}
 		} catch (err) {
-			// Expected: SSH default ID lookup can fail for user configuration issues
 			console.error('[useSshRemotes] Failed to load default ID:', err);
 		}
 	}, []);
@@ -165,7 +162,6 @@ export function useSshRemotes(): UseSshRemotesReturn {
 					return { success: false, error: errorMsg };
 				}
 			} catch (err) {
-				// Expected: SSH remote config save can fail for user configuration issues
 				console.error('[useSshRemotes] Failed to save config:', err);
 				const errorMsg =
 					err instanceof Error ? err.message : 'Failed to save SSH remote configuration';
@@ -200,7 +196,6 @@ export function useSshRemotes(): UseSshRemotesReturn {
 					return { success: false, error: errorMsg };
 				}
 			} catch (err) {
-				// Expected: SSH remote config delete can fail for user configuration issues
 				console.error('[useSshRemotes] Failed to delete config:', err);
 				const errorMsg =
 					err instanceof Error ? err.message : 'Failed to delete SSH remote configuration';
@@ -228,7 +223,6 @@ export function useSshRemotes(): UseSshRemotesReturn {
 					return { success: false, error: errorMsg };
 				}
 			} catch (err) {
-				// Expected: SSH default ID update can fail for user configuration issues
 				console.error('[useSshRemotes] Failed to set default ID:', err);
 				const errorMsg = err instanceof Error ? err.message : 'Failed to set default SSH remote';
 				setError(errorMsg);
@@ -260,7 +254,6 @@ export function useSshRemotes(): UseSshRemotesReturn {
 					return { success: false, error: result.error || 'Connection test failed' };
 				}
 			} catch (err) {
-				// Expected: SSH connection test can fail for user configuration issues
 				console.error('[useSshRemotes] Failed to test connection:', err);
 				setTestingConfigId(null);
 				const errorMsg = err instanceof Error ? err.message : 'Connection test failed';

@@ -65,10 +65,12 @@ describe('usePipelineLayout', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 		vi.clearAllMocks();
-		Object.assign(window.maestro.cue, {
-			savePipelineLayout: vi.fn().mockResolvedValue(undefined),
-			loadPipelineLayout: vi.fn().mockResolvedValue(null),
-		});
+		(window as any).maestro = {
+			cue: {
+				savePipelineLayout: vi.fn().mockResolvedValue(undefined),
+				loadPipelineLayout: vi.fn().mockResolvedValue(null),
+			},
+		};
 		mockGraphSessionsToPipelines.mockReturnValue([]);
 	});
 

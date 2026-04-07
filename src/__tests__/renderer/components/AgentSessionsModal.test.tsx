@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import { AgentSessionsModal } from '../../../renderer/components/AgentSessionsModal';
 import type { Theme, Session } from '../../../renderer/types';
-import { createMockSession } from '../../helpers/mockSession';
-import { mockTheme } from '../../helpers/mockTheme';
 
 // Mock LayerStackContext
 const mockRegisterLayer = vi.fn(() => 'layer-id-1');
@@ -24,12 +22,58 @@ vi.mock('../../../renderer/constants/modalPriorities', () => ({
 		AGENT_SESSIONS: 200,
 	},
 }));
+
+// Create a mock theme
+const mockTheme: Theme = {
+	id: 'dracula',
+	name: 'Dracula',
+	mode: 'dark',
+	colors: {
+		bgMain: '#282a36',
+		bgSidebar: '#21222c',
+		bgActivity: '#343746',
+		textMain: '#f8f8f2',
+		textDim: '#6272a4',
+		accent: '#bd93f9',
+		accentForeground: '#f8f8f2',
+		border: '#44475a',
+		success: '#50fa7b',
+		warning: '#ffb86c',
+		error: '#ff5555',
+		scrollbar: '#44475a',
+		scrollbarHover: '#6272a4',
+	},
+};
+
 const lightTheme: Theme = {
 	...mockTheme,
 	id: 'github-light',
 	name: 'GitHub Light',
 	mode: 'light',
 };
+
+// Create a mock session
+const createMockSession = (overrides: Partial<Session> = {}): Session =>
+	({
+		id: 'session-1',
+		name: 'Test Session',
+		cwd: '/test/project',
+		projectRoot: '/test/project',
+		inputMode: 'ai',
+		state: 'idle',
+		toolType: 'claude-code',
+		aiPid: 12345,
+		terminalPid: 12346,
+		aiLogs: [],
+		shellLogs: [],
+		isGitRepo: true,
+		fileTree: [],
+		fileExplorerExpanded: [],
+		messageQueue: [],
+		terminalTabs: [],
+		activeTerminalTabId: null,
+		...overrides,
+	}) as Session;
 
 // Create a mock Claude session
 interface MockClaudeSession {

@@ -9,10 +9,42 @@
  */
 
 import { ipcRenderer } from 'electron';
-import type { AgentCapabilities, AgentConfig } from '../../shared/types';
 
-// Re-export for consumers that import from this file
-export type { AgentCapabilities, AgentConfig };
+/**
+ * Capability flags that determine what features are available for each agent.
+ * This is a simplified version for the renderer - full definition in agent-capabilities.ts
+ */
+export interface AgentCapabilities {
+	supportsResume: boolean;
+	supportsReadOnlyMode: boolean;
+	supportsJsonOutput: boolean;
+	supportsSessionId: boolean;
+	supportsImageInput: boolean;
+	supportsImageInputOnResume: boolean;
+	supportsSlashCommands: boolean;
+	supportsSessionStorage: boolean;
+	supportsCostTracking: boolean;
+	supportsUsageStats: boolean;
+	supportsBatchMode: boolean;
+	requiresPromptToStart: boolean;
+	supportsStreaming: boolean;
+	supportsResultMessages: boolean;
+	supportsModelSelection: boolean;
+	supportsStreamJsonInput: boolean;
+}
+
+/**
+ * Agent configuration
+ */
+export interface AgentConfig {
+	id: string;
+	name: string;
+	command: string;
+	args?: string[];
+	available: boolean;
+	path?: string;
+	capabilities?: AgentCapabilities;
+}
 
 /**
  * Agent refresh result
@@ -139,6 +171,16 @@ export function createAgentsApi() {
 		 */
 		getModels: (agentId: string, forceRefresh?: boolean, sshRemoteId?: string): Promise<string[]> =>
 			ipcRenderer.invoke('agents:getModels', agentId, forceRefresh, sshRemoteId),
+
+		/**
+		 * Discover available values for a dynamic select config option
+		 */
+		getConfigOptions: (
+			agentId: string,
+			optionKey: string,
+			forceRefresh?: boolean
+		): Promise<string[]> =>
+			ipcRenderer.invoke('agents:getConfigOptions', agentId, optionKey, forceRefresh),
 
 		/**
 		 * Discover available slash commands for an agent.

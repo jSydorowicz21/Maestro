@@ -13,11 +13,9 @@
  */
 
 import React, { memo, useMemo, useCallback, useState } from 'react';
-import { EmptyState } from '../ui';
 import type { Theme } from '../../types';
 import type { StatsAggregation } from '../../hooks/stats/useStats';
 import { COLORBLIND_AGENT_PALETTE } from '../../constants/colorblindPalettes';
-import { formatElapsedTime as formatDuration, formatNumber } from '../../../shared/formatters';
 
 interface AgentData {
 	agent: string;
@@ -69,6 +67,37 @@ function getAgentColor(
 	];
 
 	return additionalColors[(index - 1) % additionalColors.length];
+}
+
+/**
+ * Format duration in milliseconds to human-readable string
+ */
+function formatDuration(ms: number): string {
+	const totalSeconds = Math.floor(ms / 1000);
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+
+	if (hours > 0) {
+		return `${hours}h ${minutes}m`;
+	}
+	if (minutes > 0) {
+		return `${minutes}m ${seconds}s`;
+	}
+	return `${seconds}s`;
+}
+
+/**
+ * Format large numbers with K/M suffixes
+ */
+function formatNumber(num: number): string {
+	if (num >= 1000000) {
+		return `${(num / 1000000).toFixed(1)}M`;
+	}
+	if (num >= 1000) {
+		return `${(num / 1000).toFixed(1)}K`;
+	}
+	return num.toString();
 }
 
 export const AgentComparisonChart = memo(function AgentComparisonChart({
@@ -146,7 +175,12 @@ export const AgentComparisonChart = memo(function AgentComparisonChart({
 			{/* Chart container */}
 			<div className="relative">
 				{agentData.length === 0 ? (
-					<EmptyState theme={theme} className="h-32" message="No agent data available" />
+					<div
+						className="flex items-center justify-center h-32"
+						style={{ color: theme.colors.textDim }}
+					>
+						<span className="text-sm">No agent data available</span>
+					</div>
 				) : (
 					<div className="space-y-2" role="list" aria-label="Agent usage data">
 						{agentData.map((agent) => {

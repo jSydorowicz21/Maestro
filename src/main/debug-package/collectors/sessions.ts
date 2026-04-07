@@ -10,7 +10,7 @@
 import Store from 'electron-store';
 import { sanitizePath } from './sanitize';
 
-export interface DebugSessionInfo {
+export interface SessionInfo {
 	id: string;
 	groupId?: string;
 	toolType: string;
@@ -39,14 +39,14 @@ export interface DebugSessionInfo {
 /**
  * Collect session metadata without conversation content.
  */
-export async function collectSessions(sessionsStore: Store<any>): Promise<DebugSessionInfo[]> {
-	const sessions: DebugSessionInfo[] = [];
+export async function collectSessions(sessionsStore: Store<any>): Promise<SessionInfo[]> {
+	const sessions: SessionInfo[] = [];
 
 	// Get all sessions from the store
 	const storedSessions = sessionsStore.get('sessions', []) as any[];
 
 	for (const session of storedSessions) {
-		const sessionInfo: DebugSessionInfo = {
+		const sessionInfo: SessionInfo = {
 			id: session.id || 'unknown',
 			groupId: session.groupId,
 			toolType: session.toolType || 'unknown',

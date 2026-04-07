@@ -14,12 +14,12 @@ import {
 } from 'lucide-react';
 import type { Theme } from '../types';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useThrottledCallback } from '../hooks';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { safeClipboardWrite } from '../utils/clipboard';
 import { ConfirmModal } from './ConfirmModal';
 import { useSessionStore } from '../stores/sessionStore';
-import { EmptyState } from './ui';
 
 interface SystemLogEntry {
 	timestamp: number;
@@ -128,11 +128,17 @@ export function LogViewer({
 	const [expandedData, setExpandedData] = useState<Set<number>>(new Set());
 	const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 	const [showClearConfirm, setShowClearConfirm] = useState(false);
+	const [viewportPercent, setViewportPercent] = useState<number | null>(null);
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
+	const scrollTargetRef = useRef<HTMLDivElement | null>(null);
+	const layerIdRef = useRef<string>();
+
 	// Store onClose in ref to avoid re-registering layer when callback identity changes
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
+
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
 
 	const toggleDataExpanded = (index: number) => {
 		setExpandedData((prev) => {
@@ -227,20 +233,48 @@ export function LogViewer({
 		setFilteredLogs(filtered);
 	}, [logs, searchQuery, selectedLevels]);
 
-	// Escape handler for layer stack
-	const handleEscape = useCallback(() => {
-		if (searchOpen) {
-			setSearchOpen(false);
-			setSearchQuery('');
-			containerRef.current?.focus();
-		} else {
-			onCloseRef.current();
-		}
-	}, [searchOpen]);
+	// Register layer on mount
+	// Note: Using 'modal' type because LogViewer blocks all shortcuts (like the original modalOpen check)
+	useEffect(() => {
+		layerIdRef.current = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.LOG_VIEWER,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'lenient',
+			ariaLabel: 'System Log Viewer',
+			onEscape: () => {
+				if (searchOpen) {
+					setSearchOpen(false);
+					setSearchQuery('');
+					containerRef.current?.focus();
+				} else {
+					onCloseRef.current();
+				}
+			},
+		});
 
-	useModalLayer(MODAL_PRIORITIES.LOG_VIEWER, 'System Log Viewer', handleEscape, {
-		focusTrap: 'lenient',
-	});
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [registerLayer, unregisterLayer]); // Note: onClose NOT in deps (using ref)
+
+	// Update layer handler when dependencies change
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, () => {
+				if (searchOpen) {
+					setSearchOpen(false);
+					setSearchQuery('');
+					containerRef.current?.focus();
+				} else {
+					onCloseRef.current();
+				}
+			});
+		}
+	}, [searchOpen, updateLayerHandler]); // Note: onClose NOT in deps (using ref)
 
 	// Auto-focus container on mount for keyboard navigation
 	useEffect(() => {
@@ -353,6 +387,34 @@ export function LogViewer({
 			containerRef.current?.scrollBy({ top: 100, behavior: 'smooth' });
 		}
 	};
+
+	// Track scroll position for the viewport indicator on the timeline bar
+	const handleScrollInner = useCallback(() => {
+		const target = scrollTargetRef.current;
+		if (!target) return;
+		const maxScroll = target.scrollHeight - target.clientHeight;
+		if (maxScroll <= 0) {
+			setViewportPercent(null);
+			return;
+		}
+		const percent = (target.scrollTop / maxScroll) * 100;
+		// Hide indicator when fully at top or bottom
+		if (target.scrollTop < 10) {
+			setViewportPercent(null);
+		} else {
+			setViewportPercent(Math.max(0, Math.min(100, percent)));
+		}
+	}, []);
+
+	const throttledScrollHandler = useThrottledCallback(handleScrollInner, 16);
+
+	const handleScroll = useCallback(
+		(e: React.UIEvent<HTMLDivElement>) => {
+			scrollTargetRef.current = e.currentTarget;
+			throttledScrollHandler();
+		},
+		[throttledScrollHandler]
+	);
 
 	const getLevelColor = (level: string) => LOG_LEVEL_COLORS[level]?.fg ?? theme.colors.textDim;
 	const getLevelBgColor = (level: string) => LOG_LEVEL_COLORS[level]?.bg ?? 'transparent';
@@ -527,7 +589,19 @@ export function LogViewer({
 
 			{/* Visual Log History Timeline */}
 			<div className="sticky top-0 z-10 pt-2 px-4" style={{ backgroundColor: theme.colors.bgMain }}>
-				<div className="flex h-2 w-full mb-2 rounded-sm overflow-hidden">
+				<div className="flex h-2 w-full mb-2 rounded-sm overflow-hidden relative">
+					{/* Viewport position indicator */}
+					{viewportPercent !== null && (
+						<div
+							className="absolute top-0 bottom-0 pointer-events-none z-20"
+							style={{
+								left: `${viewportPercent}%`,
+								width: '2px',
+								backgroundColor: theme.colors.error,
+								transition: 'left 0.15s ease-out',
+							}}
+						/>
+					)}
 					{filteredLogs.map((log, idx) => (
 						<div
 							key={`${log.timestamp}-${log.level}-${idx}`}
@@ -584,16 +658,15 @@ export function LogViewer({
 			{/* Logs Container */}
 			<div
 				ref={containerRef}
+				onScroll={handleScroll}
 				className="flex-1 overflow-y-auto p-4 space-y-2 outline-none scrollbar-thin"
 				tabIndex={-1}
 				style={{ backgroundColor: theme.colors.bgMain }}
 			>
 				{filteredLogs.length === 0 ? (
-					<EmptyState
-						theme={theme}
-						message={logs.length === 0 ? 'No logs yet' : 'No logs match your filter'}
-						className="py-12 opacity-50"
-					/>
+					<div className="text-center py-12 opacity-50" style={{ color: theme.colors.textDim }}>
+						{logs.length === 0 ? 'No logs yet' : 'No logs match your filter'}
+					</div>
 				) : (
 					filteredLogs.map((log, index) => (
 						<div

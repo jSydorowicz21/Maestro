@@ -36,28 +36,34 @@ Clean up remaining P3 (nice-to-have) duplications:
 
 ### 2. Consolidate DEFAULT_CAPABILITIES (2 definitions)
 
-- [ ] Verify locations: `main/agents/capabilities.ts:98` (canonical) and `renderer/hooks/agent/useAgentCapabilities.ts:89`
-- [ ] Move `DEFAULT_CAPABILITIES` to `src/shared/agentConstants.ts` (accessible by both main and renderer)
-- [ ] Update import in `main/agents/capabilities.ts` to use shared location
-- [ ] Update import in `renderer/hooks/agent/useAgentCapabilities.ts` to use shared location
-- [ ] Remove the duplicate definition from the renderer hook
-- [ ] Run targeted tests: `CI=1 rtk vitest run` (filter for agent capability tests)
+- [x] Verify locations: `main/agents/capabilities.ts:98` (canonical) and `renderer/hooks/agent/useAgentCapabilities.ts:89`
+- [x] Move `DEFAULT_CAPABILITIES` to `src/shared/agentConstants.ts` (accessible by both main and renderer)
+- [x] Update import in `main/agents/capabilities.ts` to use shared location
+- [x] Update import in `renderer/hooks/agent/useAgentCapabilities.ts` to use shared location
+- [x] Remove the duplicate definition from the renderer hook
+- [x] Run targeted tests: `CI=1 rtk vitest run` (filter for agent capability tests)
+
+> **Note:** Phase 2 (02_AGENT_CAPABILITIES_BUG) had already consolidated the 2 duplicate `DEFAULT_CAPABILITIES` definitions into `src/shared/types.ts`. This task moved the canonical definition from `types.ts` to `agentConstants.ts` (alongside `DEFAULT_CONTEXT_WINDOWS`, `FALLBACK_CONTEXT_WINDOW`, and `COMBINED_CONTEXT_AGENTS`) for better organizational cohesion. A backward-compatible re-export was added to `types.ts`. Updated direct imports in `capabilities.ts`, `useAgentCapabilities.ts`, and `renderer/types/index.ts` to point to the new canonical location. All 42 capability-related tests pass.
 
 ### 3. Extract compound CSS className constants
 
-- [ ] Create `src/renderer/constants/classNames.ts`
-- [ ] Add `LIST_ITEM_CLASS = 'w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/10 transition-colors text-left'` (used 23x)
-- [ ] Add `SECTION_LABEL_CLASS = 'block text-xs font-bold opacity-70 uppercase mb-2'` (used 20x)
-- [ ] Find files using the list item pattern: `rtk grep "w-full flex items-center gap-3 px-3 py-2.5" src/renderer/ --glob "*.tsx"`
-- [ ] Find files using the section label pattern: `rtk grep "block text-xs font-bold opacity-70 uppercase mb-2" src/renderer/ --glob "*.tsx"`
-- [ ] Replace inline className strings with the imported constants in all found files
-- [ ] Run targeted tests after each batch of replacements
+- [x] Create `src/renderer/constants/classNames.ts`
+- [x] Add `LIST_ITEM_CLASS = 'w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/10 transition-colors text-left'` (used 23x)
+- [x] Add `SECTION_LABEL_CLASS = 'block text-xs font-bold opacity-70 uppercase mb-2'` (used 20x)
+- [x] Find files using the list item pattern: `rtk grep "w-full flex items-center gap-3 px-3 py-2.5" src/renderer/ --glob "*.tsx"`
+- [x] Find files using the section label pattern: `rtk grep "block text-xs font-bold opacity-70 uppercase mb-2" src/renderer/ --glob "*.tsx"`
+- [x] Replace inline className strings with the imported constants in all found files
+- [x] Run targeted tests after each batch of replacements
+
+> **Note:** Created `src/renderer/constants/classNames.ts` with both constants. Replaced LIST_ITEM_CLASS in 2 files (24 occurrences: 8 in EmptyStateView.tsx, 16 in HamburgerMenuContent.tsx). Replaced SECTION_LABEL_CLASS in 11 files (32 occurrences: 21 exact matches using `className={SECTION_LABEL_CLASS}` and 11 extended matches using `className={\`${SECTION_LABEL_CLASS} flex items-center gap-2\`}`). Files updated: FontConfigurationPanel.tsx, GroupChatModal.tsx, NewInstanceModal.tsx, NotificationsPanel.tsx, SettingCheckbox.tsx, SshRemoteSelector.tsx, FormInput.tsx, SettingsModal.tsx, GeneralTab.tsx, DisplayTab.tsx, EncoreTab.tsx. Lint passes. All 23,659 tests pass; 55 pre-existing failures in unrelated modules (pathUtils, cue, stats, agents IPC).
 
 ### 4. Verify full build
 
-- [ ] Run lint: `rtk npm run lint`
-- [ ] Run tests: `CI=1 rtk vitest run`
-- [ ] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
+- [x] Run lint: `rtk npm run lint`
+- [x] Run tests: `CI=1 rtk vitest run`
+- [x] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
+
+> **Note:** All checks pass. Lint clean. TypeScript compiles with zero errors on both tsconfig.main.json and tsconfig.lint.json. Test suite: 23,659 pass / 55 fail - all 55 failures are pre-existing baseline issues in pathUtils, cue, stats, and agents IPC modules (none introduced by Phase 12 changes).
 
 ---
 

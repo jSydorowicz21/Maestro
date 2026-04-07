@@ -18,7 +18,6 @@ import { Trophy } from 'lucide-react';
 import type { Theme } from '../../types';
 import type { StatsTimeRange } from '../../hooks/stats/useStats';
 import { captureException } from '../../utils/sentry';
-import { formatElapsedTime as formatDuration, formatTimestamp } from '../../../shared/formatters';
 
 /**
  * Auto Run session data shape from the API
@@ -43,6 +42,26 @@ interface LongestAutoRunsTableProps {
 }
 
 const MAX_ROWS = 25;
+
+/**
+ * Format duration in milliseconds to human-readable string
+ */
+function formatDuration(ms: number): string {
+	if (ms === 0) return '0s';
+
+	const totalSeconds = Math.floor(ms / 1000);
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+
+	if (hours > 0) {
+		return `${hours}h ${minutes}m`;
+	}
+	if (minutes > 0) {
+		return `${minutes}m ${seconds}s`;
+	}
+	return `${seconds}s`;
+}
 
 /**
  * Format agent type to display name
@@ -87,6 +106,16 @@ function formatDate(timestamp: number): string {
 		month: 'short',
 		day: 'numeric',
 		year: 'numeric',
+	});
+}
+
+/**
+ * Format time for table display
+ */
+function formatTime(timestamp: number): string {
+	return new Date(timestamp).toLocaleTimeString('en-US', {
+		hour: 'numeric',
+		minute: '2-digit',
 	});
 }
 
@@ -227,7 +256,7 @@ export const LongestAutoRunsTable = memo(function LongestAutoRunsTable({
 										className="px-3 py-2 whitespace-nowrap"
 										style={{ color: theme.colors.textDim }}
 									>
-										{formatTimestamp(session.startTime, 'time')}
+										{formatTime(session.startTime)}
 									</td>
 									<td
 										className="px-3 py-2 whitespace-nowrap"

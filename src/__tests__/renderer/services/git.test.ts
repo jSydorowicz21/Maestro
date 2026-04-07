@@ -22,8 +22,11 @@ const mockGit = {
 beforeEach(() => {
 	vi.clearAllMocks();
 
-	// Override window.maestro.git with local mocks (setup.ts provides base)
-	Object.assign(window.maestro.git, mockGit);
+	// Ensure window.maestro.git is mocked
+	(window as any).maestro = {
+		...(window as any).maestro,
+		git: mockGit,
+	};
 
 	// Mock console.error to prevent noise in test output
 	vi.spyOn(console, 'error').mockImplementation(() => {});

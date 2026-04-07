@@ -2,27 +2,72 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useKeyboardNavigation, UseKeyboardNavigationDeps } from '../../../renderer/hooks';
 import type { Session, Group, FocusArea } from '../../../renderer/types';
-import { createMockSession } from '../../helpers/mockSession';
+
+// Create a mock session
+const createMockSession = (overrides: Partial<Session> = {}): Session => ({
+	id: `session-${Date.now()}-${Math.random()}`,
+	name: 'Test Session',
+	toolType: 'claude-code',
+	state: 'idle',
+	cwd: '/test',
+	projectRoot: '/test',
+	fullPath: '/test',
+	port: 3000,
+	aiPid: 0,
+	inputMode: 'ai',
+	aiTabs: [
+		{
+			id: 'default-tab',
+			name: 'Main',
+			logs: [],
+		},
+	],
+	activeTabId: 'default-tab',
+	closedTabHistory: [],
+	shellLogs: [],
+	executionQueue: [],
+	usageStats: undefined,
+	contextUsage: 0,
+	workLog: [],
+	isGitRepo: false,
+	changedFiles: [],
+	gitBranches: [],
+	gitTags: [],
+	fileTree: [],
+	fileExplorerExpanded: [],
+	fileExplorerScrollPos: 0,
+	isLive: false,
+	terminalTabs: [],
+	activeTerminalTabId: null,
+	...overrides,
+});
 
 // Create mock dependencies
 const createMockDeps = (
 	overrides: Partial<UseKeyboardNavigationDeps> = {}
-): UseKeyboardNavigationDeps => ({
-	sortedSessions: [],
-	selectedSidebarIndex: 0,
-	setSelectedSidebarIndex: vi.fn(),
-	activeSessionId: null,
-	setActiveSessionId: vi.fn(),
-	activeFocus: 'main',
-	setActiveFocus: vi.fn(),
-	groups: [],
-	setGroups: vi.fn(),
-	bookmarksCollapsed: false,
-	setBookmarksCollapsed: vi.fn(),
-	inputRef: { current: null },
-	terminalOutputRef: { current: null },
-	...overrides,
-});
+): UseKeyboardNavigationDeps => {
+	// Default navSessions mirrors sortedSessions if not explicitly provided
+	const sortedSessions = overrides.sortedSessions ?? [];
+	const navSessions = overrides.navSessions ?? sortedSessions;
+	return {
+		sortedSessions,
+		navSessions,
+		bookmarkNavSize: overrides.bookmarkNavSize ?? 0,
+		selectedSidebarIndex: 0,
+		setSelectedSidebarIndex: vi.fn(),
+		activeSessionId: null,
+		setActiveSessionId: vi.fn(),
+		activeFocus: 'main',
+		setActiveFocus: vi.fn(),
+		groups: [],
+		setGroups: vi.fn(),
+		bookmarksCollapsed: false,
+		setBookmarksCollapsed: vi.fn(),
+		inputRef: { current: null },
+		terminalOutputRef: { current: null },
+		...overrides,
+	};
+};
 
 describe('useKeyboardNavigation', () => {
 	beforeEach(() => {
@@ -62,6 +107,7 @@ describe('useKeyboardNavigation', () => {
 			const deps = createMockDeps({
 				activeFocus: 'sidebar',
 				sortedSessions: [session1, session2],
+				navSessions: [session1, session2],
 				selectedSidebarIndex: 0,
 				setSelectedSidebarIndex,
 			});
@@ -80,6 +126,8 @@ describe('useKeyboardNavigation', () => {
 			const deps = createMockDeps({
 				activeFocus: 'sidebar',
 				sortedSessions: [session1],
+				navSessions: [session1],
+				bookmarkNavSize: 1,
 				selectedSidebarIndex: 0,
 				bookmarksCollapsed: false,
 				setBookmarksCollapsed,
@@ -99,6 +147,8 @@ describe('useKeyboardNavigation', () => {
 			const deps = createMockDeps({
 				activeFocus: 'sidebar',
 				sortedSessions: [session1],
+				navSessions: [session1],
+				bookmarkNavSize: 1,
 				selectedSidebarIndex: 0,
 				bookmarksCollapsed: true,
 				setBookmarksCollapsed,
@@ -113,12 +163,14 @@ describe('useKeyboardNavigation', () => {
 		});
 
 		it('should collapse group with ArrowLeft when session is in expanded group', () => {
-			const group1: Group = { id: 'g1', name: 'Group 1', collapsed: false };
+			const group1: Group = { id: 'g1', name: 'Group 1', emoji: '📁', collapsed: false };
 			const session1 = createMockSession({ id: 's1', groupId: 'g1' });
 			const setGroups = vi.fn();
 			const deps = createMockDeps({
 				activeFocus: 'sidebar',
 				sortedSessions: [session1],
+				navSessions: [session1],
+				bookmarkNavSize: 0,
 				selectedSidebarIndex: 0,
 				groups: [group1],
 				setGroups,
@@ -274,6 +326,7 @@ describe('useKeyboardNavigation', () => {
 			const deps = createMockDeps({
 				activeFocus: 'sidebar',
 				sortedSessions: [session1, session2],
+				navSessions: [session1, session2],
 				selectedSidebarIndex: 1,
 				setActiveSessionId,
 			});
@@ -373,6 +426,7 @@ describe('useKeyboardNavigation', () => {
 			const setSelectedSidebarIndex = vi.fn();
 			const deps = createMockDeps({
 				sortedSessions: [session1, session2],
+				navSessions: [session1, session2],
 				activeSessionId: 's1',
 				setSelectedSidebarIndex,
 			});
@@ -393,7 +447,7 @@ describe('useKeyboardNavigation', () => {
 
 	describe('group navigation with space', () => {
 		it('should collapse group and jump to next visible session on Space', () => {
-			const group1: Group = { id: 'g1', name: 'Group 1', collapsed: false };
+			const group1: Group = { id: 'g1', name: 'Group 1', emoji: '📁', collapsed: false };
 			const session1 = createMockSession({ id: 's1', groupId: 'g1' });
 			const session2 = createMockSession({ id: 's2' }); // ungrouped
 			const setGroups = vi.fn();
@@ -402,6 +456,8 @@ describe('useKeyboardNavigation', () => {
 			const deps = createMockDeps({
 				activeFocus: 'sidebar',
 				sortedSessions: [session1, session2],
+				navSessions: [session1, session2],
+				bookmarkNavSize: 0,
 				selectedSidebarIndex: 0,
 				groups: [group1],
 				setGroups,

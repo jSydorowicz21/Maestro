@@ -13,7 +13,6 @@ import type { Session, Theme, HistoryEntry, HistoryEntryType } from '../types';
 import { HistoryDetailModal } from './HistoryDetailModal';
 import { HistoryHelpModal } from './HistoryHelpModal';
 import { useThrottledCallback, useListNavigation } from '../hooks';
-import { EmptyState } from './ui';
 import {
 	ActivityGraph,
 	HistoryEntryItem,
@@ -74,7 +73,9 @@ export const HistoryPanel = React.memo(
 		const [searchFilter, setSearchFilter] = useState('');
 		const searchFilterOpen = useUIStore((s) => s.historySearchFilterOpen);
 		const setSearchFilterOpen = useUIStore((s) => s.setHistorySearchFilterOpen);
-		const [graphReferenceTime, setGraphReferenceTime] = useState<number | undefined>(undefined);
+		const [graphViewportRange, setGraphViewportRange] = useState<
+			{ start: number; end: number } | undefined
+		>(undefined);
 		const [helpModalOpen, setHelpModalOpen] = useState(false);
 		const [graphLookbackHours, setGraphLookbackHours] = useState<number | null>(null); // default to "All time"
 
@@ -135,6 +136,23 @@ export const HistoryPanel = React.memo(
 		useEffect(() => {
 			loadHistory();
 		}, [loadHistory]);
+
+		// Subscribe to real-time history entry additions
+		useEffect(() => {
+			const cleanup = window.maestro.directorNotes.onHistoryEntryAdded((entry, sourceSessionId) => {
+				// Only add entries belonging to this session
+				if (sourceSessionId !== session.id) return;
+
+				setHistoryEntries((prev) => {
+					// Deduplicate
+					if (prev.some((e) => e.id === entry.id)) return prev;
+					// Prepend (newest first), cap at MAX_HISTORY_IN_MEMORY
+					return [entry, ...prev].slice(0, MAX_HISTORY_IN_MEMORY);
+				});
+			});
+
+			return cleanup;
+		}, [session.id]);
 
 		// Load persisted graph lookback preference for this session
 		useEffect(() => {
@@ -332,9 +350,8 @@ export const HistoryPanel = React.memo(
 		// PERF: Store scroll target ref for throttled handler
 		const scrollTargetRef = useRef<HTMLDivElement | null>(null);
 
-		// Handle scroll to update graph reference time
+		// Handle scroll to update graph viewport indicator
 		// PERF: Inner handler contains the actual logic
-		// Note: With virtualization, we no longer need to load more entries on scroll
 		const handleScrollInner = useCallback(() => {
 			const target = scrollTargetRef.current;
 			if (!target) return;
@@ -342,19 +359,27 @@ export const HistoryPanel = React.memo(
 			// Save scroll position to module-level cache (persists across session switches)
 			scrollPositionCache.set(session.id, target.scrollTop);
 
-			// Find the topmost visible entry to update the graph's reference time
-			// This creates the "sliding window" effect as you scroll through history
-			// With virtualization, we use the virtualizer's visible range
+			// Track which entries are visible to show a viewport indicator on the graph
 			const visibleItems = virtualizer.getVirtualItems();
-			const firstVisibleIndex = visibleItems[0]?.index ?? 0;
-			const topmostVisibleEntry = allFilteredEntries[firstVisibleIndex];
+			if (visibleItems.length === 0) {
+				setGraphViewportRange(undefined);
+				return;
+			}
 
-			// Update the graph reference time to the topmost visible entry's timestamp
-			// If at the very top (no scrolling), use undefined to show "now"
-			if (target.scrollTop < 10) {
-				setGraphReferenceTime(undefined);
-			} else if (topmostVisibleEntry) {
-				setGraphReferenceTime(topmostVisibleEntry.timestamp);
+			const firstVisibleIndex = visibleItems[0]?.index ?? 0;
+			const lastVisibleIndex = visibleItems[visibleItems.length - 1]?.index ?? 0;
+			const topEntry = allFilteredEntries[firstVisibleIndex];
+			const bottomEntry = allFilteredEntries[lastVisibleIndex];
+
+			if (target.scrollTop < 10 && lastVisibleIndex >= allFilteredEntries.length - 1) {
+				// All entries visible — no indicator needed
+				setGraphViewportRange(undefined);
+			} else if (topEntry && bottomEntry) {
+				// Entries are newest-first, so topEntry.timestamp > bottomEntry.timestamp
+				setGraphViewportRange({
+					start: bottomEntry.timestamp,
+					end: topEntry.timestamp,
+				});
 			}
 		}, [session.id, allFilteredEntries, virtualizer]);
 
@@ -391,10 +416,10 @@ export const HistoryPanel = React.memo(
 			hasRestoredScroll.current = false;
 		}, [session.id]);
 
-		// Reset selected index and graph reference time when filters or lookback change
+		// Reset selected index and viewport indicator when filters or lookback change
 		useEffect(() => {
 			setSelectedIndex(-1);
-			setGraphReferenceTime(undefined); // Reset to "now" when filters change
+			setGraphViewportRange(undefined); // Reset viewport indicator when filters change
 			// Scroll to top when filters change
 			if (listRef.current) {
 				listRef.current.scrollTop = 0;
@@ -487,7 +512,7 @@ export const HistoryPanel = React.memo(
 							<ActivityGraph
 								entries={historyEntries}
 								theme={theme}
-								referenceTime={graphReferenceTime}
+								viewportRange={graphViewportRange}
 								onBarClick={handleGraphBarClickVirtualized}
 								lookbackHours={graphLookbackHours}
 								onLookbackChange={handleLookbackChange}
@@ -513,7 +538,7 @@ export const HistoryPanel = React.memo(
 						<ActivityGraph
 							entries={historyEntries}
 							theme={theme}
-							referenceTime={graphReferenceTime}
+							viewportRange={graphViewportRange}
 							onBarClick={handleGraphBarClickVirtualized}
 							lookbackHours={graphLookbackHours}
 							onLookbackChange={handleLookbackChange}
@@ -568,27 +593,33 @@ export const HistoryPanel = React.memo(
 					{isLoading ? (
 						<div className="text-center py-8 text-xs opacity-50">Loading history...</div>
 					) : allFilteredEntries.length === 0 ? (
-						<EmptyState
-							theme={theme}
-							className="py-8 text-xs opacity-50"
-							message={
-								historyEntries.length === 0
-									? 'No history yet. Run batch tasks or use /history to add entries.'
-									: searchFilter
-										? `No entries match "${searchFilter}"`
-										: graphLookbackHours !== null
-											? `No entries in the last ${graphLookbackHours <= 24 ? `${graphLookbackHours}h` : graphLookbackHours <= 168 ? `${Math.round(graphLookbackHours / 24)}d` : `${Math.round(graphLookbackHours / 720)}mo`}.`
-											: 'No entries match the selected filters.'
-							}
-							action={
-								historyEntries.length > 0 && !searchFilter && graphLookbackHours !== null
-									? {
-											label: `Show all time (${historyEntries.length} entries)`,
-											onClick: () => handleLookbackChange(null),
-										}
-									: undefined
-							}
-						/>
+						<div className="text-center py-8 text-xs opacity-50">
+							{historyEntries.length === 0 ? (
+								'No history yet. Run batch tasks or use /history to add entries.'
+							) : searchFilter ? (
+								`No entries match "${searchFilter}"`
+							) : graphLookbackHours !== null ? (
+								<>
+									No entries in the last{' '}
+									{graphLookbackHours <= 24
+										? `${graphLookbackHours}h`
+										: graphLookbackHours <= 168
+											? `${Math.round(graphLookbackHours / 24)}d`
+											: `${Math.round(graphLookbackHours / 720)}mo`}
+									.
+									<br />
+									<button
+										onClick={() => handleLookbackChange(null)}
+										className="mt-2 underline hover:no-underline"
+										style={{ color: theme.colors.accent }}
+									>
+										Show all time ({historyEntries.length} entries)
+									</button>
+								</>
+							) : (
+								'No entries match the selected filters.'
+							)}
+						</div>
 					) : (
 						<div
 							style={{

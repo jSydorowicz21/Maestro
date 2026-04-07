@@ -9,7 +9,6 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { ArrowDown } from 'lucide-react';
 import { useThemeColors } from '../components/ThemeProvider';
 import { stripAnsiCodes } from '../../shared/stringUtils';
-import { formatTimestamp } from '../../shared/formatters';
 import { MobileMarkdownRenderer } from './MobileMarkdownRenderer';
 
 /** Threshold for character-based truncation */
@@ -48,6 +47,26 @@ export interface MessageHistoryProps {
 	thinkingMode?: 'off' | 'on' | 'sticky';
 	/** Session state (e.g. 'busy', 'idle') — needed for 'on' mode */
 	sessionState?: string;
+}
+
+/**
+ * Format timestamp for display
+ * Shows time only for today's messages, date + time for older messages
+ */
+function formatTime(timestamp: number): string {
+	const date = new Date(timestamp);
+	const now = new Date();
+	const isToday = date.toDateString() === now.toDateString();
+
+	if (isToday) {
+		return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+	} else {
+		return (
+			date.toLocaleDateString([], { month: 'short', day: 'numeric' }) +
+			' ' +
+			date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+		);
+	}
 }
 
 /**
@@ -406,7 +425,7 @@ export function MessageHistory({
 														? 'AI'
 														: 'Output'}
 								</span>
-								<span style={{ opacity: 0.7 }}>{formatTimestamp(entry.timestamp)}</span>
+								<span style={{ opacity: 0.7 }}>{formatTime(entry.timestamp)}</span>
 								{/* Show expand/collapse indicator for truncatable messages */}
 								{isTruncatable && (
 									<span

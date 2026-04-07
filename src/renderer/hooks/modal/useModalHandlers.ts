@@ -13,14 +13,12 @@
  * directly. These will be migrated in a future cleanup pass.
  */
 
-import { useCallback, useEffect, useRef } from 'react';
-import { useEventListener } from '../utils/useEventListener';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Session, LeaderboardRegistration, AgentError } from '../../types';
 import type { RecoveryAction } from '../../components/AgentErrorModal';
 import { getModalActions, useModalStore } from '../../stores/modalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { useSessionStore, selectSessionById, updateActiveAiTab } from '../../stores/sessionStore';
-import { useActiveSession } from '../session/useActiveSession';
+import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
 import { useGroupChatStore } from '../../stores/groupChatStore';
 import { useAgentStore } from '../../stores/agentStore';
 import { useAgentErrorRecovery } from '../agent/useAgentErrorRecovery';
@@ -168,6 +166,7 @@ export function useModalHandlers(
 	// --- Reactive subscriptions (for derived state & effects) ---
 	const agentErrorModalSessionId = useModalStore(selectAgentErrorSessionId);
 	const historicalAgentError = useModalStore(selectAgentErrorHistorical);
+	const sessions = useSessionStore((s) => s.sessions);
 	const logViewerOpen = useModalStore(selectLogViewerOpen);
 	const shortcutsHelpOpen = useModalStore(selectShortcutsHelpOpen);
 	const settingsLoaded = useSettingsStore((s) => s.settingsLoaded);
@@ -177,10 +176,13 @@ export function useModalHandlers(
 	// Derived State
 	// ====================================================================
 
-	const errorSession =
-		useSessionStore(
-			agentErrorModalSessionId ? selectSessionById(agentErrorModalSessionId) : () => undefined
-		) ?? null;
+	const errorSession = useMemo(
+		() =>
+			agentErrorModalSessionId
+				? (sessions.find((s) => s.id === agentErrorModalSessionId) ?? null)
+				: null,
+		[agentErrorModalSessionId, sessions]
+	);
 
 	// ====================================================================
 	// Group A: Simple Close Handlers
@@ -546,12 +548,24 @@ export function useModalHandlers(
 				.setGroupChatStagedImages((prev) => prev.filter((i) => i !== img));
 		} else {
 			// Update staged images for active tab in session store
-			const { activeSessionId } = useSessionStore.getState();
-			if (activeSessionId) {
-				updateActiveAiTab(activeSessionId, (tab) => ({
-					...tab,
-					stagedImages: (tab.stagedImages || []).filter((i) => i !== img),
-				}));
+			const { sessions: currentSessions, activeSessionId } = useSessionStore.getState();
+			const session = currentSessions.find((s) => s.id === activeSessionId);
+			if (session) {
+				useSessionStore.getState().setSessions((prev) =>
+					prev.map((s) => {
+						if (s.id !== session.id) return s;
+						return {
+							...s,
+							aiTabs: s.aiTabs.map((tab) => {
+								if (tab.id !== s.activeTabId) return tab;
+								return {
+									...tab,
+									stagedImages: (tab.stagedImages || []).filter((i) => i !== img),
+								};
+							}),
+						};
+					})
+				);
 			}
 		}
 
@@ -703,77 +717,73 @@ export function useModalHandlers(
 	// Check for unacknowledged badges when user returns to the app
 	// Uses multiple triggers: visibility change, window focus, and mouse activity
 	// This catches badges earned during overnight Auto Runs when display was off
-
-	// Shared refs for badge-check debouncing across the three listeners below
-	const badgeCheckPendingRef = useRef(false);
-	const lastMouseCheckRef = useRef(0);
-
-	const checkForUnacknowledgedBadge = useCallback(() => {
+	useEffect(() => {
 		if (!settingsLoaded || !sessionsLoaded) return;
-		// Don't show if there's already an ovation displayed
-		const currentOvation = useModalStore.getState().getData('standingOvation');
-		if (currentOvation) return;
-		if (badgeCheckPendingRef.current) return;
 
-		const { getUnacknowledgedBadgeLevel, autoRunStats } = useSettingsStore.getState();
-		const unacknowledgedLevel = getUnacknowledgedBadgeLevel();
-		if (unacknowledgedLevel !== null) {
-			const badge = CONDUCTOR_BADGES.find((b) => b.level === unacknowledgedLevel);
-			if (badge) {
-				badgeCheckPendingRef.current = true;
-				// Small delay to let the UI stabilize
-				setTimeout(() => {
-					// Double-check in case it was acknowledged in the meantime
-					if (!useModalStore.getState().getData('standingOvation')) {
-						getModalActions().setStandingOvationData({
-							badge,
-							isNewRecord: false,
-							recordTimeMs: autoRunStats.longestRunMs,
-						});
-					}
-					badgeCheckPendingRef.current = false;
-				}, 500);
+		// Debounce to avoid showing multiple times
+		let checkPending = false;
+
+		const checkForUnacknowledgedBadge = () => {
+			// Don't show if there's already an ovation displayed
+			const currentOvation = useModalStore.getState().getData('standingOvation');
+			if (currentOvation) return;
+			if (checkPending) return;
+
+			const { getUnacknowledgedBadgeLevel, autoRunStats } = useSettingsStore.getState();
+			const unacknowledgedLevel = getUnacknowledgedBadgeLevel();
+			if (unacknowledgedLevel !== null) {
+				const badge = CONDUCTOR_BADGES.find((b) => b.level === unacknowledgedLevel);
+				if (badge) {
+					checkPending = true;
+					// Small delay to let the UI stabilize
+					setTimeout(() => {
+						// Double-check in case it was acknowledged in the meantime
+						if (!useModalStore.getState().getData('standingOvation')) {
+							getModalActions().setStandingOvationData({
+								badge,
+								isNewRecord: false,
+								recordTimeMs: autoRunStats.longestRunMs,
+							});
+						}
+						checkPending = false;
+					}, 500);
+				}
 			}
-		}
-	}, [settingsLoaded, sessionsLoaded]);
+		};
 
-	// Only attach when settings and sessions are loaded
-	const badgeCheckTarget = settingsLoaded && sessionsLoaded;
-
-	useEventListener(
-		'visibilitychange',
-		() => {
+		const handleVisibilityChange = () => {
 			// Only check when becoming visible
 			if (!document.hidden) {
 				checkForUnacknowledgedBadge();
 			}
-		},
-		badgeCheckTarget ? document : null
-	);
+		};
 
-	useEventListener(
-		'focus',
-		() => {
+		const handleWindowFocus = () => {
 			// Window gained focus - user is actively looking at the app
 			checkForUnacknowledgedBadge();
-		},
-		badgeCheckTarget ? window : null
-	);
+		};
 
-	// Mouse move handler with heavy debounce - only triggers once per 30 seconds
-	useEventListener(
-		'mousemove',
-		() => {
+		// Mouse move handler with heavy debounce - only triggers once per 30 seconds
+		let lastMouseCheck = 0;
+		const handleMouseMove = () => {
 			const now = Date.now();
-			if (now - lastMouseCheckRef.current > 30000) {
+			if (now - lastMouseCheck > 30000) {
 				// 30 second debounce
-				lastMouseCheckRef.current = now;
+				lastMouseCheck = now;
 				checkForUnacknowledgedBadge();
 			}
-		},
-		badgeCheckTarget ? document : null,
-		{ passive: true }
-	);
+		};
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+		window.addEventListener('focus', handleWindowFocus);
+		document.addEventListener('mousemove', handleMouseMove, { passive: true });
+
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+			window.removeEventListener('focus', handleWindowFocus);
+			document.removeEventListener('mousemove', handleMouseMove);
+		};
+	}, [settingsLoaded, sessionsLoaded]);
 
 	// Check for unacknowledged keyboard mastery levels on startup
 	useEffect(() => {
@@ -796,7 +806,7 @@ export function useModalHandlers(
 	// Git Diff Opener (Tier 3C)
 	// ====================================================================
 
-	const activeSession = useActiveSession();
+	const activeSession = useSessionStore(selectActiveSession);
 
 	const handleViewGitDiff = useCallback(async () => {
 		if (!activeSession || !activeSession.isGitRepo) return;

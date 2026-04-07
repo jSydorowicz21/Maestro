@@ -13,6 +13,7 @@ import { GhostIconButton } from './ui/GhostIconButton';
 import { safeClipboardWrite } from '../utils/clipboard';
 import { isBetaAgent, getAgentDisplayName } from '../../shared/agentMetadata';
 import { buildMaestroUrl } from '../utils/buildMaestroUrl';
+import { SECTION_LABEL_CLASS } from '../constants/classNames';
 
 // Maximum character length for nudge message
 const NUDGE_MESSAGE_MAX_LENGTH = 1000;
@@ -373,6 +374,7 @@ export function NewInstanceModal({
 				}
 			}
 		} catch (error) {
+			// Expected: agent detection may fail if agent not installed
 			console.error('Failed to load agents:', error);
 		} finally {
 			setLoading(false);
@@ -396,6 +398,7 @@ export function NewInstanceModal({
 				setDebugInfo(result.debugInfo);
 			}
 		} catch (error) {
+			// Expected: agent detection may fail if agent not installed
 			console.error('Failed to refresh agent:', error);
 		} finally {
 			setRefreshingAgent(null);
@@ -417,6 +420,7 @@ export function NewInstanceModal({
 				const models = await window.maestro.agents.getModels(agentId, forceRefresh);
 				setAvailableModels((prev) => ({ ...prev, [agentId]: models }));
 			} catch (error) {
+				// Expected: agent detection may fail if agent not installed
 				console.error(`Failed to load models for ${agentId}:`, error);
 			} finally {
 				setLoadingModels((prev) => ({ ...prev, [agentId]: false }));
@@ -605,6 +609,7 @@ export function NewInstanceModal({
 						setSshRemotes(sshConfigsResult.configs);
 					}
 				} catch (sshError) {
+					// Expected: agent detection may fail if agent not installed
 					console.error('Failed to load SSH remote configs:', sshError);
 				}
 			};
@@ -703,10 +708,7 @@ export function NewInstanceModal({
 
 					{/* Agent Selection */}
 					<div>
-						<div
-							className="block text-xs font-bold opacity-70 uppercase mb-2"
-							style={{ color: theme.colors.textMain }}
-						>
+						<div className={SECTION_LABEL_CLASS} style={{ color: theme.colors.textMain }}>
 							Agent Provider
 						</div>
 						{loading ? (
@@ -981,6 +983,7 @@ export function NewInstanceModal({
 															void window.maestro.agents
 																.setConfig(agent.id, updatedConfig)
 																.catch((error) => {
+																	// Expected: agent detection may fail if agent not installed
 																	console.error(`Failed to persist config for ${agent.id}:`, error);
 																});
 														}}
@@ -1182,10 +1185,7 @@ export function NewInstanceModal({
 
 					{/* Nudge Message */}
 					<div>
-						<div
-							className="block text-xs font-bold opacity-70 uppercase mb-2"
-							style={{ color: theme.colors.textMain }}
-						>
+						<div className={SECTION_LABEL_CLASS} style={{ color: theme.colors.textMain }}>
 							Nudge Message <span className="font-normal opacity-50">(optional)</span>
 						</div>
 						<textarea
@@ -1291,6 +1291,7 @@ export function EditAgentModal({
 					window.maestro.agents
 						.getModels(activeToolType)
 						.then((models) => setAvailableModels(models))
+						// Expected: agent detection may fail if agent not installed
 						.catch((err) => console.error('Failed to load models:', err))
 						.finally(() => setLoadingModels(false));
 				} else {
@@ -1330,6 +1331,7 @@ export function EditAgentModal({
 						setSshRemotes(result.configs);
 					}
 				})
+				// Expected: agent detection may fail if agent not installed
 				.catch((err) => console.error('Failed to load SSH remotes:', err));
 
 			// Load per-session config (stored on the session/agent instance)
@@ -1505,6 +1507,7 @@ export function EditAgentModal({
 			const models = await window.maestro.agents.getModels(selectedToolType, true);
 			setAvailableModels(models);
 		} catch (err) {
+			// Expected: agent detection may fail if agent not installed
 			console.error('Failed to refresh models:', err);
 		} finally {
 			setLoadingModels(false);
@@ -1519,6 +1522,7 @@ export function EditAgentModal({
 			const foundAgent = result.agents.find((a: AgentConfig) => a.id === selectedToolType);
 			setAgent(foundAgent || null);
 		} catch (error) {
+			// Expected: agent detection may fail if agent not installed
 			console.error('Failed to refresh agent:', error);
 		} finally {
 			setRefreshingAgent(false);
@@ -1622,10 +1626,7 @@ export function EditAgentModal({
 
 					{/* Agent Provider */}
 					<div>
-						<div
-							className="block text-xs font-bold opacity-70 uppercase mb-2"
-							style={{ color: theme.colors.textMain }}
-						>
+						<div className={SECTION_LABEL_CLASS} style={{ color: theme.colors.textMain }}>
 							Agent Provider
 						</div>
 						<select
@@ -1664,10 +1665,7 @@ export function EditAgentModal({
 
 					{/* Working Directory (read-only) */}
 					<div>
-						<div
-							className="block text-xs font-bold opacity-70 uppercase mb-2"
-							style={{ color: theme.colors.textMain }}
-						>
+						<div className={SECTION_LABEL_CLASS} style={{ color: theme.colors.textMain }}>
 							Working Directory
 						</div>
 						<div
@@ -1719,10 +1717,7 @@ export function EditAgentModal({
 
 					{/* Nudge Message */}
 					<div>
-						<div
-							className="block text-xs font-bold opacity-70 uppercase mb-2"
-							style={{ color: theme.colors.textMain }}
-						>
+						<div className={SECTION_LABEL_CLASS} style={{ color: theme.colors.textMain }}>
 							Nudge Message <span className="font-normal opacity-50">(optional)</span>
 						</div>
 						<textarea
@@ -1747,10 +1742,7 @@ export function EditAgentModal({
 					{/* Per-session config (path, args, env vars) saved on modal save, not on blur */}
 					{agent && (
 						<div>
-							<div
-								className="block text-xs font-bold opacity-70 uppercase mb-2"
-								style={{ color: theme.colors.textMain }}
-							>
+							<div className={SECTION_LABEL_CLASS} style={{ color: theme.colors.textMain }}>
 								{agentName} Settings
 							</div>
 							<AgentConfigPanel
@@ -1812,6 +1804,7 @@ export function EditAgentModal({
 										void window.maestro.agents
 											.setConfig(selectedToolType, otherConfig)
 											.catch((error) => {
+												// Expected: agent detection may fail if agent not installed
 												console.error(`Failed to persist config for ${selectedToolType}:`, error);
 											});
 									}

@@ -7,16 +7,10 @@
  * - formatNumber: Large numbers with k/M/B suffixes
  * - formatTokens: Token counts with K/M/B suffixes (~prefix)
  * - formatTokensCompact: Token counts without ~prefix
- * - formatTimestamp: Timestamp display with multiple styles (time, datetime, smart, full)
  * - formatRelativeTime: Relative timestamps ("5m ago", "2h ago")
  * - formatActiveTime: Duration display (1D, 2H 30M, <1M)
  * - formatElapsedTime: Precise elapsed time (1h 10m, 30s, 500ms)
  * - formatElapsedTimeColon: Timer-style elapsed time (mm:ss or hh:mm:ss)
- * - formatDurationCompact: Compact duration without seconds in minute range (1h 10m, 5m, 30s)
- * - formatDurationVerbose: Full-word duration with pluralization (5 minutes 30 seconds)
- * - formatDurationParts: Duration with all units including days (2d 5h 30m)
- * - formatDurationDecimal: Decimal-notation duration for CLI (5.2m, 1.3h)
- * - formatDurationSecondsDecimal: Decimal-notation duration from seconds (5.2m, 1.3h)
  * - formatCost: USD currency display ($1.23, <$0.01)
  * - estimateTokenCount: Estimate token count from text (~4 chars/token)
  * - truncatePath: Truncate file paths for display (.../<parent>/<current>)
@@ -77,55 +71,6 @@ export function formatTokensCompact(tokens: number): string {
 	if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
 	if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}K`;
 	return tokens.toString();
-}
-
-/**
- * Format a timestamp for display using one of several styles.
- *
- * Styles:
- * - 'time': Time only (e.g., "03:45 PM")
- * - 'datetime': Always date + time (e.g., "Jan 5, 03:45 PM")
- * - 'smart': Time if today, date + time otherwise (default)
- * - 'full': Full locale string (e.g., "1/5/2025, 3:45:00 PM")
- *
- * @param timestamp - Unix timestamp in milliseconds, or ISO date string
- * @param style - Display style (default: 'smart')
- * @returns Formatted timestamp string
- */
-export function formatTimestamp(
-	timestamp: number | string,
-	style: 'time' | 'datetime' | 'smart' | 'full' = 'smart'
-): string {
-	const date = new Date(timestamp);
-
-	switch (style) {
-		case 'time':
-			return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-		case 'datetime':
-			return date.toLocaleString([], {
-				month: 'short',
-				day: 'numeric',
-				hour: '2-digit',
-				minute: '2-digit',
-			});
-
-		case 'smart': {
-			const now = new Date();
-			const isToday = date.toDateString() === now.toDateString();
-			if (isToday) {
-				return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-			}
-			return (
-				date.toLocaleDateString([], { month: 'short', day: 'numeric' }) +
-				' ' +
-				date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-			);
-		}
-
-		case 'full':
-			return date.toLocaleString();
-	}
 }
 
 /**
@@ -206,106 +151,6 @@ export function formatElapsedTime(ms: number): string {
 	const hours = Math.floor(minutes / 60);
 	const remainingMinutes = minutes % 60;
 	return `${hours}h ${remainingMinutes}m`;
-}
-
-/**
- * Format duration in milliseconds to compact human-readable string.
- * Omits seconds when showing minutes, suitable for dashboard summaries
- * and compact displays where minute-level precision is sufficient.
- *
- * @param ms - Duration in milliseconds
- * @returns Formatted string (e.g., "1h 10m", "5m", "30s", "0s")
- */
-export function formatDurationCompact(ms: number): string {
-	const totalSeconds = Math.floor(ms / 1000);
-	if (totalSeconds < 60) return `${totalSeconds}s`;
-	const minutes = Math.floor(totalSeconds / 60);
-	if (minutes < 60) return `${minutes}m`;
-	const hours = Math.floor(minutes / 60);
-	const remainingMinutes = minutes % 60;
-	return `${hours}h ${remainingMinutes}m`;
-}
-
-/**
- * Format duration in milliseconds using full English words with pluralization.
- * Suitable for celebration, achievement, or user-facing summary displays.
- *
- * @param ms - Duration in milliseconds
- * @returns Formatted string (e.g., "1 hour 30 minutes", "5 minutes 30 seconds", "45 seconds")
- */
-export function formatDurationVerbose(ms: number): string {
-	const totalSeconds = Math.floor(ms / 1000);
-	const minutes = Math.floor(totalSeconds / 60);
-	const hours = Math.floor(minutes / 60);
-
-	if (hours > 0) {
-		const remainingMinutes = minutes % 60;
-		if (remainingMinutes > 0) {
-			return `${hours} hour${hours > 1 ? 's' : ''} ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''}`;
-		}
-		return `${hours} hour${hours > 1 ? 's' : ''}`;
-	}
-
-	if (minutes > 0) {
-		const remainingSeconds = totalSeconds % 60;
-		if (remainingSeconds > 0) {
-			return `${minutes} minute${minutes > 1 ? 's' : ''} ${remainingSeconds} second${remainingSeconds > 1 ? 's' : ''}`;
-		}
-		return `${minutes} minute${minutes > 1 ? 's' : ''}`;
-	}
-
-	return `${totalSeconds} second${totalSeconds > 1 ? 's' : ''}`;
-}
-
-/**
- * Format duration in milliseconds with all relevant time parts including days.
- * Shows ms for sub-second values, omits seconds when showing days for readability.
- *
- * @param ms - Duration in milliseconds
- * @returns Formatted string (e.g., "2d 5h 30m", "1h 15m 30s", "45s", "500ms", "0s")
- */
-export function formatDurationParts(ms: number): string {
-	if (ms < 1000) return `${ms}ms`;
-	const totalSeconds = Math.floor(ms / 1000);
-	if (totalSeconds < 60) return `${totalSeconds}s`;
-
-	const days = Math.floor(totalSeconds / 86400);
-	const hours = Math.floor((totalSeconds % 86400) / 3600);
-	const minutes = Math.floor((totalSeconds % 3600) / 60);
-	const seconds = totalSeconds % 60;
-
-	const parts: string[] = [];
-	if (days > 0) parts.push(`${days}d`);
-	if (hours > 0) parts.push(`${hours}h`);
-	if (minutes > 0) parts.push(`${minutes}m`);
-	if (seconds > 0 && days === 0) parts.push(`${seconds}s`);
-
-	return parts.join(' ') || '0s';
-}
-
-/**
- * Format duration in milliseconds using single-decimal notation for compact CLI output.
- *
- * @param ms - Duration in milliseconds
- * @returns Formatted string (e.g., "500ms", "5.2s", "3.5m", "1.2h")
- */
-export function formatDurationDecimal(ms: number): string {
-	if (ms < 1000) return `${ms}ms`;
-	if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-	if (ms < 3600_000) return `${(ms / 60_000).toFixed(1)}m`;
-	return `${(ms / 3600_000).toFixed(1)}h`;
-}
-
-/**
- * Format duration in seconds using single-decimal notation for compact CLI output.
- *
- * @param seconds - Duration in seconds
- * @returns Formatted string (e.g., "30s", "5.2m", "1.3h")
- */
-export function formatDurationSecondsDecimal(seconds: number): string {
-	if (seconds < 60) return `${seconds}s`;
-	if (seconds < 3600) return `${(seconds / 60).toFixed(1)}m`;
-	return `${(seconds / 3600).toFixed(1)}h`;
 }
 
 /**

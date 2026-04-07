@@ -20,6 +20,7 @@ import {
 	ExternalLink,
 	RefreshCw,
 	Search,
+	Loader2,
 	ChevronDown,
 	Sliders,
 	AlertCircle,
@@ -31,7 +32,6 @@ import {
 	ChevronLeft,
 	ChevronRight,
 } from 'lucide-react';
-import { EmptyState, Spinner } from '../ui';
 import type { Theme } from '../../types';
 import { useLayerStack } from '../../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
@@ -1299,12 +1299,6 @@ export function DocumentGraphView({
 							Document Graph
 						</h2>
 						<span
-							className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
-							style={{ backgroundColor: theme.colors.warning + '30', color: theme.colors.warning }}
-						>
-							Beta
-						</span>
-						<span
 							className="text-xs px-2 py-0.5 rounded"
 							style={{
 								backgroundColor: `${theme.colors.accent}20`,
@@ -1692,7 +1686,7 @@ export function DocumentGraphView({
 				>
 					{loading ? (
 						<div className="h-full flex flex-col items-center justify-center gap-8">
-							<Spinner size="xl" style={{ color: theme.colors.accent }} />
+							<Loader2 className="w-8 h-8 animate-spin" style={{ color: theme.colors.accent }} />
 							<div className="flex flex-col items-center gap-4">
 								<p className="text-sm" style={{ color: theme.colors.textDim }}>
 									{progress
@@ -1755,13 +1749,14 @@ export function DocumentGraphView({
 							</button>
 						</div>
 					) : nodes.length === 0 ? (
-						<EmptyState
-							theme={theme}
-							icon={<Network className="w-12 h-12" />}
-							message="No markdown files found"
-							description="This directory doesn't contain any .md files"
-							className="h-full gap-2"
-						/>
+						<div
+							className="h-full flex flex-col items-center justify-center gap-2"
+							style={{ color: theme.colors.textDim }}
+						>
+							<Network className="w-12 h-12 opacity-30" />
+							<p className="text-lg">No markdown files found</p>
+							<p className="text-sm opacity-70">This directory doesn't contain any .md files</p>
+						</div>
 					) : activeFocusFile ? (
 						<MindMap
 							centerFilePath={activeFocusFile}
@@ -1930,7 +1925,7 @@ export function DocumentGraphView({
 										className="flex items-center gap-2 text-xs"
 										style={{ color: theme.colors.textDim }}
 									>
-										<Spinner size="sm" />
+										<Loader2 className="w-4 h-4 animate-spin" />
 										Loading preview...
 									</div>
 								) : previewError ? (
@@ -2020,7 +2015,11 @@ export function DocumentGraphView({
 								onMouseLeave={(e) => !loadingMore && (e.currentTarget.style.opacity = '1')}
 								title={`Load ${Math.min(LOAD_MORE_INCREMENT, totalDocuments - loadedDocuments)} more documents`}
 							>
-								{loadingMore ? <Spinner size="xs" /> : <ChevronDown className="w-3 h-3" />}
+								{loadingMore ? (
+									<Loader2 className="w-3 h-3 animate-spin" />
+								) : (
+									<ChevronDown className="w-3 h-3" />
+								)}
 								{loadingMore
 									? 'Loading...'
 									: `Load more (${totalDocuments - loadedDocuments} remaining)`}
@@ -2036,7 +2035,7 @@ export function DocumentGraphView({
 								}}
 								title="Scanning for documents that link to the current graph"
 							>
-								<Spinner size="xs" style={{ color: theme.colors.accent }} />
+								<Loader2 className="w-3 h-3 animate-spin" style={{ color: theme.colors.accent }} />
 								<span>
 									Scanning backlinks
 									{backlinkProgress && ` (${backlinkProgress.scanned}/${backlinkProgress.total})`}

@@ -14,13 +14,11 @@ import type { Session, Theme, QueuedItem } from '../../../renderer/types';
 // Mock the LayerStackContext
 const mockRegisterLayer = vi.fn().mockReturnValue('layer-1');
 const mockUnregisterLayer = vi.fn();
-const mockUpdateLayerHandler = vi.fn();
 
 vi.mock('../../../renderer/contexts/LayerStackContext', () => ({
 	useLayerStack: () => ({
 		registerLayer: mockRegisterLayer,
 		unregisterLayer: mockUnregisterLayer,
-		updateLayerHandler: mockUpdateLayerHandler,
 	}),
 }));
 
@@ -88,7 +86,6 @@ describe('ExecutionQueueBrowser', () => {
 		mockOnSwitchSession = vi.fn();
 		mockRegisterLayer.mockClear();
 		mockUnregisterLayer.mockClear();
-		mockUpdateLayerHandler.mockClear();
 	});
 
 	afterEach(() => {
@@ -155,16 +152,14 @@ describe('ExecutionQueueBrowser', () => {
 					onSwitchSession={mockOnSwitchSession}
 				/>
 			);
-			expect(mockRegisterLayer).toHaveBeenCalledWith(
-				expect.objectContaining({
-					type: 'modal',
-					priority: expect.any(Number),
-					blocksLowerLayers: true,
-					capturesFocus: true,
-					focusTrap: 'strict',
-					onEscape: expect.any(Function),
-				})
-			);
+			expect(mockRegisterLayer).toHaveBeenCalledWith({
+				type: 'modal',
+				priority: expect.any(Number),
+				blocksLowerLayers: true,
+				capturesFocus: true,
+				focusTrap: 'strict',
+				onEscape: expect.any(Function),
+			});
 		});
 
 		it('should unregister from layer stack when closed', () => {
@@ -976,7 +971,7 @@ describe('ExecutionQueueBrowser', () => {
 			const tabButton = screen.getByText('My Tab');
 			fireEvent.click(tabButton);
 
-			expect(mockOnSwitchSession).toHaveBeenCalledWith('session-1');
+			expect(mockOnSwitchSession).toHaveBeenCalledWith('session-1', 'tab-1');
 			expect(mockOnClose).toHaveBeenCalled();
 		});
 
@@ -1565,15 +1560,11 @@ describe('ExecutionQueueBrowser', () => {
 				/>
 			);
 
-			// useModalLayer uses updateLayerHandler to update the escape handler
-			// The most recent call should pass the updated onClose as the handler
-			const lastCall =
-				mockUpdateLayerHandler.mock.calls[mockUpdateLayerHandler.mock.calls.length - 1];
-			expect(lastCall).toBeDefined();
-			expect(lastCall[0]).toBe('layer-1'); // layer ID
+			// Trigger escape via the registered handler
+			const registerCall = mockRegisterLayer.mock.calls[0][0];
+			registerCall.onEscape();
 
-			// Call the updated handler - it should invoke the updated onClose
-			lastCall[1]();
+			// Should call the updated onClose, not the initial one
 			expect(updatedOnClose).toHaveBeenCalled();
 			expect(initialOnClose).not.toHaveBeenCalled();
 		});

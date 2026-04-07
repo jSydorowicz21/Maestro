@@ -13,13 +13,11 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { useEventListener } from '../../hooks/utils/useEventListener';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { getSyntaxStyle } from '../../utils/syntaxTheme';
-import { Eye, Edit, ChevronDown, ChevronRight, X, FileText, Check } from 'lucide-react';
-import { Spinner, EmptyState } from '../ui';
+import { Eye, Edit, ChevronDown, ChevronRight, X, Loader2, FileText, Check } from 'lucide-react';
 import type { Theme } from '../../types';
 import type { GeneratedDocument } from '../Wizard/WizardContext';
 import { AustinFactsDisplay } from './AustinFactsDisplay';
@@ -88,19 +86,20 @@ export function DocumentSelector({
 	useClickOutside(dropdownRef, () => setIsOpen(false), isOpen);
 
 	// Close dropdown on Escape
-	useEventListener(
-		'keydown',
-		(event: KeyboardEvent) => {
+	useEffect(() => {
+		function handleKeyDown(event: KeyboardEvent) {
 			if (event.key === 'Escape' && isOpen) {
 				event.preventDefault();
 				event.stopPropagation();
 				setIsOpen(false);
 				buttonRef.current?.focus();
 			}
-		},
-		isOpen ? document : null,
-		{ capture: true }
-	);
+		}
+		if (isOpen) {
+			document.addEventListener('keydown', handleKeyDown, true);
+			return () => document.removeEventListener('keydown', handleKeyDown, true);
+		}
+	}, [isOpen]);
 
 	const selectedDoc = documents[selectedIndex];
 
@@ -284,7 +283,7 @@ function MarkdownImage({
 				className="inline-flex items-center gap-2 px-3 py-2 rounded"
 				style={{ backgroundColor: theme.colors.bgActivity }}
 			>
-				<Spinner style={{ color: theme.colors.textDim }} />
+				<Loader2 className="w-4 h-4 animate-spin" style={{ color: theme.colors.textDim }} />
 				<span className="text-xs" style={{ color: theme.colors.textDim }}>
 					Loading...
 				</span>
@@ -1062,13 +1061,23 @@ export function DocumentGenerationView({
 	// Fallback - no documents and not generating
 	if (!isGenerating && documents.length === 0) {
 		return (
-			<div className="flex flex-col h-full" style={{ backgroundColor: theme.colors.bgMain }}>
-				<EmptyState
-					theme={theme}
-					className="flex-1 p-6"
-					message="No documents generated yet."
-					action={onCancel ? { label: 'Cancel', onClick: onCancel } : undefined}
-				/>
+			<div
+				className="flex flex-col h-full items-center justify-center p-6"
+				style={{ backgroundColor: theme.colors.bgMain }}
+			>
+				<p style={{ color: theme.colors.textDim }}>No documents generated yet.</p>
+				{onCancel && (
+					<button
+						onClick={onCancel}
+						className="mt-4 px-4 py-2 text-sm rounded"
+						style={{
+							backgroundColor: theme.colors.bgActivity,
+							color: theme.colors.textDim,
+						}}
+					>
+						Cancel
+					</button>
+				)}
 			</div>
 		);
 	}

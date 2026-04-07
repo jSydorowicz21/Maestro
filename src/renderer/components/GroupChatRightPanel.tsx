@@ -8,7 +8,6 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { PanelRightClose } from 'lucide-react';
-import { EmptyState } from './ui';
 import type { Theme, GroupChatParticipant, SessionState, Shortcut } from '../types';
 import type { GroupChatHistoryEntry } from '../../shared/group-chat-types';
 import { ParticipantCard } from './ParticipantCard';
@@ -21,6 +20,7 @@ import {
 	type ParticipantColorInfo,
 } from '../utils/participantColors';
 import { useResizablePanel } from '../hooks';
+import { useGroupChatStore } from '../stores/groupChatStore';
 
 export type GroupChatRightTab = 'participants' | 'history';
 
@@ -81,6 +81,8 @@ export function GroupChatRightPanel({
 	onJumpToMessage,
 	onColorsComputed,
 }: GroupChatRightPanelProps): JSX.Element | null {
+	const participantLiveOutput = useGroupChatStore((s) => s.participantLiveOutput);
+
 	// Color preferences state
 	const [colorPreferences, setColorPreferences] = useState<Record<string, number>>({});
 	const { panelRef, onResizeStart, transitionClass } = useResizablePanel({
@@ -186,6 +188,14 @@ export function GroupChatRightPanel({
 			} catch (error) {
 				console.error(`Failed to reset context for ${participantName}:`, error);
 			}
+		},
+		[groupChatId]
+	);
+
+	// Handle removing a participant from the group chat
+	const handleRemoveParticipant = useCallback(
+		async (participantName: string) => {
+			await window.maestro.groupChat.removeParticipant(groupChatId, participantName);
 		},
 		[groupChatId]
 	);
@@ -304,12 +314,11 @@ export function GroupChatRightPanel({
 
 					{/* Participants sorted alphabetically */}
 					{sortedParticipants.length === 0 ? (
-						<EmptyState
-							theme={theme}
-							message="No participants yet."
-							description="Ask the moderator to add agents."
-							className="py-4"
-						/>
+						<div className="text-sm text-center py-4" style={{ color: theme.colors.textDim }}>
+							No participants yet.
+							<br />
+							Ask the moderator to add agents.
+						</div>
 					) : (
 						sortedParticipants.map((participant) => {
 							// Convert 'working' state to 'busy' for SessionState compatibility
@@ -324,6 +333,8 @@ export function GroupChatRightPanel({
 									color={participantColors[participant.name]}
 									groupChatId={groupChatId}
 									onContextReset={handleContextReset}
+									onRemove={handleRemoveParticipant}
+									liveOutput={participantLiveOutput.get(`${groupChatId}:${participant.name}`)}
 								/>
 							);
 						})

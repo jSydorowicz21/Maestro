@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { Search, Star, FileText, Terminal } from 'lucide-react';
 import type { AITab, FilePreviewTab, TerminalTab, Theme, Shortcut, ToolType } from '../types';
 import { fuzzyMatchWithScore } from '../utils/search';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { useListNavigation } from '../hooks';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { getContextColor } from '../utils/theme';
@@ -11,7 +10,6 @@ import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import { formatTokensCompact, formatRelativeTime, formatCost } from '../utils/formatters';
 import { calculateContextDisplay } from '../utils/contextUsage';
 import { getExtensionColor } from '../utils/extensionColors';
-import { EmptyState } from './ui';
 
 /** Named session from the store (not currently open) */
 interface NamedSession {
@@ -212,6 +210,8 @@ export function TabSwitcherModal({
 	const inputRef = useRef<HTMLInputElement>(null);
 	const selectedItemRef = useRef<HTMLButtonElement>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
+	const layerIdRef = useRef<string>();
+	const onCloseRef = useRef(onClose);
 
 	const handleSearchChange = useCallback((value: string) => {
 		setSearch(value);
@@ -225,10 +225,46 @@ export function TabSwitcherModal({
 		setFirstVisibleIndex(0);
 	}, []);
 
-	useModalLayer(MODAL_PRIORITIES.TAB_SWITCHER, 'Tab Switcher', onClose);
+	// Keep onClose ref up to date
+	useEffect(() => {
+		onCloseRef.current = onClose;
+	});
+
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
+
+	// Register layer on mount
+	useEffect(() => {
+		layerIdRef.current = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.TAB_SWITCHER,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'strict',
+			ariaLabel: 'Tab Switcher',
+			onEscape: () => onCloseRef.current(),
+		});
+
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [registerLayer, unregisterLayer]);
+
+	// Update handler when onClose changes
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, () => {
+				onCloseRef.current();
+			});
+		}
+	}, [updateLayerHandler]);
 
 	// Focus input on mount
-	useFocusAfterRender(inputRef, true, 50);
+	useEffect(() => {
+		const timer = setTimeout(() => inputRef.current?.focus(), 50);
+		return () => clearTimeout(timer);
+	}, []);
 
 	// On mount: sync any named tabs to the origins store, then load named sessions
 	// This ensures tabs that were named before persistence was added get saved
@@ -980,17 +1016,16 @@ export function TabSwitcherModal({
 					})}
 
 					{filteredItems.length === 0 && (
-						<EmptyState
-							theme={theme}
-							message={
-								viewMode === 'open'
-									? 'No open tabs'
-									: viewMode === 'starred'
-										? 'No starred sessions'
-										: 'No named sessions found'
-							}
-							className="px-4 py-4 opacity-50"
-						/>
+						<div
+							className="px-4 py-4 text-center opacity-50 text-sm"
+							style={{ color: theme.colors.textDim }}
+						>
+							{viewMode === 'open'
+								? 'No open tabs'
+								: viewMode === 'starred'
+									? 'No starred sessions'
+									: 'No named sessions found'}
+						</div>
 					)}
 				</div>
 

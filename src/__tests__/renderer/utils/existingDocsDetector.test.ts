@@ -10,13 +10,13 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
+	AUTO_RUN_FOLDER_NAME,
 	getAutoRunFolderPath,
 	hasExistingAutoRunDocs,
 	getExistingAutoRunDocs,
 	getExistingAutoRunDocsCount,
 	ExistingDocument,
 } from '../../../renderer/utils/existingDocsDetector';
-import { PLAYBOOKS_DIR } from '../../../shared/maestro-paths';
 
 // Mock window.maestro.autorun API
 const mockAutorunApi = {
@@ -47,9 +47,9 @@ describe('existingDocsDetector', () => {
 		}
 	});
 
-	describe('PLAYBOOKS_DIR', () => {
+	describe('AUTO_RUN_FOLDER_NAME', () => {
 		it('equals ".maestro/playbooks"', () => {
-			expect(PLAYBOOKS_DIR).toBe('.maestro/playbooks');
+			expect(AUTO_RUN_FOLDER_NAME).toBe('.maestro/playbooks');
 		});
 	});
 

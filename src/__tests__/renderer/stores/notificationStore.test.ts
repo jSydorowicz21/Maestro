@@ -5,10 +5,21 @@
  * - Toast CRUD (add, remove, clear)
  * - Notification config (duration, audio feedback, OS notifications)
  * - notifyToast wrapper (ID generation, duration calc, side effects)
+ * - Selectors
+ * - Non-React access
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { useNotificationStore, notifyToast } from '../../../renderer/stores/notificationStore';
+import {
+	useNotificationStore,
+	notifyToast,
+	resetToastIdCounter,
+	getNotificationState,
+	getNotificationActions,
+	selectToasts,
+	selectToastCount,
+	selectConfig,
+} from '../../../renderer/stores/notificationStore';
 import type { Toast } from '../../../renderer/stores/notificationStore';
 
 // ============================================================================
@@ -30,6 +41,8 @@ beforeEach(() => {
 			osNotificationsEnabled: true,
 		},
 	});
+	resetToastIdCounter();
+
 	// Mock window.maestro
 	(globalThis as any).window = {
 		maestro: {
@@ -218,12 +231,9 @@ describe('notificationStore', () => {
 			});
 
 			it('increments counter', () => {
-				const id1 = notifyToast({ type: 'success', title: 'A', message: 'a' });
+				notifyToast({ type: 'success', title: 'A', message: 'a' });
 				const id2 = notifyToast({ type: 'success', title: 'B', message: 'b' });
-				// Extract counter values and verify second is one greater than first
-				const counter1 = parseInt(id1.split('-').pop()!, 10);
-				const counter2 = parseInt(id2.split('-').pop()!, 10);
-				expect(counter2).toBe(counter1 + 1);
+				expect(id2).toMatch(/^toast-\d+-1$/);
 			});
 		});
 
@@ -295,6 +305,23 @@ describe('notificationStore', () => {
 						message: 'Task complete',
 						group: 'MyGroup',
 						project: 'MyProject',
+					})
+				);
+			});
+
+			it('includes sessionId and tabId in logged toast data for navigation', () => {
+				notifyToast({
+					type: 'success',
+					title: 'Done',
+					message: 'Task complete',
+					sessionId: 'sess-123',
+					tabId: 'tab-456',
+				});
+				expect(mockLoggerToast).toHaveBeenCalledWith(
+					'Done',
+					expect.objectContaining({
+						sessionId: 'sess-123',
+						tabId: 'tab-456',
 					})
 				);
 			});
@@ -470,6 +497,52 @@ describe('notificationStore', () => {
 				// No timer set, no toast in queue
 				expect(useNotificationStore.getState().toasts).toHaveLength(0);
 			});
+		});
+	});
+
+	// ==========================================================================
+	// Selectors
+	// ==========================================================================
+
+	describe('selectors', () => {
+		it('selectToasts returns toasts array', () => {
+			useNotificationStore.getState().addToast(createToast({ id: 'a' }));
+			expect(selectToasts(useNotificationStore.getState())).toHaveLength(1);
+		});
+
+		it('selectToastCount returns count', () => {
+			useNotificationStore.getState().addToast(createToast({ id: 'a' }));
+			useNotificationStore.getState().addToast(createToast({ id: 'b' }));
+			expect(selectToastCount(useNotificationStore.getState())).toBe(2);
+		});
+
+		it('selectConfig returns config object', () => {
+			const config = selectConfig(useNotificationStore.getState());
+			expect(config.defaultDuration).toBe(20);
+			expect(config.osNotificationsEnabled).toBe(true);
+		});
+	});
+
+	// ==========================================================================
+	// Non-React access
+	// ==========================================================================
+
+	describe('non-React access', () => {
+		it('getNotificationState returns current state', () => {
+			notifyToast({ type: 'info', title: 'Test', message: 'msg' });
+			expect(getNotificationState().toasts).toHaveLength(1);
+		});
+
+		it('getNotificationActions returns working action references', () => {
+			const actions = getNotificationActions();
+			actions.addToast(createToast({ id: 'from-actions' }));
+			expect(useNotificationStore.getState().toasts[0].id).toBe('from-actions');
+		});
+
+		it('getNotificationActions.clearToasts works', () => {
+			notifyToast({ type: 'info', title: 'A', message: 'a' });
+			getNotificationActions().clearToasts();
+			expect(useNotificationStore.getState().toasts).toHaveLength(0);
 		});
 	});
 

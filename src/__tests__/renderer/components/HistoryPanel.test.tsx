@@ -22,10 +22,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { HistoryPanel, HistoryPanelHandle } from '../../../renderer/components/HistoryPanel';
 import type { Theme, Session, HistoryEntry, HistoryEntryType } from '../../../renderer/types';
-import { createMockSession } from '../../helpers/mockSession';
 import { useUIStore } from '../../../renderer/stores/uiStore';
 import { useSettingsStore } from '../../../renderer/stores/settingsStore';
-import { mockTheme } from '../../helpers/mockTheme';
 
 // Mock child components
 vi.mock('../../../renderer/components/HistoryDetailModal', () => ({
@@ -106,6 +104,50 @@ vi.mock('../../../renderer/components/HistoryHelpModal', () => ({
 		</div>
 	),
 }));
+
+// Create mock theme
+const mockTheme: Theme = {
+	id: 'test-theme',
+	name: 'Test Theme',
+	mode: 'dark',
+	colors: {
+		bgMain: '#1e1e1e',
+		bgSidebar: '#252526',
+		bgActivity: '#333333',
+		textMain: '#ffffff',
+		textDim: '#808080',
+		accent: '#007acc',
+		border: '#404040',
+		success: '#4ec9b0',
+		warning: '#dcdcaa',
+		error: '#f14c4c',
+		buttonBg: '#0e639c',
+		buttonText: '#ffffff',
+	},
+};
+
+// Create mock session
+const createMockSession = (overrides: Partial<Session> = {}): Session => ({
+	id: 'session-1',
+	name: 'Test Session',
+	toolType: 'claude-code',
+	state: 'idle',
+	inputMode: 'ai',
+	cwd: '/test/project',
+	projectRoot: '/test/project',
+	aiPid: 1234,
+	terminalPid: 5678,
+	aiLogs: [],
+	shellLogs: [],
+	isGitRepo: true,
+	fileTree: [],
+	fileExplorerExpanded: [],
+	messageQueue: [],
+	terminalTabs: [],
+	activeTerminalTabId: null,
+	...overrides,
+});
+
 // Create mock history entry factory
 const createMockEntry = (overrides: Partial<HistoryEntry> = {}): HistoryEntry => ({
 	id: `entry-${Math.random().toString(36).substring(7)}`,
@@ -146,7 +188,7 @@ describe('HistoryPanel', () => {
 		mockHistoryDelete = vi.fn().mockResolvedValue(true);
 		mockHistoryUpdate = vi.fn().mockResolvedValue(true);
 
-		// Add history and settings mocks to window.maestro
+		// Add history, settings, and directorNotes mocks to window.maestro
 		(
 			window as unknown as {
 				maestro: {
@@ -159,6 +201,9 @@ describe('HistoryPanel', () => {
 						get: ReturnType<typeof vi.fn>;
 						set: ReturnType<typeof vi.fn>;
 					};
+					directorNotes: {
+						onHistoryEntryAdded: ReturnType<typeof vi.fn>;
+					};
 				};
 			}
 		).maestro = {
@@ -170,6 +215,9 @@ describe('HistoryPanel', () => {
 			settings: {
 				get: vi.fn().mockResolvedValue(undefined),
 				set: vi.fn().mockResolvedValue(undefined),
+			},
+			directorNotes: {
+				onHistoryEntryAdded: vi.fn().mockReturnValue(() => {}),
 			},
 		};
 

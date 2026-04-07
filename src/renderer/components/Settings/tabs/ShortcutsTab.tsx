@@ -7,7 +7,6 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useFocusAfterRender } from '../../../hooks/utils/useFocusAfterRender';
 import { useSettings } from '../../../hooks';
 import { formatShortcutKeys } from '../../../utils/shortcutFormatter';
 import type { Theme, Shortcut } from '../../../types';
@@ -31,7 +30,10 @@ export function ShortcutsTab({ theme, hasNoAgents, onRecordingChange }: Shortcut
 	}, [recordingId, onRecordingChange]);
 
 	// Auto-focus filter input on mount
-	useFocusAfterRender(shortcutsFilterRef, true, 50);
+	useEffect(() => {
+		const timer = setTimeout(() => shortcutsFilterRef.current?.focus(), 50);
+		return () => clearTimeout(timer);
+	}, []);
 
 	const handleRecord = (
 		e: React.KeyboardEvent,
@@ -136,7 +138,7 @@ export function ShortcutsTab({ theme, hasNoAgents, onRecordingChange }: Shortcut
 	);
 
 	return (
-		<div className="flex flex-col" style={{ minHeight: '450px' }}>
+		<div data-setting-id="shortcuts-tab" className="flex flex-col" style={{ minHeight: '450px' }}>
 			{hasNoAgents && (
 				<p
 					className="text-xs mb-3 px-2 py-1.5 rounded"

@@ -7,35 +7,68 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useAgentStore } from '../../../renderer/stores/agentStore';
+import {
+	useAgentStore,
+	selectAvailableAgents,
+	selectAgentsDetected,
+	getAgentState,
+	getAgentActions,
+} from '../../../renderer/stores/agentStore';
 import type { ProcessQueuedItemDeps } from '../../../renderer/stores/agentStore';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import type { Session, AgentConfig, QueuedItem } from '../../../renderer/types';
-import { createMockSession as _createMockSession } from '../../helpers/mockSession';
 
 // ============================================================================
 // Helpers
 // ============================================================================
 
-// Wrapper: the old factory always included a default tab. Many tests depend on this.
-const defaultTab = {
-	id: 'tab-1',
-	agentSessionId: null,
-	name: null,
-	starred: false,
-	logs: [] as any[],
-	inputValue: '',
-	stagedImages: [] as any[],
-	createdAt: Date.now(),
-	state: 'idle' as const,
-};
-
 function createMockSession(overrides: Partial<Session> = {}): Session {
-	return _createMockSession({
-		aiTabs: [{ ...defaultTab }],
-		activeTabId: 'tab-1',
+	const defaultTab = {
+		id: 'default-tab',
+		agentSessionId: null,
+		name: null,
+		starred: false,
+		logs: [],
+		inputValue: '',
+		stagedImages: [],
+		createdAt: Date.now(),
+		state: 'idle' as const,
+	};
+	return {
+		id: overrides.id ?? `session-${Math.random().toString(36).slice(2, 8)}`,
+		name: overrides.name ?? 'Test Session',
+		toolType: overrides.toolType ?? 'claude-code',
+		state: overrides.state ?? 'idle',
+		cwd: '/test',
+		fullPath: '/test',
+		projectRoot: '/test',
+		aiLogs: [],
+		shellLogs: [],
+		workLog: [],
+		contextUsage: 0,
+		inputMode: overrides.inputMode ?? 'ai',
+		aiPid: 0,
+		terminalPid: 0,
+		port: 0,
+		isLive: false,
+		changedFiles: [],
+		isGitRepo: false,
+		fileTree: [],
+		fileExplorerExpanded: [],
+		fileExplorerScrollPos: 0,
+		executionQueue: [],
+		activeTimeMs: 0,
+		aiTabs: overrides.aiTabs ?? [defaultTab],
+		activeTabId: overrides.activeTabId ?? defaultTab.id,
+		closedTabHistory: [],
+		filePreviewTabs: [],
+		activeFileTabId: null,
+		unifiedTabOrder: [{ type: 'ai' as const, id: defaultTab.id }],
+		unifiedClosedTabHistory: [],
+		terminalTabs: [],
+		activeTerminalTabId: null,
 		...overrides,
-	});
+	} as Session;
 }
 
 function createMockAgentConfig(overrides: Partial<AgentConfig> = {}): AgentConfig {
@@ -52,7 +85,7 @@ function createMockAgentConfig(overrides: Partial<AgentConfig> = {}): AgentConfi
 // Setup
 // ============================================================================
 
-// Override window.maestro namespaces with test-specific mocks (setup.ts provides base)
+// Mock window.maestro (add to existing window, don't replace it)
 const mockSpawn = vi.fn().mockResolvedValue({ pid: 123, success: true });
 const mockKill = vi.fn().mockResolvedValue(true);
 const mockInterrupt = vi.fn().mockResolvedValue(true);
@@ -60,18 +93,19 @@ const mockDetect = vi.fn().mockResolvedValue([]);
 const mockGetAgent = vi.fn().mockResolvedValue(null);
 const mockClearError = vi.fn().mockResolvedValue(undefined);
 
-Object.assign(window.maestro.process, {
-	spawn: mockSpawn,
-	kill: mockKill,
-	interrupt: mockInterrupt,
-});
-Object.assign(window.maestro.agents, {
-	detect: mockDetect,
-	get: mockGetAgent,
-});
-// Add agentError namespace (not in setup.ts base mock)
-(window as any).maestro.agentError = {
-	clearError: mockClearError,
+(window as any).maestro = {
+	process: {
+		spawn: mockSpawn,
+		kill: mockKill,
+		interrupt: mockInterrupt,
+	},
+	agents: {
+		detect: mockDetect,
+		get: mockGetAgent,
+	},
+	agentError: {
+		clearError: mockClearError,
+	},
 };
 
 // Mock gitService
@@ -876,6 +910,115 @@ describe('agentStore', () => {
 		});
 	});
 
+	describe('selectors', () => {
+		it('selectAvailableAgents returns the agents list', () => {
+			const agents = [createMockAgentConfig({ id: 'claude-code' })];
+			useAgentStore.setState({ availableAgents: agents });
+
+			expect(selectAvailableAgents(useAgentStore.getState())).toEqual(agents);
+		});
+
+		it('selectAgentsDetected returns detection status', () => {
+			expect(selectAgentsDetected(useAgentStore.getState())).toBe(false);
+
+			useAgentStore.setState({ agentsDetected: true });
+
+			expect(selectAgentsDetected(useAgentStore.getState())).toBe(true);
+		});
+	});
+
+	describe('non-React access', () => {
+		it('getAgentState returns current snapshot', () => {
+			const agents = [createMockAgentConfig()];
+			useAgentStore.setState({ availableAgents: agents, agentsDetected: true });
+
+			const state = getAgentState();
+			expect(state.availableAgents).toEqual(agents);
+			expect(state.agentsDetected).toBe(true);
+		});
+
+		it('getAgentState reflects latest mutations', () => {
+			expect(getAgentState().agentsDetected).toBe(false);
+
+			useAgentStore.setState({ agentsDetected: true });
+
+			expect(getAgentState().agentsDetected).toBe(true);
+		});
+
+		it('getAgentActions returns all 10 action functions', () => {
+			const actions = getAgentActions();
+
+			expect(typeof actions.refreshAgents).toBe('function');
+			expect(typeof actions.getAgentConfig).toBe('function');
+			expect(typeof actions.processQueuedItem).toBe('function');
+			expect(typeof actions.clearAgentError).toBe('function');
+			expect(typeof actions.startNewSessionAfterError).toBe('function');
+			expect(typeof actions.retryAfterError).toBe('function');
+			expect(typeof actions.restartAgentAfterError).toBe('function');
+			expect(typeof actions.authenticateAfterError).toBe('function');
+			expect(typeof actions.killAgent).toBe('function');
+			expect(typeof actions.interruptAgent).toBe('function');
+
+			// Verify exactly 10 actions (no extras, no missing)
+			expect(Object.keys(actions)).toHaveLength(10);
+		});
+
+		it('getAgentActions clearAgentError works end-to-end', () => {
+			const session = createMockSession({
+				id: 'session-1',
+				state: 'error',
+				agentError: { type: 'agent_crashed', message: 'crash' } as any,
+			});
+			useSessionStore.getState().setSessions([session]);
+
+			const { clearAgentError } = getAgentActions();
+			clearAgentError('session-1');
+
+			expect(useSessionStore.getState().sessions[0].state).toBe('idle');
+			expect(mockClearError).toHaveBeenCalledWith('session-1');
+		});
+
+		it('getAgentActions killAgent works end-to-end', async () => {
+			const { killAgent } = getAgentActions();
+			await killAgent('session-1', 'terminal');
+
+			expect(mockKill).toHaveBeenCalledWith('session-1-terminal');
+		});
+	});
+
+	describe('React hook integration', () => {
+		it('useAgentStore with selector re-renders on agent detection', async () => {
+			const { result } = renderHook(() => useAgentStore(selectAgentsDetected));
+
+			expect(result.current).toBe(false);
+
+			const agents = [createMockAgentConfig()];
+			mockDetect.mockResolvedValueOnce(agents);
+
+			await act(async () => {
+				await useAgentStore.getState().refreshAgents();
+			});
+
+			expect(result.current).toBe(true);
+		});
+
+		it('useAgentStore with availableAgents selector updates on refresh', async () => {
+			const { result } = renderHook(() => useAgentStore(selectAvailableAgents));
+
+			expect(result.current).toEqual([]);
+
+			const agents = [createMockAgentConfig({ id: 'claude-code' })];
+			mockDetect.mockResolvedValueOnce(agents);
+
+			await act(async () => {
+				await useAgentStore.getState().refreshAgents();
+			});
+
+			expect(result.current).toHaveLength(1);
+			expect(result.current[0].id).toBe('claude-code');
+		});
+	});
+
 	describe('action stability', () => {
 		it('all action references are stable across state changes', () => {
 			const before = useAgentStore.getState();
@@ -1119,7 +1262,6 @@ describe('agentStore', () => {
 			const session = createMockSession({
 				id: 'session-1',
 				toolType: 'claude-code',
-				cwd: '/test',
 				aiTabs: [
 					{
 						id: 'tab-1',

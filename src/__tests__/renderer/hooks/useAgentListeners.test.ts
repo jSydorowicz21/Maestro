@@ -18,7 +18,6 @@ import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import { useModalStore } from '../../../renderer/stores/modalStore';
 import { useGroupChatStore } from '../../../renderer/stores/groupChatStore';
 import type { Session, AITab, AgentError } from '../../../renderer/types';
-import { createMockSession } from '../../helpers/mockSession';
 
 // ============================================================================
 // Helpers
@@ -38,6 +37,45 @@ function createMockTab(overrides: Partial<AITab> = {}): AITab {
 		saveToHistory: true,
 		...overrides,
 	};
+}
+
+function createMockSession(overrides: Partial<Session> = {}): Session {
+	const baseTab = createMockTab();
+	return {
+		id: 'session-1',
+		name: 'Test Session',
+		toolType: 'claude-code',
+		state: 'idle',
+		cwd: '/test/project',
+		fullPath: '/test/project',
+		projectRoot: '/test/project',
+		aiLogs: [],
+		shellLogs: [],
+		workLog: [],
+		contextUsage: 0,
+		inputMode: 'ai',
+		aiPid: 0,
+		terminalPid: 0,
+		port: 0,
+		isLive: false,
+		changedFiles: [],
+		isGitRepo: true,
+		fileTree: [],
+		fileExplorerExpanded: [],
+		fileExplorerScrollPos: 0,
+		aiTabs: overrides.aiTabs ?? [baseTab],
+		activeTabId: overrides.activeTabId ?? baseTab.id,
+		closedTabHistory: [],
+		executionQueue: [],
+		activeTimeMs: 0,
+		filePreviewTabs: [],
+		activeFileTabId: null,
+		unifiedTabOrder: [{ type: 'ai' as const, id: baseTab.id }],
+		unifiedClosedTabHistory: [],
+		terminalTabs: [],
+		activeTerminalTabId: null,
+		...overrides,
+	} as Session;
 }
 
 // ============================================================================
@@ -183,25 +221,26 @@ beforeEach(() => {
 	useModalStore.getState().closeAll();
 
 	// Mock window.maestro
-	Object.assign(window.maestro, {
+	(window as any).maestro = {
+		...((window as any).maestro || {}),
 		process: mockProcess,
 		agentError: {
 			clearError: vi.fn().mockResolvedValue(undefined),
 		},
-	});
-	Object.assign(window.maestro.agentSessions, {
-		registerSessionOrigin: vi.fn().mockResolvedValue(undefined),
-	});
-	Object.assign(window.maestro.stats, {
-		recordQuery: vi.fn().mockResolvedValue(undefined),
-	});
-	Object.assign(window.maestro.logger, {
-		log: vi.fn(),
-	});
-	Object.assign(window.maestro.agents, {
-		detect: vi.fn().mockResolvedValue([]),
-		get: vi.fn().mockResolvedValue(null),
-	});
+		agentSessions: {
+			registerSessionOrigin: vi.fn().mockResolvedValue(undefined),
+		},
+		stats: {
+			recordQuery: vi.fn().mockResolvedValue(undefined),
+		},
+		logger: {
+			log: vi.fn(),
+		},
+		agents: {
+			detect: vi.fn().mockResolvedValue([]),
+			get: vi.fn().mockResolvedValue(null),
+		},
+	};
 });
 
 afterEach(() => {
@@ -654,6 +693,32 @@ describe('useAgentListeners', () => {
 			expect(agentErrorOpen).toBe(false);
 		});
 
+		it('clears agentSessionId on session_not_found so next spawn starts fresh', () => {
+			const deps = createMockDeps();
+			const tab = createMockTab({ id: 'tab-1', agentSessionId: 'stale-session-id' });
+			const session = createMockSession({
+				id: 'sess-1',
+				state: 'busy',
+				aiTabs: [tab],
+				activeTabId: 'tab-1',
+			});
+			useSessionStore.setState({
+				sessions: [session],
+				activeSessionId: 'sess-1',
+			});
+
+			renderHook(() => useAgentListeners(deps));
+
+			onAgentErrorHandler?.('sess-1-ai-tab-1', {
+				...baseError,
+				type: 'session_not_found',
+			});
+
+			const updated = useSessionStore.getState().sessions.find((s) => s.id === 'sess-1');
+			const updatedTab = updated?.aiTabs.find((t) => t.id === 'tab-1');
+			expect(updatedTab?.agentSessionId).toBeNull();
+		});
+
 		it('appends error log entry to the target tab', () => {
 			const deps = createMockDeps();
 			const tab = createMockTab({ id: 'tab-1', logs: [] });
@@ -836,9 +901,9 @@ describe('useAgentListeners', () => {
 	// ========================================================================
 
 	describe('onExit', () => {
-		it('transitions AI session from busy to idle on process exit', async () => {
+		it('transitions AI session from busy to idle on process exit and preserves agentSessionId for resume', async () => {
 			const deps = createMockDeps();
-			const tab = createMockTab({ id: 'tab-1' });
+			const tab = createMockTab({ id: 'tab-1', agentSessionId: 'old-session-id' });
 			const session = createMockSession({
 				id: 'sess-1',
 				state: 'busy',
@@ -861,6 +926,11 @@ describe('useAgentListeners', () => {
 
 			const updated = useSessionStore.getState().sessions.find((s) => s.id === 'sess-1');
 			expect(updated?.state).toBe('idle');
+			// agentSessionId is preserved on normal exit so the next message can
+			// resume the conversation. Stale IDs are cleared by onAgentError when
+			// session_not_found is detected.
+			const updatedTab = updated?.aiTabs.find((t) => t.id === 'tab-1');
+			expect(updatedTab?.agentSessionId).toBe('old-session-id');
 		});
 
 		it('processes execution queue on exit', async () => {

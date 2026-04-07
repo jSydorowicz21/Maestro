@@ -1,6 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, memo, useMemo } from 'react';
-import { useEventListener } from '../../hooks/utils/useEventListener';
-import { Search, Mail } from 'lucide-react';
+import { Search, Bell } from 'lucide-react';
 import type { AITab } from '../../types';
 import { hasDraft } from '../../utils/tabHelpers';
 import { formatShortcutKeys } from '../../utils/shortcutFormatter';
@@ -11,7 +10,6 @@ import { TerminalTabItem } from './TerminalTabItem';
 import { NewTabPopover } from './NewTabPopover';
 import { isUnifiedTabActive, getShortcutHint } from './tabBarUtils';
 import type { TabBarProps } from './types';
-import { GhostIconButton } from '../ui/GhostIconButton';
 
 /** Approximate width of the sticky right "+" button area (px) */
 const STICKY_RIGHT_WIDTH = 48;
@@ -54,7 +52,7 @@ function TabBarInner({
 	onFileTabClose,
 	onUnifiedTabReorder,
 	activeTerminalTabId,
-	inputMode,
+	inputMode = 'ai',
 	onTerminalTabSelect,
 	onTerminalTabClose,
 	onTerminalTabRename,
@@ -81,6 +79,8 @@ function TabBarInner({
 
 	const shortcuts = useSettingsStore((s) => s.shortcuts);
 	const tabShortcuts = useSettingsStore((s) => s.tabShortcuts);
+	const showStarredInUnreadFilter = useSettingsStore((s) => s.showStarredInUnreadFilter);
+	const showFilePreviewsInUnreadFilter = useSettingsStore((s) => s.showFilePreviewsInUnreadFilter);
 
 	const tabBarRef = useRef<HTMLDivElement>(null);
 	const stickyLeftRef = useRef<HTMLDivElement>(null);
@@ -125,7 +125,14 @@ function TabBarInner({
 
 	// Filter tabs for display
 	const displayedTabs = showUnreadOnly
-		? tabs.filter((t) => t.hasUnread || t.state === 'busy' || t.id === activeTabId || hasDraft(t))
+		? tabs.filter(
+				(t) =>
+					t.hasUnread ||
+					t.state === 'busy' ||
+					(inputMode === 'ai' && t.id === activeTabId) ||
+					hasDraft(t) ||
+					(showStarredInUnreadFilter && t.starred)
+			)
 		: tabs;
 
 	const displayedUnifiedTabs = useMemo(() => {
@@ -139,14 +146,28 @@ function TabBarInner({
 				return (
 					ut.data.hasUnread ||
 					ut.data.state === 'busy' ||
-					ut.id === activeTabId ||
-					hasDraft(ut.data)
+					(inputMode === 'ai' && ut.id === activeTabId) ||
+					hasDraft(ut.data) ||
+					(showStarredInUnreadFilter && ut.data.starred)
 				);
 			}
-			// File and terminal tabs are always visible
+			// File preview tabs: hidden by default in unread filter, shown if setting enabled
+			if (ut.type === 'file') {
+				return showFilePreviewsInUnreadFilter;
+			}
+			// Terminal tabs are always visible
 			return true;
 		});
-	}, [unifiedTabs, showUnreadOnly, activeTabId, activeFileTabId, activeTerminalTabId, inputMode]);
+	}, [
+		unifiedTabs,
+		showUnreadOnly,
+		activeTabId,
+		activeFileTabId,
+		activeTerminalTabId,
+		inputMode,
+		showStarredInUnreadFilter,
+		showFilePreviewsInUnreadFilter,
+	]);
 
 	// Drag handlers
 	const handleDragStart = useCallback((tabId: string, e: React.DragEvent) => {
@@ -196,24 +217,19 @@ function TabBarInner({
 	);
 
 	// Overflow detection
-	const checkOverflow = useCallback(() => {
-		if (tabBarRef.current) {
-			setIsOverflowing(tabBarRef.current.scrollWidth > tabBarRef.current.clientWidth);
-		}
-	}, []);
-
-	useEventListener('resize', checkOverflow);
-
 	useEffect(() => {
+		const checkOverflow = () => {
+			if (tabBarRef.current) {
+				setIsOverflowing(tabBarRef.current.scrollWidth > tabBarRef.current.clientWidth);
+			}
+		};
 		const timeoutId = setTimeout(checkOverflow, 0);
-		return () => clearTimeout(timeoutId);
-	}, [
-		tabs.length,
-		displayedTabs.length,
-		unifiedTabs?.length,
-		displayedUnifiedTabs?.length,
-		checkOverflow,
-	]);
+		window.addEventListener('resize', checkOverflow);
+		return () => {
+			clearTimeout(timeoutId);
+			window.removeEventListener('resize', checkOverflow);
+		};
+	}, [tabs.length, displayedTabs.length, unifiedTabs?.length, displayedUnifiedTabs?.length]);
 
 	// Move-to-first/last handlers
 	const handleMoveToFirst = useCallback(
@@ -343,20 +359,21 @@ function TabBarInner({
 				style={{ backgroundColor: theme.colors.bgSidebar, zIndex: 5 }}
 			>
 				{onOpenTabSearch && (
-					<GhostIconButton
+					<button
 						onClick={onOpenTabSearch}
+						className="flex items-center justify-center w-6 h-6 rounded hover:bg-white/10 transition-colors"
 						style={{ color: theme.colors.textDim }}
-						tooltip={`Search tabs (${formatShortcutKeys(tabShortcuts.tabSwitcher?.keys ?? ['Alt', 'Meta', 't'])})`}
+						title={`Search tabs (${formatShortcutKeys(tabShortcuts.tabSwitcher?.keys ?? ['Alt', 'Meta', 't'])})`}
 					>
 						<Search className="w-4 h-4" />
-					</GhostIconButton>
+					</button>
 				)}
 				<button
 					onClick={toggleUnreadFilter}
 					className="relative flex items-center justify-center w-6 h-6 rounded transition-colors"
 					style={{
-						color: showUnreadOnly ? theme.colors.accent : theme.colors.textDim,
-						opacity: showUnreadOnly ? 1 : 0.5,
+						color: showUnreadOnly ? theme.colors.accentForeground : theme.colors.textDim,
+						backgroundColor: showUnreadOnly ? theme.colors.accent : undefined,
 					}}
 					title={
 						showUnreadOnly
@@ -364,11 +381,13 @@ function TabBarInner({
 							: `Filter unread tabs (${formatShortcutKeys(tabShortcuts.filterUnreadTabs?.keys ?? ['Meta', 'u'])})`
 					}
 				>
-					<Mail className="w-4 h-4" />
-					<div
-						className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
-						style={{ backgroundColor: theme.colors.accent }}
-					/>
+					<Bell className="w-4 h-4" />
+					{tabs.some((t) => t.hasUnread) && (
+						<div
+							className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
+							style={{ backgroundColor: theme.colors.error }}
+						/>
+					)}
 				</button>
 			</div>
 

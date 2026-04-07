@@ -21,6 +21,7 @@ declare const window: Window & {
 			getConfig: (agentId: string) => Promise<Record<string, any> | null>;
 			setConfig: (agentId: string, config: Record<string, any>) => Promise<boolean>;
 			getModels: (agentId: string, force?: boolean) => Promise<string[]>;
+			getConfigOptions: (agentId: string, optionKey: string, force?: boolean) => Promise<string[]>;
 			refresh: (agentId: string) => Promise<void>;
 		};
 		sshRemote: {
@@ -80,6 +81,10 @@ export interface UseAgentConfigurationReturn {
 	loadingModels: boolean;
 	refreshModels: () => Promise<void>;
 
+	// Dynamic config options (for select fields with dynamic: true)
+	dynamicOptions: Record<string, string[]>;
+	loadingDynamicOptions: boolean;
+
 	// Refresh
 	refreshingAgent: boolean;
 	refreshAgent: () => Promise<void>;
@@ -136,6 +141,10 @@ export function useAgentConfiguration(
 	const [availableModels, setAvailableModels] = useState<string[]>([]);
 	const [loadingModels, setLoadingModels] = useState(false);
 
+	// Dynamic config options (for select fields with dynamic: true)
+	const [dynamicOptions, setDynamicOptions] = useState<Record<string, string[]>>({});
+	const [loadingDynamicOptions, setLoadingDynamicOptions] = useState(false);
+
 	// Guard against stale async results when switching agents rapidly
 	const latestLoadRequestRef = useRef(0);
 
@@ -161,6 +170,8 @@ export function useAgentConfiguration(
 		agentConfigRef.current = {};
 		setAvailableModels([]);
 		setLoadingModels(false);
+		setDynamicOptions({});
+		setLoadingDynamicOptions(false);
 		setRefreshingAgent(false);
 		setSshRemoteConfig(undefined);
 	}, []);
@@ -180,7 +191,6 @@ export function useAgentConfiguration(
 				setSelectedAgent(filtered[0].id);
 			}
 		} catch (error) {
-			// Expected: agent detection can fail if agent is not installed
 			console.error('Failed to detect agents:', error);
 		} finally {
 			setIsDetecting(false);
@@ -206,11 +216,39 @@ export function useAgentConfiguration(
 					if (latestLoadRequestRef.current !== requestId) return; // stale
 					setAvailableModels(models);
 				} catch (err) {
-					// Expected: model list lookup can fail if agent is unavailable
 					console.error('Failed to load models:', err);
 				} finally {
 					if (latestLoadRequestRef.current === requestId) {
 						setLoadingModels(false);
+					}
+				}
+			}
+
+			// Load dynamic config options for select fields with dynamic: true
+			if (agent?.configOptions) {
+				const dynamicSelects = agent.configOptions.filter(
+					(opt: any) => opt.type === 'select' && opt.dynamic
+				);
+				if (dynamicSelects.length > 0) {
+					setLoadingDynamicOptions(true);
+					try {
+						const results: Record<string, string[]> = {};
+						await Promise.all(
+							dynamicSelects.map(async (opt: any) => {
+								try {
+									const options = await window.maestro.agents.getConfigOptions(agentId, opt.key);
+									results[opt.key] = options;
+								} catch {
+									// Silently fall back to static options
+								}
+							})
+						);
+						if (latestLoadRequestRef.current !== requestId) return;
+						setDynamicOptions(results);
+					} finally {
+						if (latestLoadRequestRef.current === requestId) {
+							setLoadingDynamicOptions(false);
+						}
 					}
 				}
 			}
@@ -231,7 +269,6 @@ export function useAgentConfiguration(
 			const models = await window.maestro.agents.getModels(selectedAgent, true);
 			setAvailableModels(models);
 		} catch (err) {
-			// Expected: model list refresh can fail if agent is unavailable
 			console.error('Failed to refresh models:', err);
 		} finally {
 			setLoadingModels(false);
@@ -248,7 +285,6 @@ export function useAgentConfiguration(
 				: agents.filter((a: AgentConfig) => a.available && !a.hidden);
 			setDetectedAgents(filtered);
 		} catch (error) {
-			// Expected: agent detection refresh can fail if agent is not installed
 			console.error('Failed to refresh agents:', error);
 		} finally {
 			setRefreshingAgent(false);
@@ -269,6 +305,8 @@ export function useAgentConfiguration(
 			agentConfigRef.current = {};
 			setAvailableModels([]);
 			setLoadingModels(false);
+			setDynamicOptions({});
+			setLoadingDynamicOptions(false);
 			if (isConfigExpanded) {
 				loadAgentConfig(agentId);
 			}
@@ -298,7 +336,6 @@ export function useAgentConfiguration(
 						setSshRemotes(configsResult.configs);
 					}
 				} catch (error) {
-					// Expected: SSH remote config loading can fail if not configured
 					console.error('Failed to load SSH remotes:', error);
 				}
 			})();
@@ -346,6 +383,10 @@ export function useAgentConfiguration(
 		availableModels,
 		loadingModels,
 		refreshModels,
+
+		// Dynamic config options
+		dynamicOptions,
+		loadingDynamicOptions,
 
 		// Refresh
 		refreshingAgent,

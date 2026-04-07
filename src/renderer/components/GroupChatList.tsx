@@ -5,7 +5,6 @@
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useEventListener } from '../hooks/utils/useEventListener';
 import {
 	MessageSquare,
 	ChevronDown,
@@ -19,7 +18,6 @@ import {
 import type { Theme, GroupChat, GroupChatState } from '../types';
 import { useClickOutside, useContextMenuPosition } from '../hooks';
 import { getStatusColor } from '../utils/theme';
-import { EmptyState } from './ui';
 
 // ============================================================================
 // GroupChatContextMenu - Right-click context menu for group chat items
@@ -54,15 +52,15 @@ function GroupChatContextMenu({
 	useClickOutside(menuRef, onClose);
 
 	// Close on Escape
-	useEventListener(
-		'keydown',
-		(e: KeyboardEvent) => {
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.key === 'Escape') {
 				onClose();
 			}
-		},
-		document
-	);
+		};
+		document.addEventListener('keydown', handleKeyDown);
+		return () => document.removeEventListener('keydown', handleKeyDown);
+	}, [onClose]);
 
 	// Measure menu and adjust position to stay within viewport
 	const { left, top, ready } = useContextMenuPosition(menuRef, x, y);
@@ -233,7 +231,7 @@ export function GroupChatList({
 				if (showArchived && a.archived !== b.archived) {
 					return a.archived ? 1 : -1;
 				}
-				return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+				return (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt);
 			});
 	}, [groupChats, showArchived]);
 
@@ -308,13 +306,9 @@ export function GroupChatList({
 			{isExpanded && (
 				<div className="px-2 pb-2">
 					{sortedGroupChats.length === 0 ? (
-						<EmptyState
-							theme={theme}
-							message={
-								groupChats.length === 0 ? 'No group chats yet' : 'All group chats are archived'
-							}
-							className="text-xs px-3 py-2 italic"
-						/>
+						<div className="text-xs px-3 py-2 italic" style={{ color: theme.colors.textDim }}>
+							{groupChats.length === 0 ? 'No group chats yet' : 'All group chats are archived'}
+						</div>
 					) : (
 						<div
 							className="flex flex-col border-l ml-4"

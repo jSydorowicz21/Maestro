@@ -10,7 +10,7 @@ import {
 	Star,
 } from 'lucide-react';
 import type { Theme, Session } from '../types';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { useListNavigation } from '../hooks';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { formatSize, formatRelativeTime } from '../utils/formatters';
@@ -73,22 +73,51 @@ export function AgentSessionsModal({
 	const selectedItemRef = useRef<HTMLButtonElement>(null);
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
 	const sessionsContainerRef = useRef<HTMLDivElement>(null);
+	const layerIdRef = useRef<string>();
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
 
-	// Escape handler for layer stack
-	const handleEscape = useCallback(() => {
-		if (viewingSession) {
-			setViewingSession(null);
-			setMessages([]);
-		} else {
-			onCloseRef.current();
-		}
-	}, [viewingSession]);
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
 
-	useModalLayer(MODAL_PRIORITIES.AGENT_SESSIONS, 'Agent Sessions', handleEscape, {
-		focusTrap: 'strict',
-	});
+	// Register layer on mount
+	useEffect(() => {
+		layerIdRef.current = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.AGENT_SESSIONS,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'strict',
+			ariaLabel: 'Agent Sessions',
+			onEscape: () => {
+				if (viewingSession) {
+					setViewingSession(null);
+					setMessages([]);
+				} else {
+					onCloseRef.current();
+				}
+			},
+		});
+
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [registerLayer, unregisterLayer]);
+
+	// Update handler when viewingSession changes
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, () => {
+				if (viewingSession) {
+					setViewingSession(null);
+					setMessages([]);
+				} else {
+					onCloseRef.current();
+				}
+			});
+		}
+	}, [viewingSession, updateLayerHandler]);
 
 	// Load sessions on mount and reset to list view
 	useEffect(() => {

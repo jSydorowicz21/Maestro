@@ -8,7 +8,6 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useEventListener } from '../../hooks/utils/useEventListener';
 import {
 	ReactFlowProvider,
 	useReactFlow,
@@ -556,34 +555,53 @@ function CuePipelineEditorInner({
 
 	// ─── Keyboard shortcuts ──────────────────────────────────────────────────
 
-	useEventListener('keydown', (e: KeyboardEvent) => {
-		const target = e.target as HTMLElement;
-		const isInput =
-			target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			const target = e.target as HTMLElement;
+			const isInput =
+				target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
 
-		if (e.key === 'Delete' || e.key === 'Backspace') {
-			if (isInput) return;
-			if (selectedNode && selectedNodePipelineId) {
+			if (e.key === 'Delete' || e.key === 'Backspace') {
+				if (isInput) return;
+				if (selectedNode && selectedNodePipelineId) {
+					e.preventDefault();
+					onDeleteNode(selectedNode.id);
+				} else if (selectedEdge && selectedEdgePipelineId) {
+					e.preventDefault();
+					onDeleteEdge(selectedEdge.id);
+				}
+			} else if (e.key === 'Escape') {
+				if (triggerDrawerOpen) {
+					setTriggerDrawerOpen(false);
+				} else if (agentDrawerOpen) {
+					setAgentDrawerOpen(false);
+				} else if (selectedNodeId || selectedEdgeId) {
+					setSelectedNodeId(null);
+					setSelectedEdgeId(null);
+				}
+			} else if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
 				e.preventDefault();
-				onDeleteNode(selectedNode.id);
-			} else if (selectedEdge && selectedEdgePipelineId) {
-				e.preventDefault();
-				onDeleteEdge(selectedEdge.id);
+				handleSave();
 			}
-		} else if (e.key === 'Escape') {
-			if (triggerDrawerOpen) {
-				setTriggerDrawerOpen(false);
-			} else if (agentDrawerOpen) {
-				setAgentDrawerOpen(false);
-			} else if (selectedNodeId || selectedEdgeId) {
-				setSelectedNodeId(null);
-				setSelectedEdgeId(null);
-			}
-		} else if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
-			e.preventDefault();
-			handleSave();
-		}
-	});
+		};
+
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
+	}, [
+		selectedNode,
+		selectedNodePipelineId,
+		selectedEdge,
+		selectedEdgePipelineId,
+		selectedNodeId,
+		selectedEdgeId,
+		onDeleteNode,
+		onDeleteEdge,
+		triggerDrawerOpen,
+		agentDrawerOpen,
+		handleSave,
+		setSelectedNodeId,
+		setSelectedEdgeId,
+	]);
 
 	// ─── Context menu handlers ───────────────────────────────────────────────
 

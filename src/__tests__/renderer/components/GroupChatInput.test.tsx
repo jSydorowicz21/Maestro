@@ -14,12 +14,71 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { GroupChatInput } from '../../../renderer/components/GroupChatInput';
 import type { Theme, Session, Group, GroupChatParticipant } from '../../../renderer/types';
-import { createMockSession } from '../../helpers/mockSession';
-import { createMockTheme } from '../../helpers/mockTheme';
 
 // =============================================================================
 // TEST HELPERS
 // =============================================================================
+
+/**
+ * Creates a minimal mock theme for testing
+ */
+function createMockTheme(): Theme {
+	return {
+		id: 'test-theme',
+		name: 'Test Theme',
+		colors: {
+			bgMain: '#1a1a1a',
+			bgSidebar: '#252525',
+			textMain: '#ffffff',
+			textDim: '#888888',
+			accent: '#6366f1',
+			border: '#333333',
+			success: '#22c55e',
+			error: '#ef4444',
+			warning: '#f59e0b',
+			contextFree: '#22c55e',
+			contextMedium: '#f59e0b',
+			contextHigh: '#ef4444',
+		},
+	};
+}
+
+/**
+ * Creates a mock session for testing
+ */
+function createMockSession(id: string, name: string, toolType: string = 'claude-code'): Session {
+	return {
+		id,
+		name,
+		toolType,
+		state: 'idle',
+		cwd: '/test/project',
+		fullPath: '/test/project',
+		projectRoot: '/test/project',
+		aiLogs: [],
+		shellLogs: [],
+		workLog: [],
+		contextUsage: 0,
+		inputMode: 'ai',
+		aiPid: 0,
+		terminalPid: 0,
+		port: 0,
+		isLive: false,
+		changedFiles: [],
+		isGitRepo: false,
+		fileTree: [],
+		fileExplorerExpanded: [],
+		fileExplorerScrollPos: 0,
+		executionQueue: [],
+		activeTimeMs: 0,
+		aiTabs: [],
+		activeTabId: '',
+		closedTabHistory: [],
+		terminalTabs: [],
+		activeTerminalTabId: null,
+	};
+}
+
 /**
  * Creates a mock participant for testing
  */
@@ -69,8 +128,8 @@ describe('GroupChatInput', () => {
 	describe('@mention autocomplete', () => {
 		it('shows mention dropdown when typing @', () => {
 			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Maestro', toolType: 'claude-code' }),
-				createMockSession({ id: 'session-2', name: 'RunMaestro.ai', toolType: 'claude-code' }),
+				createMockSession('session-1', 'Maestro', 'claude-code'),
+				createMockSession('session-2', 'RunMaestro.ai', 'claude-code'),
 			];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
@@ -85,9 +144,9 @@ describe('GroupChatInput', () => {
 
 		it('filters mention suggestions as user types', () => {
 			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Maestro', toolType: 'claude-code' }),
-				createMockSession({ id: 'session-2', name: 'RunMaestro.ai', toolType: 'claude-code' }),
-				createMockSession({ id: 'session-3', name: 'OtherAgent', toolType: 'claude-code' }),
+				createMockSession('session-1', 'Maestro', 'claude-code'),
+				createMockSession('session-2', 'RunMaestro.ai', 'claude-code'),
+				createMockSession('session-3', 'OtherAgent', 'claude-code'),
 			];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
@@ -101,9 +160,7 @@ describe('GroupChatInput', () => {
 		});
 
 		it('inserts mention when clicking suggestion', () => {
-			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Maestro', toolType: 'claude-code' }),
-			];
+			const sessions = [createMockSession('session-1', 'Maestro', 'claude-code')];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
 
@@ -119,9 +176,7 @@ describe('GroupChatInput', () => {
 		});
 
 		it('inserts mention when pressing Tab', () => {
-			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Maestro', toolType: 'claude-code' }),
-			];
+			const sessions = [createMockSession('session-1', 'Maestro', 'claude-code')];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
 
@@ -136,9 +191,7 @@ describe('GroupChatInput', () => {
 		});
 
 		it('inserts mention when pressing Enter (without modifier)', () => {
-			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Maestro', toolType: 'claude-code' }),
-			];
+			const sessions = [createMockSession('session-1', 'Maestro', 'claude-code')];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
 
@@ -154,9 +207,9 @@ describe('GroupChatInput', () => {
 
 		it('navigates suggestions with arrow keys', () => {
 			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Agent1', toolType: 'claude-code' }),
-				createMockSession({ id: 'session-2', name: 'Agent2', toolType: 'claude-code' }),
-				createMockSession({ id: 'session-3', name: 'Agent3', toolType: 'claude-code' }),
+				createMockSession('session-1', 'Agent1', 'claude-code'),
+				createMockSession('session-2', 'Agent2', 'claude-code'),
+				createMockSession('session-3', 'Agent3', 'claude-code'),
 			];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
@@ -176,9 +229,7 @@ describe('GroupChatInput', () => {
 		});
 
 		it('closes dropdown when pressing Escape', () => {
-			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Maestro', toolType: 'claude-code' }),
-			];
+			const sessions = [createMockSession('session-1', 'Maestro', 'claude-code')];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
 
@@ -196,9 +247,7 @@ describe('GroupChatInput', () => {
 		});
 
 		it('closes dropdown when typing space after @mention trigger', () => {
-			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Maestro', toolType: 'claude-code' }),
-			];
+			const sessions = [createMockSession('session-1', 'Maestro', 'claude-code')];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
 
@@ -217,8 +266,8 @@ describe('GroupChatInput', () => {
 
 		it('excludes terminal sessions from mention suggestions', () => {
 			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Maestro', toolType: 'claude-code' }),
-				createMockSession({ id: 'session-2', name: 'Terminal', toolType: 'terminal' }),
+				createMockSession('session-1', 'Maestro', 'claude-code'),
+				createMockSession('session-2', 'Terminal', 'terminal'),
 			];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
@@ -246,9 +295,9 @@ describe('GroupChatInput', () => {
 
 		it('handles sessions with special characters in names', () => {
 			const sessions = [
-				createMockSession({ id: 'session-1', name: 'RunMaestro.ai', toolType: 'claude-code' }),
-				createMockSession({ id: 'session-2', name: 'my-agent', toolType: 'claude-code' }),
-				createMockSession({ id: 'session-3', name: 'agent_test', toolType: 'claude-code' }),
+				createMockSession('session-1', 'RunMaestro.ai', 'claude-code'),
+				createMockSession('session-2', 'my-agent', 'claude-code'),
+				createMockSession('session-3', 'agent_test', 'claude-code'),
 			];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
@@ -263,9 +312,7 @@ describe('GroupChatInput', () => {
 		});
 
 		it('shows agent type in parentheses', () => {
-			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Maestro', toolType: 'claude-code' }),
-			];
+			const sessions = [createMockSession('session-1', 'Maestro', 'claude-code')];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
 
@@ -278,8 +325,8 @@ describe('GroupChatInput', () => {
 
 		it('wraps arrow key navigation (down from last goes to first)', () => {
 			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Agent1', toolType: 'claude-code' }),
-				createMockSession({ id: 'session-2', name: 'Agent2', toolType: 'claude-code' }),
+				createMockSession('session-1', 'Agent1', 'claude-code'),
+				createMockSession('session-2', 'Agent2', 'claude-code'),
 			];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
@@ -300,8 +347,8 @@ describe('GroupChatInput', () => {
 
 		it('wraps arrow key navigation (up from first goes to last)', () => {
 			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Agent1', toolType: 'claude-code' }),
-				createMockSession({ id: 'session-2', name: 'Agent2', toolType: 'claude-code' }),
+				createMockSession('session-1', 'Agent1', 'claude-code'),
+				createMockSession('session-2', 'Agent2', 'claude-code'),
 			];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
@@ -320,9 +367,7 @@ describe('GroupChatInput', () => {
 
 	describe('mention dropdown visibility', () => {
 		it('shows dropdown when @ is typed at start of input', () => {
-			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Maestro', toolType: 'claude-code' }),
-			];
+			const sessions = [createMockSession('session-1', 'Maestro', 'claude-code')];
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
 
 			const textarea = screen.getByPlaceholderText(/Type a message/i) as HTMLTextAreaElement;
@@ -332,9 +377,7 @@ describe('GroupChatInput', () => {
 		});
 
 		it('shows dropdown when @ is typed after text', () => {
-			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Maestro', toolType: 'claude-code' }),
-			];
+			const sessions = [createMockSession('session-1', 'Maestro', 'claude-code')];
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
 
 			const textarea = screen.getByPlaceholderText(/Type a message/i) as HTMLTextAreaElement;
@@ -344,9 +387,7 @@ describe('GroupChatInput', () => {
 		});
 
 		it('hides dropdown when all text is deleted', () => {
-			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Maestro', toolType: 'claude-code' }),
-			];
+			const sessions = [createMockSession('session-1', 'Maestro', 'claude-code')];
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
 
 			const textarea = screen.getByPlaceholderText(/Type a message/i) as HTMLTextAreaElement;
@@ -361,9 +402,7 @@ describe('GroupChatInput', () => {
 		});
 
 		it('hides dropdown when no sessions match filter', () => {
-			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Maestro', toolType: 'claude-code' }),
-			];
+			const sessions = [createMockSession('session-1', 'Maestro', 'claude-code')];
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
 
 			const textarea = screen.getByPlaceholderText(/Type a message/i) as HTMLTextAreaElement;
@@ -376,9 +415,7 @@ describe('GroupChatInput', () => {
 
 	describe('case-insensitive filtering', () => {
 		it('filters case-insensitively', () => {
-			const sessions = [
-				createMockSession({ id: 'session-1', name: 'MyAgent', toolType: 'claude-code' }),
-			];
+			const sessions = [createMockSession('session-1', 'MyAgent', 'claude-code')];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
 
@@ -396,14 +433,8 @@ describe('GroupChatInput', () => {
 		it('shows groups in mention dropdown', () => {
 			const groups = [createMockGroup('group-1', 'PROJECTS', '📁')];
 			const sessions = [
-				{
-					...createMockSession({ id: 'session-1', name: 'Agent1', toolType: 'claude-code' }),
-					groupId: 'group-1',
-				},
-				{
-					...createMockSession({ id: 'session-2', name: 'Agent2', toolType: 'claude-code' }),
-					groupId: 'group-1',
-				},
+				{ ...createMockSession('session-1', 'Agent1', 'claude-code'), groupId: 'group-1' },
+				{ ...createMockSession('session-2', 'Agent2', 'claude-code'), groupId: 'group-1' },
 			];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions, groups })} />);
@@ -419,10 +450,7 @@ describe('GroupChatInput', () => {
 		it('shows groups before individual agents', () => {
 			const groups = [createMockGroup('group-1', 'PROJECTS', '📁')];
 			const sessions = [
-				{
-					...createMockSession({ id: 'session-1', name: 'Agent1', toolType: 'claude-code' }),
-					groupId: 'group-1',
-				},
+				{ ...createMockSession('session-1', 'Agent1', 'claude-code'), groupId: 'group-1' },
 			];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions, groups })} />);
@@ -444,14 +472,8 @@ describe('GroupChatInput', () => {
 		it('expands group into all member mentions on click', () => {
 			const groups = [createMockGroup('group-1', 'PROJECTS', '📁')];
 			const sessions = [
-				{
-					...createMockSession({ id: 'session-1', name: 'Agent1', toolType: 'claude-code' }),
-					groupId: 'group-1',
-				},
-				{
-					...createMockSession({ id: 'session-2', name: 'Agent2', toolType: 'claude-code' }),
-					groupId: 'group-1',
-				},
+				{ ...createMockSession('session-1', 'Agent1', 'claude-code'), groupId: 'group-1' },
+				{ ...createMockSession('session-2', 'Agent2', 'claude-code'), groupId: 'group-1' },
 			];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions, groups })} />);
@@ -469,14 +491,8 @@ describe('GroupChatInput', () => {
 		it('expands group via Tab key', () => {
 			const groups = [createMockGroup('group-1', 'PROJECTS', '📁')];
 			const sessions = [
-				{
-					...createMockSession({ id: 'session-1', name: 'Agent1', toolType: 'claude-code' }),
-					groupId: 'group-1',
-				},
-				{
-					...createMockSession({ id: 'session-2', name: 'Agent2', toolType: 'claude-code' }),
-					groupId: 'group-1',
-				},
+				{ ...createMockSession('session-1', 'Agent1', 'claude-code'), groupId: 'group-1' },
+				{ ...createMockSession('session-2', 'Agent2', 'claude-code'), groupId: 'group-1' },
 			];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions, groups })} />);
@@ -493,10 +509,7 @@ describe('GroupChatInput', () => {
 		it('excludes empty groups (no non-terminal members)', () => {
 			const groups = [createMockGroup('group-1', 'TERMINALS', '💻')];
 			const sessions = [
-				{
-					...createMockSession({ id: 'session-1', name: 'Term1', toolType: 'terminal' }),
-					groupId: 'group-1',
-				},
+				{ ...createMockSession('session-1', 'Term1', 'terminal'), groupId: 'group-1' },
 			];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions, groups })} />);
@@ -514,14 +527,8 @@ describe('GroupChatInput', () => {
 				createMockGroup('group-2', 'TOOLS', '🔧'),
 			];
 			const sessions = [
-				{
-					...createMockSession({ id: 'session-1', name: 'Agent1', toolType: 'claude-code' }),
-					groupId: 'group-1',
-				},
-				{
-					...createMockSession({ id: 'session-2', name: 'Agent2', toolType: 'claude-code' }),
-					groupId: 'group-2',
-				},
+				{ ...createMockSession('session-1', 'Agent1', 'claude-code'), groupId: 'group-1' },
+				{ ...createMockSession('session-2', 'Agent2', 'claude-code'), groupId: 'group-2' },
 			];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions, groups })} />);
@@ -535,9 +542,7 @@ describe('GroupChatInput', () => {
 		});
 
 		it('works without groups prop', () => {
-			const sessions = [
-				createMockSession({ id: 'session-1', name: 'Agent1', toolType: 'claude-code' }),
-			];
+			const sessions = [createMockSession('session-1', 'Agent1', 'claude-code')];
 
 			render(<GroupChatInput {...createDefaultProps({ sessions })} />);
 

@@ -11,5 +11,6 @@ export { WizardProvider, useWizard } from './WizardContext';
 export { WizardResumeModal } from './WizardResumeModal';
 export { WizardExitConfirmModal } from './WizardExitConfirmModal';
 export { ScreenReaderAnnouncement, useAnnouncement } from './ScreenReaderAnnouncement';
+export { AUTO_RUN_FOLDER_NAME } from './services/phaseGenerator';
 export type { WizardState, WizardStep, SerializableWizardState } from './WizardContext';
 export type { AnnouncementPoliteness } from './ScreenReaderAnnouncement';

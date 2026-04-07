@@ -42,6 +42,7 @@ const GitLogViewer = lazy(() =>
 export interface AppUtilityModalsProps {
 	theme: Theme;
 	sessions: Session[];
+	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	activeSessionId: string;
 	activeSession: Session | null;
 	groups: Group[];
@@ -125,6 +126,7 @@ export interface AppUtilityModalsProps {
 	autoRunSelectedDocument: string | null;
 	autoRunCompletedTaskCount: number;
 	onAutoRunResetTasks: () => void;
+	onClearActiveTerminal?: () => void;
 
 	// Gist publishing (for QuickActionsModal)
 	isFilePreviewOpen: boolean;
@@ -229,6 +231,7 @@ export interface AppUtilityModalsProps {
 	onPromptToggleTabSaveToHistory?: () => void;
 	promptTabReadOnlyMode: boolean;
 	onPromptToggleTabReadOnlyMode: () => void;
+	promptComposerAgentId?: string;
 	promptTabShowThinking: ThinkingMode;
 	onPromptToggleTabShowThinking?: () => void;
 	promptSupportsThinking: boolean;
@@ -239,7 +242,7 @@ export interface AppUtilityModalsProps {
 	queueBrowserOpen: boolean;
 	onCloseQueueBrowser: () => void;
 	onRemoveQueueItem: (sessionId: string, itemId: string) => void;
-	onSwitchQueueSession: (sessionId: string) => void;
+	onSwitchQueueSession: (sessionId: string, tabId?: string) => void;
 	onReorderQueueItems: (sessionId: string, fromIndex: number, toIndex: number) => void;
 }
 
@@ -261,6 +264,7 @@ export interface AppUtilityModalsProps {
 export const AppUtilityModals = memo(function AppUtilityModals({
 	theme,
 	sessions,
+	setSessions,
 	activeSessionId,
 	activeSession,
 	groups,
@@ -337,6 +341,7 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 	autoRunSelectedDocument,
 	autoRunCompletedTaskCount,
 	onAutoRunResetTasks,
+	onClearActiveTerminal,
 	// Gist publishing
 	isFilePreviewOpen,
 	ghCliAvailable,
@@ -412,6 +417,7 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 	onPromptToggleTabSaveToHistory,
 	promptTabReadOnlyMode,
 	onPromptToggleTabReadOnlyMode,
+	promptComposerAgentId,
 	promptTabShowThinking,
 	onPromptToggleTabShowThinking,
 	promptSupportsThinking,
@@ -431,6 +437,7 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 				<QuickActionsModal
 					theme={theme}
 					sessions={sessions}
+					setSessions={setSessions}
 					activeSessionId={activeSessionId}
 					groups={groups}
 					setGroups={setGroups}
@@ -503,6 +510,7 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 					autoRunSelectedDocument={autoRunSelectedDocument}
 					autoRunCompletedTaskCount={autoRunCompletedTaskCount}
 					onAutoRunResetTasks={onAutoRunResetTasks}
+					onClearActiveTerminal={onClearActiveTerminal}
 					isFilePreviewOpen={isFilePreviewOpen}
 					ghCliAvailable={ghCliAvailable}
 					onPublishGist={onPublishGist}
@@ -652,6 +660,7 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 					onToggleTabSaveToHistory={onPromptToggleTabSaveToHistory}
 					tabReadOnlyMode={promptTabReadOnlyMode}
 					onToggleTabReadOnlyMode={onPromptToggleTabReadOnlyMode}
+					agentId={promptComposerAgentId}
 					tabShowThinking={promptTabShowThinking}
 					onToggleTabShowThinking={onPromptToggleTabShowThinking}
 					supportsThinking={promptSupportsThinking}

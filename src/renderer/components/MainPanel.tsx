@@ -596,6 +596,7 @@ export const MainPanel = React.memo(
 					const value = typeof config?.contextWindow === 'number' ? config.contextWindow : 0;
 					if (isActive) setConfiguredContextWindow(value);
 				} catch (error) {
+					// Expected: agent configuration may be unavailable
 					console.error('Failed to load agent context window setting', error);
 					if (isActive) setConfiguredContextWindow(0);
 				}

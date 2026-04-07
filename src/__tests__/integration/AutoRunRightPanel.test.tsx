@@ -14,9 +14,7 @@ import React, { createRef, useState } from 'react';
 import { RightPanel, RightPanelHandle } from '../../renderer/components/RightPanel';
 import { AutoRun, AutoRunHandle } from '../../renderer/components/AutoRun';
 import type { Session, Theme, Shortcut, BatchRunState, RightPanelTab } from '../../renderer/types';
-import { createMockSession } from '../helpers/mockSession';
 import { LayerStackProvider } from '../../renderer/contexts/LayerStackContext';
-import { createMockTheme } from '../helpers/mockTheme';
 
 // Mock external dependencies
 vi.mock('react-markdown', () => ({
@@ -124,23 +122,86 @@ vi.mock('../../renderer/utils/shortcutFormatter', () => ({
 	formatShortcutKeys: vi.fn((keys) => keys?.join('+') || ''),
 	isMacOS: vi.fn(() => false),
 }));
-// Override specific window.maestro namespaces (setup.ts provides the base mock)
-const overrideMaestroMock = () => {
-	Object.assign(window.maestro.fs, {
-		readFile: vi.fn().mockResolvedValue('data:image/png;base64,abc123'),
-		readDir: vi.fn().mockResolvedValue([]),
-	});
-	Object.assign(window.maestro.autorun, {
-		listImages: vi.fn().mockResolvedValue({ success: true, images: [] }),
-		saveImage: vi.fn().mockResolvedValue({ success: true, relativePath: 'images/test-123.png' }),
-		deleteImage: vi.fn().mockResolvedValue({ success: true }),
-		writeDoc: vi.fn().mockResolvedValue(undefined),
-	});
-	Object.assign(window.maestro.settings, {
-		get: vi.fn().mockResolvedValue(null),
-		set: vi.fn().mockResolvedValue(undefined),
-	});
+
+// Create a mock theme for testing
+const createMockTheme = (): Theme => ({
+	id: 'test-theme',
+	name: 'Test Theme',
+	mode: 'dark',
+	colors: {
+		bgMain: '#1a1a1a',
+		bgPanel: '#252525',
+		bgActivity: '#2d2d2d',
+		bgSidebar: '#1e1e1e',
+		textMain: '#ffffff',
+		textDim: '#888888',
+		accent: '#0066ff',
+		accentForeground: '#ffffff',
+		border: '#333333',
+		highlight: '#0066ff33',
+		success: '#00aa00',
+		warning: '#ffaa00',
+		error: '#ff0000',
+	},
+});
+
+// Setup window.maestro mock
+const setupMaestroMock = () => {
+	const mockMaestro = {
+		fs: {
+			readFile: vi.fn().mockResolvedValue('data:image/png;base64,abc123'),
+			readDir: vi.fn().mockResolvedValue([]),
+		},
+		autorun: {
+			listImages: vi.fn().mockResolvedValue({ success: true, images: [] }),
+			saveImage: vi.fn().mockResolvedValue({ success: true, relativePath: 'images/test-123.png' }),
+			deleteImage: vi.fn().mockResolvedValue({ success: true }),
+			writeDoc: vi.fn().mockResolvedValue(undefined),
+		},
+		settings: {
+			get: vi.fn().mockResolvedValue(null),
+			set: vi.fn().mockResolvedValue(undefined),
+		},
+	};
+
+	(window as any).maestro = mockMaestro;
+	return mockMaestro;
 };
+
+// Create mock session
+const createMockSession = (overrides: Partial<Session> = {}): Session => ({
+	id: 'test-session-1',
+	name: 'Test Session',
+	cwd: '/test/path',
+	projectRoot: '/test/path',
+	fullPath: '/test/path',
+	toolType: 'claude-code',
+	state: 'idle',
+	inputMode: 'ai',
+	isGitRepo: true,
+	aiPid: 1234,
+	terminalPid: 5678,
+	port: 3000,
+	aiTabs: [{ id: 'tab-1', name: 'Tab 1', logs: [] }],
+	activeTabId: 'tab-1',
+	closedTabHistory: [],
+	shellLogs: [],
+	fileTree: [],
+	fileExplorerExpanded: [],
+	fileExplorerScrollPos: 0,
+	executionQueue: [],
+	changedFiles: [],
+	isLive: false,
+	contextUsage: 0,
+	workLog: [],
+	autoRunFolderPath: '/test/autorun',
+	autoRunSelectedFile: 'Phase 1',
+	autoRunMode: 'edit',
+	autoRunCursorPosition: 0,
+	autoRunEditScrollPos: 0,
+	autoRunPreviewScrollPos: 0,
+	...overrides,
+});
 
 // Create mock shortcuts
 const createMockShortcuts = (): Record<string, Shortcut> => ({
@@ -262,8 +323,10 @@ const RightPanelTestWrapper = ({
 };
 
 describe('Auto Run + RightPanel Integration', () => {
+	let mockMaestro: ReturnType<typeof setupMaestroMock>;
+
 	beforeEach(() => {
-		overrideMaestroMock();
+		mockMaestro = setupMaestroMock();
 		vi.useFakeTimers({ shouldAdvanceTime: true });
 		vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
 			cb(0);

@@ -115,6 +115,16 @@ export interface DeleteAgentModalData {
 	session: Session;
 }
 
+/** Director's Notes modal data */
+export interface DirectorNotesData {
+	initialTab?: 'overview' | 'history' | 'ai-overview';
+}
+
+/** Cue modal data */
+export interface CueModalData {
+	initialTab?: 'dashboard' | 'pipeline';
+}
+
 /** Cue YAML editor data */
 export interface CueYamlEditorData {
 	sessionId: string;
@@ -262,6 +272,8 @@ export interface ModalDataMap {
 	firstRunCelebration: FirstRunCelebrationData;
 	keyboardMastery: KeyboardMasteryData;
 	lightbox: LightboxData;
+	directorNotes: DirectorNotesData;
+	cueModal: CueModalData;
 	cueYamlEditor: CueYamlEditorData;
 }
 
@@ -444,6 +456,18 @@ export const selectModalData =
 	<T extends ModalId>(id: T) =>
 	(state: ModalStore): ModalDataFor<T> | undefined =>
 		state.modals.get(id)?.data as ModalDataFor<T> | undefined;
+
+/**
+ * Create a selector for a specific modal's full entry (open + data).
+ *
+ * @example
+ * const settings = useModalStore(selectModal('settings'));
+ * if (settings?.open) { ... }
+ */
+export const selectModal =
+	<T extends ModalId>(id: T) =>
+	(state: ModalStore): ModalEntry<ModalDataFor<T>> | undefined =>
+		state.modals.get(id) as ModalEntry<ModalDataFor<T>> | undefined;
 
 // ============================================================================
 // ModalContext Compatibility Layer
@@ -779,6 +803,8 @@ export function getModalActions() {
 
 		// Maestro Cue Modal
 		setCueModalOpen: (open: boolean) => (open ? openModal('cueModal') : closeModal('cueModal')),
+		openCueModalWithTab: (tab: 'dashboard' | 'pipeline') =>
+			openModal('cueModal', { initialTab: tab }),
 
 		// Maestro Cue YAML Editor (standalone, bypasses CueModal dashboard)
 		openCueYamlEditor: (sessionId: string, projectRoot: string) =>

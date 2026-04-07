@@ -1,9 +1,8 @@
-import { memo, useState, useMemo, useRef } from 'react';
-import { useFocusAfterRender } from '../../../hooks/utils/useFocusAfterRender';
+import { memo, useState, useMemo, useRef, useEffect } from 'react';
 import { Bot, Search, X } from 'lucide-react';
 import type { Theme } from '../../../types';
 
-export interface PipelineAgentInfo {
+export interface AgentSessionInfo {
 	id: string;
 	groupId?: string;
 	name: string;
@@ -13,13 +12,13 @@ export interface PipelineAgentInfo {
 export interface AgentDrawerProps {
 	isOpen: boolean;
 	onClose: () => void;
-	sessions: PipelineAgentInfo[];
+	sessions: AgentSessionInfo[];
 	groups?: { id: string; name: string; emoji: string }[];
 	onCanvasSessionIds?: Set<string>;
 	theme: Theme;
 }
 
-function handleDragStart(e: React.DragEvent, session: PipelineAgentInfo) {
+function handleDragStart(e: React.DragEvent, session: AgentSessionInfo) {
 	e.dataTransfer.setData(
 		'application/cue-pipeline',
 		JSON.stringify({
@@ -43,8 +42,14 @@ export const AgentDrawer = memo(function AgentDrawer({
 	const [search, setSearch] = useState('');
 	const searchInputRef = useRef<HTMLInputElement>(null);
 
-	// Auto-focus search input when drawer opens (small delay for CSS transition)
-	useFocusAfterRender(searchInputRef, isOpen, 50);
+	// Auto-focus search input when drawer opens
+	useEffect(() => {
+		if (isOpen) {
+			// Small delay to allow the CSS transform transition to start
+			const timer = setTimeout(() => searchInputRef.current?.focus(), 50);
+			return () => clearTimeout(timer);
+		}
+	}, [isOpen]);
 
 	const filtered = useMemo(() => {
 		if (!search.trim()) return sessions;
@@ -67,7 +72,7 @@ export const AgentDrawer = memo(function AgentDrawer({
 	const grouped = useMemo(() => {
 		const result = new Map<
 			string,
-			{ label: string; sortName: string; sessions: PipelineAgentInfo[] }
+			{ label: string; sortName: string; sessions: AgentSessionInfo[] }
 		>();
 		for (const s of filtered) {
 			const key = s.groupId ?? '__ungrouped__';

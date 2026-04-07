@@ -1,11 +1,14 @@
 import { useCallback } from 'react';
 import type { Session } from '../../types';
-import { updateActiveAiTab, updateSessionWith } from '../../stores/sessionStore';
+import { getActiveTab } from '../../utils/tabHelpers';
 
 /**
  * Dependencies required by the useInputSync hook
  */
-export interface UseInputSyncDeps {}
+export interface UseInputSyncDeps {
+	/** Session state setter */
+	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
+}
 
 /**
  * Return type for the useInputSync hook
@@ -38,15 +41,29 @@ export interface UseInputSyncReturn {
  */
 export function useInputSync(
 	activeSession: Session | null,
-	_deps: UseInputSyncDeps
+	deps: UseInputSyncDeps
 ): UseInputSyncReturn {
+	const { setSessions } = deps;
+
 	// Function to persist AI input to session state (called on blur/submit)
 	const syncAiInputToSession = useCallback(
 		(value: string) => {
 			if (!activeSession) return;
-			updateActiveAiTab(activeSession.id, (tab) => ({ ...tab, inputValue: value }));
+			setSessions((prev) =>
+				prev.map((s) => {
+					if (s.id !== activeSession.id) return s;
+					const currentActiveTab = getActiveTab(s);
+					if (!currentActiveTab) return s;
+					return {
+						...s,
+						aiTabs: s.aiTabs.map((tab) =>
+							tab.id === currentActiveTab.id ? { ...tab, inputValue: value } : tab
+						),
+					};
+				})
+			);
 		},
-		[activeSession]
+		[activeSession, setSessions]
 	);
 
 	// Function to persist terminal input to session state (called on blur/session switch)
@@ -54,9 +71,11 @@ export function useInputSync(
 		(value: string, sessionId?: string) => {
 			const targetSessionId = sessionId || activeSession?.id;
 			if (!targetSessionId) return;
-			updateSessionWith(targetSessionId, (s) => ({ ...s, terminalDraftInput: value }));
+			setSessions((prev) =>
+				prev.map((s) => (s.id === targetSessionId ? { ...s, terminalDraftInput: value } : s))
+			);
 		},
-		[activeSession?.id]
+		[activeSession?.id, setSessions]
 	);
 
 	return {

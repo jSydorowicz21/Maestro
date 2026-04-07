@@ -3,9 +3,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import React from 'react';
 import { WorktreeRunSection } from '../../../renderer/components/WorktreeRunSection';
 import type { Theme, Session } from '../../../renderer/types';
-import { createMockSession as _createMockSession } from '../../helpers/mockSession';
 import { gitService } from '../../../renderer/services/git';
-import { createMockTheme } from '../../helpers/mockTheme';
 
 // Mock gitService
 vi.mock('../../../renderer/services/git', () => ({
@@ -13,21 +11,55 @@ vi.mock('../../../renderer/services/git', () => ({
 		getBranches: vi.fn().mockResolvedValue(['main', 'develop']),
 	},
 }));
-// Wrapper: old factory had id 'parent-1', name 'Test Agent', different cwd, isGitRepo, and worktreeConfig
+
+function createMockTheme(): Theme {
+	return {
+		id: 'dark',
+		name: 'Dark',
+		mode: 'dark',
+		colors: {
+			bgMain: '#1a1a1a',
+			bgSidebar: '#111111',
+			bgActivity: '#222222',
+			textMain: '#ffffff',
+			textDim: '#888888',
+			accent: '#0066ff',
+			border: '#333333',
+			success: '#00cc00',
+			warning: '#ffcc00',
+			error: '#ff0000',
+			info: '#0099ff',
+			link: '#66aaff',
+			userBubble: '#0044cc',
+		},
+	};
+}
+
 function createMockSession(overrides: Partial<Session> = {}): Session {
-	return _createMockSession({
+	return {
 		id: 'parent-1',
 		name: 'Test Agent',
+		toolType: 'claude-code',
 		cwd: '/project',
 		fullPath: '/project',
 		projectRoot: '/project',
+		state: 'idle',
+		tabs: [],
+		activeTabIndex: 0,
 		isGitRepo: true,
+		isLive: false,
+		changedFiles: [],
+		fileTree: [],
+		fileExplorerExpanded: [],
+		fileExplorerScrollPos: 0,
 		worktreeConfig: {
 			basePath: '/project/worktrees',
 			watchEnabled: false,
 		},
+		terminalTabs: [],
+		activeTerminalTabId: null,
 		...overrides,
-	} as Partial<Session>);
+	} as Session;
 }
 
 function createWorktreeChild(overrides: Partial<Session> = {}): Session {

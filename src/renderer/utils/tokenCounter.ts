@@ -8,7 +8,6 @@
  */
 
 import { getEncoding, type Tiktoken } from 'js-tiktoken';
-import { estimateTokenCount } from '../../shared/formatters';
 
 // Lazy-loaded tokenizer encoder (cl100k_base is used by Claude/GPT-4)
 let encoderPromise: Promise<Tiktoken> | null = null;
@@ -39,15 +38,25 @@ export async function countTokens(text: string): Promise<number> {
 		const encoder = await getEncoder();
 		return encoder.encode(text).length;
 	} catch (error) {
-		// Expected: tokenizer WASM may fail to load in some environments
 		console.error('Failed to count tokens:', error);
 		// Fall back to character-based estimate if tokenizer fails
 		return estimateTokens(text);
 	}
 }
 
-/** @deprecated Use `estimateTokenCount` from `shared/formatters` directly */
-export const estimateTokens = estimateTokenCount;
+/**
+ * Synchronous token estimation using character-based heuristic.
+ * Use this when you need a quick estimate without async.
+ * Less accurate than countTokens() but faster and synchronous.
+ *
+ * @param text - The text to estimate tokens for
+ * @returns Estimated token count
+ */
+export function estimateTokens(text: string): number {
+	// Average of ~4 characters per token for English text
+	// Code tends to be denser (~3 chars/token), but this is a reasonable average
+	return Math.ceil(text.length / 4);
+}
 
 /**
  * Format a token count for display with appropriate suffix.

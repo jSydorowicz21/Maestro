@@ -56,5 +56,9 @@ export type { UseSessionCrudDeps, UseSessionCrudReturn } from './useSessionCrud'
 export { useCycleSession } from './useCycleSession';
 export type { UseCycleSessionDeps, UseCycleSessionReturn } from './useCycleSession';
 
-// Active session shorthand (wraps selectActiveSession selector)
-export { useActiveSession } from './useActiveSession';
+// Session switching callbacks (navigate to session/tab from various UI surfaces)
+export { useSessionSwitchCallbacks } from './useSessionSwitchCallbacks';
+export type {
+	UseSessionSwitchCallbacksDeps,
+	UseSessionSwitchCallbacksReturn,
+} from './useSessionSwitchCallbacks';

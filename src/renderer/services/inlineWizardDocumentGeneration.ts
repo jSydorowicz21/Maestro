@@ -13,11 +13,18 @@ import type { ToolType } from '../types';
 import type { InlineWizardMessage, InlineGeneratedDocument } from '../hooks/batch/useInlineWizard';
 import type { ExistingDocument } from '../utils/existingDocsDetector';
 import { logger } from '../utils/logger';
+import { getStdinFlags } from '../utils/spawnHelpers';
 import { wizardDocumentGenerationPrompt, wizardInlineIterateGenerationPrompt } from '../../prompts';
 import { substituteTemplateVariables, type TemplateContext } from '../utils/templateVariables';
+import { deriveSshRemoteId } from '../components/Wizard/services/phaseGenerator';
 
 import { PLAYBOOKS_DIR } from '../../shared/maestro-paths';
-import { captureException } from '../utils/sentry';
+
+/**
+ * Auto Run folder name constant.
+ * @deprecated Import PLAYBOOKS_DIR from shared/maestro-paths instead.
+ */
+export const AUTO_RUN_FOLDER_NAME = PLAYBOOKS_DIR;
 
 /**
  * Generation timeout in milliseconds (20 minutes).
@@ -718,9 +725,7 @@ export async function generateInlineDocuments(
 
 	// Create a date-prefixed subfolder name: "YYYY-MM-DD-Feature-Name" (with -2, -3, etc. if needed)
 	const baseFolderName = generateWizardFolderBaseName(projectName);
-	const sshRemoteId = config.sessionSshRemoteConfig?.enabled
-		? (config.sessionSshRemoteConfig.remoteId ?? undefined)
-		: undefined;
+	const sshRemoteId = deriveSshRemoteId(config.sessionSshRemoteConfig);
 
 	// Only attempt to check existing folders if we're local OR if listDocs supports remote
 	// Since generateUniqueSubfolderName uses listDocs, and listDocs supports SSH, we can pass it
@@ -798,7 +803,6 @@ export async function generateInlineDocuments(
 					clearTimeout(timeoutId);
 
 					timeoutId = setTimeout(() => {
-						// Expected: generation inactivity timeout is a normal safeguard
 						console.error('[InlineWizardDocGen] TIMEOUT fired! Session:', sessionId);
 						cleanupAll();
 						window.maestro.process
@@ -816,7 +820,6 @@ export async function generateInlineDocuments(
 
 				// Set up timeout (20 minutes for complex generation)
 				let timeoutId = setTimeout(() => {
-					// Expected: generation inactivity timeout is a normal safeguard
 					console.error('[InlineWizardDocGen] TIMEOUT fired! Session:', sessionId);
 					cleanupAll();
 					window.maestro.process
@@ -992,6 +995,13 @@ export async function generateInlineDocuments(
 				// For remote sessions, we use the agent type name since the agent is installed on the remote host
 				const commandToUse = agent?.path || agent?.command || agentType;
 
+				const { sendPromptViaStdin: sendViaStdin, sendPromptViaStdinRaw: sendViaStdinRaw } =
+					getStdinFlags({
+						isSshSession: !!config.sessionSshRemoteConfig?.enabled,
+						supportsStreamJsonInput: agent?.capabilities?.supportsStreamJsonInput ?? false,
+						hasImages: false, // Document generation never sends images
+					});
+
 				window.maestro.process
 					.spawn({
 						sessionId,
@@ -1000,6 +1010,8 @@ export async function generateInlineDocuments(
 						command: commandToUse,
 						args: argsForSpawn,
 						prompt,
+						sendPromptViaStdin: sendViaStdin,
+						sendPromptViaStdinRaw: sendViaStdinRaw,
 						// Pass SSH config for remote execution
 						sessionSshRemoteConfig: config.sessionSshRemoteConfig,
 						// Pass session-level overrides
@@ -1069,9 +1081,6 @@ export async function generateInlineDocuments(
 					);
 				} catch (error) {
 					console.error('[InlineWizardDocGen] Failed to create playbook:', error);
-					captureException(error, {
-						extra: { operation: 'createPlaybookForDocuments', subfolderName },
-					});
 				}
 			}
 
@@ -1131,7 +1140,6 @@ export async function generateInlineDocuments(
 				callbacks?.onDocumentComplete?.(savedDoc);
 			} catch (error) {
 				console.error('[InlineWizardDocGen] Failed to save document:', doc.filename, error);
-				captureException(error, { extra: { operation: 'saveDocument', filename: doc.filename } });
 				// Continue saving other documents even if one fails
 			}
 		}
@@ -1158,9 +1166,6 @@ export async function generateInlineDocuments(
 				);
 			} catch (error) {
 				console.error('[InlineWizardDocGen] Failed to create playbook:', error);
-				captureException(error, {
-					extra: { operation: 'createPlaybookForDocuments', subfolderName },
-				});
 				// Don't fail the overall operation if playbook creation fails
 			}
 		}
@@ -1179,7 +1184,6 @@ export async function generateInlineDocuments(
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 		console.error('[InlineWizardDocGen] Error:', error);
-		captureException(error, { extra: { operation: 'generateDocuments' } });
 		callbacks?.onError?.(errorMessage);
 		return {
 			success: false,
@@ -1303,7 +1307,6 @@ async function readDocumentsFromDisk(
 
 		return documents;
 	} catch (error) {
-		// Expected: directory may not exist yet or files may have been removed
 		console.error('[InlineWizardDocGen] Error reading documents from disk:', error);
 		return [];
 	}

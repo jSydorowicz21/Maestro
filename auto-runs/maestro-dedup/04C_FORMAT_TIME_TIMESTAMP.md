@@ -49,7 +49,7 @@ Create a canonical `formatTimestamp` in `src/shared/formatters.ts` and replace 1
 - [x] Write the implementation in `src/shared/formatters.ts` covering all discovered output patterns
 - [x] Add unit tests in `src/__tests__/shared/formatters.test.ts` for each style variant
 - [x] Test edge cases: timestamp 0, negative values, future timestamps
-- [x] Run tests: `rtk vitest run src/__tests__/shared/formatters.test.ts` - all 67 tests pass
+- [x] Run tests: `CI=1 rtk vitest run src/__tests__/shared/formatters.test.ts` - all 67 tests pass
 
 ### Task 5: Migrate all 15 definitions
 
@@ -74,7 +74,7 @@ For each file:
 ### Task 7: Verify
 
 - [x] Run lint: `rtk npm run lint` - passes
-- [x] Run related tests: `rtk vitest run src/__tests__/shared/formatters.test.ts` - 67 tests pass
+- [x] Run related tests: `CI=1 rtk vitest run src/__tests__/shared/formatters.test.ts` - 67 tests pass
 - [x] Find and run component tests that use formatTime/formatTimestamp: found 6 related test files, all pass (408 tests total)
 - [x] Confirm zero new test failures
 
@@ -90,7 +90,7 @@ For each file:
 After completing changes, run targeted tests for the files you modified:
 
 ```bash
-rtk vitest run <path-to-relevant-test-files>
+CI=1 rtk vitest run <path-to-relevant-test-files>
 ```
 
 **Rule: Zero new test failures from your changes.** Pre-existing failures on the baseline are acceptable. If a test you didn't touch starts failing, investigate whether your refactoring broke it. If your change removed code that a test depended on, update that test.

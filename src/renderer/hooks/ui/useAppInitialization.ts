@@ -139,7 +139,6 @@ export function useAppInitialization(): AppInitializationReturn {
 				}
 			})
 			.catch((error) => {
-				// Expected: platform detection is best-effort, app works without it
 				console.error('[App] Failed to detect platform for Windows warning:', error);
 			});
 	}, [settingsLoaded, suppressWindowsWarning]);
@@ -183,7 +182,6 @@ export function useAppInitialization(): AppInitializationReturn {
 						getModalActions().setUpdateCheckModalOpen(true);
 					}
 				} catch (error) {
-					// Expected: update check can fail due to network or offline mode
 					console.error('Failed to check for updates on startup:', error);
 				}
 			}, 2000);
@@ -238,7 +236,6 @@ export function useAppInitialization(): AppInitializationReturn {
 				const commands = await getSpeckitCommands();
 				setSpeckitCommands(commands);
 			} catch (error) {
-				// Expected: SpecKit commands may not be configured for this project
 				console.error('[SpecKit] Failed to load commands:', error);
 			}
 		})();
@@ -251,7 +248,6 @@ export function useAppInitialization(): AppInitializationReturn {
 				const commands = await getOpenSpecCommands();
 				setOpenspecCommands(commands);
 			} catch (error) {
-				// Expected: OpenSpec commands may not be configured for this project
 				console.error('[OpenSpec] Failed to load commands:', error);
 			}
 		})();

@@ -18,6 +18,7 @@ import { AutoRunToolbar } from './AutoRunToolbar';
 import { AutoRunErrorBanner } from './AutoRunErrorBanner';
 import { AutoRunBottomPanel } from './AutoRunBottomPanel';
 import { NoFolderState, EmptyFolderState } from './AutoRunEmptyStates';
+import { useBatchStore } from '../../stores/batchStore';
 import { AutoRunAttachmentsPanel } from './AutoRunAttachmentsPanel';
 import { useTemplateAutocomplete, useAutoRunUndo, useAutoRunImageHandling } from '../../hooks';
 import { TemplateAutocompleteDropdown } from '../TemplateAutocompleteDropdown';
@@ -27,6 +28,8 @@ import { useAutoRunSearch } from '../../hooks/batch/useAutoRunSearch';
 import { useAutoRunKeyboard } from '../../hooks/batch/useAutoRunKeyboard';
 import { useAutoRunMarkdown } from '../../hooks/batch/useAutoRunMarkdown';
 import { useAutoRunScrollSync } from '../../hooks/batch/useAutoRunScrollSync';
+import { Maximize2, Edit as EditIcon, Eye } from 'lucide-react';
+import { formatShortcutKeys } from '../../utils/shortcutFormatter';
 
 // Inner implementation component
 const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInner(
@@ -92,8 +95,15 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
 	}, [isAutoRunActive]);
 	const isStopping = batchRunState?.isStopping || false;
 	// Error state (Phase 5.10)
-	const isErrorPaused = batchRunState?.errorPaused || false;
-	const batchError = batchRunState?.error;
+	// Subscribe directly to the Zustand store to bypass the multi-hop prop chain
+	// (store → useBatchProcessor → useBatchHandlers → App → RightPanel → AutoRun)
+	// which drops errorPaused updates via updateBatchStateAndBroadcast/UPDATE_PROGRESS.
+	const isErrorPaused = useBatchStore(
+		useCallback((s) => s.batchRunStates[sessionId]?.errorPaused ?? false, [sessionId])
+	);
+	const batchError = useBatchStore(
+		useCallback((s) => s.batchRunStates[sessionId]?.error, [sessionId])
+	);
 	const errorDocumentName =
 		batchRunState?.errorDocumentIndex !== undefined
 			? batchRunState.documents[batchRunState.errorDocumentIndex]
@@ -497,16 +507,11 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
 			{folderPath && !hideTopControls && (
 				<AutoRunToolbar
 					theme={theme}
-					mode={mode}
-					isLocked={isLocked}
 					isAutoRunActive={isAutoRunActive}
 					isStopping={isStopping}
 					isAgentBusy={isAgentBusy}
 					isDirty={isDirty}
 					sessionId={sessionId}
-					shortcuts={shortcuts}
-					onSwitchMode={switchMode}
-					onExpand={onExpand}
 					onOpenBatchRunner={onOpenBatchRunner}
 					onStopBatchRun={onStopBatchRun}
 					onOpenMarketplace={onOpenMarketplace}
@@ -678,6 +683,64 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
 				</div>
 			)}
 
+			{/* Editor Mode Bar - Expand, Edit/Preview toggle below content area */}
+			{folderPath && documentList.length > 0 && (
+				<div className="flex mx-2 mt-1 mb-1 gap-1 shrink-0">
+					{/* Expand button */}
+					{onExpand && !hideTopControls && (
+						<button
+							onClick={onExpand}
+							className="flex items-center justify-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors hover:bg-white/10"
+							style={{
+								color: theme.colors.accent,
+								border: `1px solid ${theme.colors.accent}40`,
+								backgroundColor: `${theme.colors.accent}15`,
+							}}
+							title={`Expand to full screen${shortcuts?.toggleAutoRunExpanded ? ` (${formatShortcutKeys(shortcuts.toggleAutoRunExpanded.keys)})` : ''}`}
+						>
+							<Maximize2 className="w-3 h-3" />
+							Expand
+						</button>
+					)}
+					{/* Edit / Preview toggle - fills remaining space */}
+					<button
+						onClick={() => {
+							if (mode === 'edit') {
+								switchMode('preview');
+							} else if (!isLocked) {
+								switchMode('edit');
+							}
+						}}
+						disabled={mode === 'preview' && isLocked}
+						className={`flex-1 flex items-center justify-center gap-1.5 py-1 rounded text-xs font-medium transition-colors ${mode === 'preview' && isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10'}`}
+						style={{
+							color: theme.colors.accent,
+							border: `1px solid ${theme.colors.accent}40`,
+							backgroundColor: `${theme.colors.accent}15`,
+						}}
+						title={
+							mode === 'edit'
+								? 'Switch to preview'
+								: isLocked
+									? 'Editing disabled while Auto Run active'
+									: 'Switch to edit'
+						}
+					>
+						{mode === 'edit' ? (
+							<>
+								<Eye className="w-3 h-3" />
+								Preview
+							</>
+						) : (
+							<>
+								<EditIcon className="w-3 h-3" />
+								Edit
+							</>
+						)}
+					</button>
+				</div>
+			)}
+
 			{/* Bottom Panel - shown when folder selected AND (there are tasks, unsaved changes, or content with token count) */}
 			{folderPath && (taskCounts.total > 0 || (isDirty && !isLocked) || tokenCount !== null) && (
 				<AutoRunBottomPanel
@@ -741,10 +804,7 @@ export const AutoRun = memo(AutoRunInner, (prevProps, nextProps) => {
 		prevProps.batchRunState?.isStopping === nextProps.batchRunState?.isStopping &&
 		prevProps.batchRunState?.currentTaskIndex === nextProps.batchRunState?.currentTaskIndex &&
 		prevProps.batchRunState?.totalTasks === nextProps.batchRunState?.totalTasks &&
-		// Error state (Phase 5.10)
-		prevProps.batchRunState?.errorPaused === nextProps.batchRunState?.errorPaused &&
-		prevProps.batchRunState?.error?.type === nextProps.batchRunState?.error?.type &&
-		prevProps.batchRunState?.error?.message === nextProps.batchRunState?.error?.message &&
+		// Error state is read directly from Zustand store (not props), so no comparison needed here.
 		// Session state affects UI (busy disables Run button)
 		prevProps.sessionState === nextProps.sessionState &&
 		// Callbacks are typically stable, but check identity

@@ -5,8 +5,6 @@ import { PromptComposerModal } from '../../../renderer/components/PromptComposer
 import { formatEnterToSend } from '../../../renderer/utils/shortcutFormatter';
 import { LayerStackProvider } from '../../../renderer/contexts/LayerStackContext';
 import type { Theme, Session, Group } from '../../../renderer/types';
-import { createMockSession } from '../../helpers/mockSession';
-import { mockTheme } from '../../helpers/mockTheme';
 
 // Mock Lucide icons
 vi.mock('lucide-react', () => ({
@@ -41,6 +39,29 @@ vi.mock('lucide-react', () => ({
 		<svg data-testid="pin-icon" className={className} style={style} />
 	),
 }));
+
+// Mock theme
+const mockTheme: Theme = {
+	id: 'test-dark',
+	name: 'Test Dark',
+	mode: 'dark',
+	colors: {
+		bgMain: '#1a1a1a',
+		bgSidebar: '#252525',
+		border: '#333333',
+		textMain: '#ffffff',
+		textDim: '#888888',
+		textFaint: '#555555',
+		accent: '#4a9eff',
+		accentForeground: '#ffffff',
+		buttonBg: '#333333',
+		buttonHover: '#444444',
+		headerBg: '#202020',
+		scrollbarTrack: '#1a1a1a',
+		scrollbarThumb: '#444444',
+	},
+};
+
 const lightTheme: Theme = {
 	id: 'test-light',
 	name: 'Test Light',
@@ -1083,12 +1104,47 @@ describe('PromptComposerModal', () => {
 	});
 
 	describe('@mention autocomplete (group chat mode)', () => {
+		function createMockSession(
+			id: string,
+			name: string,
+			toolType: string = 'claude-code'
+		): Session {
+			return {
+				id,
+				name,
+				toolType,
+				state: 'idle',
+				cwd: '/test',
+				fullPath: '/test',
+				projectRoot: '/test',
+				aiLogs: [],
+				shellLogs: [],
+				workLog: [],
+				contextUsage: 0,
+				inputMode: 'ai',
+				aiPid: 0,
+				terminalPid: 0,
+				port: 0,
+				isLive: false,
+				changedFiles: [],
+				isGitRepo: false,
+				fileTree: [],
+				fileExplorerExpanded: [],
+				fileExplorerScrollPos: 0,
+				executionQueue: [],
+				activeTimeMs: 0,
+				aiTabs: [],
+				activeTabId: '',
+				closedTabHistory: [],
+			};
+		}
+
 		function createMockGroup(id: string, name: string, emoji: string = '📁'): Group {
 			return { id, name, emoji, collapsed: false };
 		}
 
 		it('should show mention placeholder when sessions are provided', () => {
-			const sessions = [createMockSession({ id: 's1', name: 'Agent1' })];
+			const sessions = [createMockSession('s1', 'Agent1')];
 			renderWithProvider(
 				<PromptComposerModal
 					isOpen={true}
@@ -1107,10 +1163,7 @@ describe('PromptComposerModal', () => {
 		});
 
 		it('should show mention dropdown when typing @', () => {
-			const sessions = [
-				createMockSession({ id: 's1', name: 'Agent1' }),
-				createMockSession({ id: 's2', name: 'Agent2' }),
-			];
+			const sessions = [createMockSession('s1', 'Agent1'), createMockSession('s2', 'Agent2')];
 			renderWithProvider(
 				<PromptComposerModal
 					isOpen={true}
@@ -1133,10 +1186,7 @@ describe('PromptComposerModal', () => {
 		});
 
 		it('should filter mentions as user types', () => {
-			const sessions = [
-				createMockSession({ id: 's1', name: 'Agent1' }),
-				createMockSession({ id: 's2', name: 'Other' }),
-			];
+			const sessions = [createMockSession('s1', 'Agent1'), createMockSession('s2', 'Other')];
 			renderWithProvider(
 				<PromptComposerModal
 					isOpen={true}
@@ -1159,7 +1209,7 @@ describe('PromptComposerModal', () => {
 		});
 
 		it('should insert mention on click', () => {
-			const sessions = [createMockSession({ id: 's1', name: 'Agent1' })];
+			const sessions = [createMockSession('s1', 'Agent1')];
 			renderWithProvider(
 				<PromptComposerModal
 					isOpen={true}
@@ -1182,7 +1232,7 @@ describe('PromptComposerModal', () => {
 		});
 
 		it('should insert mention on Tab key', () => {
-			const sessions = [createMockSession({ id: 's1', name: 'Agent1' })];
+			const sessions = [createMockSession('s1', 'Agent1')];
 			renderWithProvider(
 				<PromptComposerModal
 					isOpen={true}
@@ -1205,10 +1255,7 @@ describe('PromptComposerModal', () => {
 		});
 
 		it('should navigate mentions with arrow keys', () => {
-			const sessions = [
-				createMockSession({ id: 's1', name: 'Agent1' }),
-				createMockSession({ id: 's2', name: 'Agent2' }),
-			];
+			const sessions = [createMockSession('s1', 'Agent1'), createMockSession('s2', 'Agent2')];
 			renderWithProvider(
 				<PromptComposerModal
 					isOpen={true}
@@ -1232,7 +1279,7 @@ describe('PromptComposerModal', () => {
 		});
 
 		it('should close dropdown on Escape', () => {
-			const sessions = [createMockSession({ id: 's1', name: 'Agent1' })];
+			const sessions = [createMockSession('s1', 'Agent1')];
 			renderWithProvider(
 				<PromptComposerModal
 					isOpen={true}
@@ -1257,8 +1304,8 @@ describe('PromptComposerModal', () => {
 
 		it('should exclude terminal sessions', () => {
 			const sessions = [
-				createMockSession({ id: 's1', name: 'Agent1', toolType: 'claude-code' }),
-				createMockSession({ id: 's2', name: 'Terminal', toolType: 'terminal' }),
+				createMockSession('s1', 'Agent1', 'claude-code'),
+				createMockSession('s2', 'Terminal', 'terminal'),
 			];
 			renderWithProvider(
 				<PromptComposerModal
@@ -1284,8 +1331,8 @@ describe('PromptComposerModal', () => {
 		it('should expand group into member mentions', () => {
 			const groups = [createMockGroup('g1', 'TEAM', '🏢')];
 			const sessions = [
-				{ ...createMockSession({ id: 's1', name: 'Agent1' }), groupId: 'g1' },
-				{ ...createMockSession({ id: 's2', name: 'Agent2' }), groupId: 'g1' },
+				{ ...createMockSession('s1', 'Agent1'), groupId: 'g1' },
+				{ ...createMockSession('s2', 'Agent2'), groupId: 'g1' },
 			];
 			renderWithProvider(
 				<PromptComposerModal

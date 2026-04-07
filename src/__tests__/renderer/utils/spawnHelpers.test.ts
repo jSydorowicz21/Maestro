@@ -1,9 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { getStdinFlags } from '../../../renderer/utils/spawnHelpers';
 
 describe('getStdinFlags', () => {
+	afterEach(() => {
+		(window as any).maestro = { platform: 'darwin' };
+	});
+
 	it('returns both false on non-Windows platforms', () => {
-		(window as any).maestro.platform = 'darwin';
+		(window as any).maestro = { platform: 'darwin' };
 		const result = getStdinFlags({
 			isSshSession: false,
 			supportsStreamJsonInput: true,
@@ -13,7 +17,7 @@ describe('getStdinFlags', () => {
 	});
 
 	it('returns sendPromptViaStdin when Windows + stream-json + images', () => {
-		(window as any).maestro.platform = 'win32';
+		(window as any).maestro = { platform: 'win32' };
 		const result = getStdinFlags({
 			isSshSession: false,
 			supportsStreamJsonInput: true,
@@ -23,7 +27,7 @@ describe('getStdinFlags', () => {
 	});
 
 	it('returns sendPromptViaStdinRaw when Windows + stream-json + no images', () => {
-		(window as any).maestro.platform = 'win32';
+		(window as any).maestro = { platform: 'win32' };
 		const result = getStdinFlags({
 			isSshSession: false,
 			supportsStreamJsonInput: true,
@@ -33,7 +37,7 @@ describe('getStdinFlags', () => {
 	});
 
 	it('returns sendPromptViaStdinRaw when Windows + stream-json unsupported', () => {
-		(window as any).maestro.platform = 'win32';
+		(window as any).maestro = { platform: 'win32' };
 		const result = getStdinFlags({
 			isSshSession: false,
 			supportsStreamJsonInput: false,
@@ -43,7 +47,7 @@ describe('getStdinFlags', () => {
 	});
 
 	it('returns both false for SSH sessions on Windows', () => {
-		(window as any).maestro.platform = 'win32';
+		(window as any).maestro = { platform: 'win32' };
 		const result = getStdinFlags({
 			isSshSession: true,
 			supportsStreamJsonInput: true,
@@ -53,7 +57,7 @@ describe('getStdinFlags', () => {
 	});
 
 	it('returns both false for SSH sessions on Windows without stream-json', () => {
-		(window as any).maestro.platform = 'win32';
+		(window as any).maestro = { platform: 'win32' };
 		const result = getStdinFlags({
 			isSshSession: true,
 			supportsStreamJsonInput: false,

@@ -15,8 +15,7 @@
 
 import { useCallback } from 'react';
 import type { ThinkingMode } from '../../types';
-import { useSessionStore } from '../../stores/sessionStore';
-import { useActiveSession } from '../session/useActiveSession';
+import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUIStore } from '../../stores/uiStore';
 import type { MainPanelHandle } from '../../components/MainPanel';
@@ -58,6 +57,8 @@ export interface UseQuickActionsHandlersReturn {
 	handleQuickActionsSummarizeAndContinue: () => void;
 	/** Open Auto Run reset tasks modal */
 	handleQuickActionsAutoRunResetTasks: () => void;
+	/** Clear the active terminal xterm buffer */
+	handleQuickActionsClearActiveTerminal: () => void;
 }
 
 // ============================================================================
@@ -76,7 +77,7 @@ export function useQuickActionsHandlers(
 	} = deps;
 
 	// --- Reactive subscriptions ---
-	const activeSession = useActiveSession();
+	const activeSession = useSessionStore(selectActiveSession);
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
 	const markdownEditMode = useSettingsStore((s) => s.markdownEditMode);
 	const chatRawTextMode = useSettingsStore((s) => s.chatRawTextMode);
@@ -179,6 +180,10 @@ export function useQuickActionsHandlers(
 		rightPanelRef.current?.openAutoRunResetTasksModal();
 	}, []);
 
+	const handleQuickActionsClearActiveTerminal = useCallback(() => {
+		mainPanelRef.current?.clearActiveTerminal();
+	}, []);
+
 	return {
 		handleQuickActionsToggleReadOnlyMode,
 		handleQuickActionsToggleTabShowThinking,
@@ -187,5 +192,6 @@ export function useQuickActionsHandlers(
 		handleQuickActionsToggleMarkdownEditMode,
 		handleQuickActionsSummarizeAndContinue,
 		handleQuickActionsAutoRunResetTasks,
+		handleQuickActionsClearActiveTerminal,
 	};
 }

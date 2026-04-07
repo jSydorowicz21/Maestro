@@ -15,12 +15,11 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Session, SessionState, ToolType, LogEntry } from '../../types';
-import { useSessionStore, updateSessionWith } from '../../stores/sessionStore';
+import { useSessionStore } from '../../stores/sessionStore';
 import { useGroupChatStore } from '../../stores/groupChatStore';
 import { gitService } from '../../services/git';
-import { captureException } from '../../utils/sentry';
 import { generateId } from '../../utils/ids';
-import { PLAYBOOKS_DIR } from '../../../shared/maestro-paths';
+import { AUTO_RUN_FOLDER_NAME } from '../../components/Wizard';
 
 // ============================================================================
 // Return type
@@ -49,10 +48,8 @@ export function useSessionRestoration(): SessionRestorationReturn {
 	// useCallback/useEffect without appearing in dependency arrays. Zustand
 	// store actions returned by getState() are stable singletons that never
 	// change, so the empty deps array is intentional.
-	const { setSessions, setGroups, setActiveSessionId, setSessionsLoaded } = useMemo(
-		() => useSessionStore.getState(),
-		[]
-	);
+	const { setSessions, setGroups, setActiveSessionId, hydrateActiveSessionId, setSessionsLoaded } =
+		useMemo(() => useSessionStore.getState(), []);
 	const { setGroupChats } = useMemo(() => useGroupChatStore.getState(), []);
 
 	// --- initialLoadComplete proxy ref ---
@@ -88,18 +85,17 @@ export function useSessionRestoration(): SessionRestorationReturn {
 				const agent = await window.maestro.agents.get(toolType, sshRemoteId);
 				if (!agent) {
 					console.error(`[validateAgentInBackground] Agent not found for toolType: ${toolType}`);
-					captureException(new Error(`Agent not found for toolType: ${toolType}`), {
-						extra: {
-							context: 'useSessionRestoration.validateAgentInBackground',
-							toolType,
-							sessionId,
-						},
-					});
-					updateSessionWith(sessionId, (s) => ({
-						...s,
-						aiPid: -1,
-						state: 'error' as SessionState,
-					}));
+					setSessions((prev) =>
+						prev.map((s) =>
+							s.id === sessionId
+								? {
+										...s,
+										aiPid: -1,
+										state: 'error' as SessionState,
+									}
+								: s
+						)
+					);
 				}
 			} catch (err) {
 				// IPC failures are treated as transient (e.g. main process still
@@ -128,20 +124,28 @@ export function useSessionRestoration(): SessionRestorationReturn {
 					gitRefsCacheTime = Date.now();
 				}
 
-				updateSessionWith(sessionId, (s) => ({
-					...s,
-					isGitRepo,
-					gitBranches,
-					gitTags,
-					gitRefsCacheTime,
-					sshConnectionFailed: false,
-				}));
+				setSessions((prev) =>
+					prev.map((s) =>
+						s.id === sessionId
+							? {
+									...s,
+									isGitRepo,
+									gitBranches,
+									gitTags,
+									gitRefsCacheTime,
+									sshConnectionFailed: false,
+								}
+							: s
+					)
+				);
 			} catch (error) {
 				console.warn(
 					`[fetchGitInfoInBackground] Failed to fetch git info for session ${sessionId}:`,
 					error
 				);
-				updateSessionWith(sessionId, (s) => ({ ...s, sshConnectionFailed: true }));
+				setSessions((prev) =>
+					prev.map((s) => (s.id === sessionId ? { ...s, sshConnectionFailed: true } : s))
+				);
 			}
 		},
 		[]
@@ -159,7 +163,7 @@ export function useSessionRestoration(): SessionRestorationReturn {
 			if (!session.autoRunFolderPath && session.projectRoot) {
 				session = {
 					...session,
-					autoRunFolderPath: `${session.projectRoot}/${PLAYBOOKS_DIR}`,
+					autoRunFolderPath: `${session.projectRoot}/${AUTO_RUN_FOLDER_NAME}`,
 				};
 			}
 
@@ -178,9 +182,6 @@ export function useSessionRestoration(): SessionRestorationReturn {
 					'[restoreSession] Session has no aiTabs - data corruption, creating default tab:',
 					session.id
 				);
-				captureException(new Error('Session has no aiTabs - data corruption'), {
-					extra: { context: 'useSessionRestoration.restoreSession', sessionId: session.id },
-				});
 				const defaultTabId = generateId();
 				return {
 					...session,
@@ -396,9 +397,6 @@ export function useSessionRestoration(): SessionRestorationReturn {
 			};
 		} catch (error) {
 			console.error(`Error restoring session ${session.id}:`, error);
-			captureException(error, {
-				extra: { context: 'useSessionRestoration.restoreSession', sessionId: session.id },
-			});
 			return {
 				...session,
 				aiPid: -1,
@@ -430,12 +428,14 @@ export function useSessionRestoration(): SessionRestorationReturn {
 					const restoredSessions = await Promise.all(savedSessions.map((s) => restoreSession(s)));
 					setSessions(restoredSessions);
 
-					// Set active session to first session if current activeSessionId is invalid
-					const activeSessionId = useSessionStore.getState().activeSessionId;
-					if (
-						restoredSessions.length > 0 &&
-						!restoredSessions.find((s) => s.id === activeSessionId)
-					) {
+					// Restore persisted active session ID, falling back to first session.
+					const savedActiveSessionId = await window.maestro.sessions.getActiveSessionId();
+					if (savedActiveSessionId && restoredSessions.find((s) => s.id === savedActiveSessionId)) {
+						// Saved ID is valid — hydrate locally without writing back to disk
+						hydrateActiveSessionId(savedActiveSessionId);
+					} else if (restoredSessions[0]?.id) {
+						// Saved ID is stale or missing — persist the fallback so it
+						// doesn't retry the invalid ID on next launch
 						setActiveSessionId(restoredSessions[0].id);
 					}
 
@@ -476,12 +476,10 @@ export function useSessionRestoration(): SessionRestorationReturn {
 					setGroupChats(savedGroupChats || []);
 				} catch (gcError) {
 					console.error('Failed to load group chats:', gcError);
-					captureException(gcError, { extra: { context: 'useSessionRestoration.loadGroupChats' } });
 					setGroupChats([]);
 				}
 			} catch (e) {
 				console.error('Failed to load sessions/groups:', e);
-				captureException(e, { extra: { context: 'useSessionRestoration.loadSessionsAndGroups' } });
 				setSessions([]);
 				setGroups([]);
 				// Error loading sessions — no file tree to wait for

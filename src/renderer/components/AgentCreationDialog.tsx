@@ -11,15 +11,22 @@
  * - Uses shared AgentSelector and AgentConfigPanel components
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Music, X, Bot, Settings, FolderOpen, ChevronRight, RefreshCw } from 'lucide-react';
+import {
+	Music,
+	X,
+	Loader2,
+	Bot,
+	Settings,
+	FolderOpen,
+	ChevronRight,
+	RefreshCw,
+} from 'lucide-react';
 import type { Theme, AgentConfig } from '../types';
 import type { RegisteredRepository, SymphonyIssue } from '../../shared/symphony-types';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
-import { GhostIconButton } from './ui/GhostIconButton';
-import { Spinner } from './ui';
 import { AgentConfigPanel } from './shared/AgentConfigPanel';
 import { useAgentConfiguration } from '../hooks/agent/useAgentConfiguration';
 import { isBetaAgent } from '../../shared/agentMetadata';
@@ -70,12 +77,9 @@ export function AgentCreationDialog({
 	issue,
 	onCreateAgent,
 }: AgentCreationDialogProps) {
-	useModalLayer(
-		MODAL_PRIORITIES.SYMPHONY_AGENT_CREATION ?? 711,
-		'Create Agent for Symphony Contribution',
-		onClose,
-		{ isOpen }
-	);
+	const { registerLayer, unregisterLayer } = useLayerStack();
+	const onCloseRef = useRef(onClose);
+	onCloseRef.current = onClose;
 
 	// Filter function: only agents that support batch mode (required for Symphony)
 	const symphonyAgentFilter = useCallback((agent: AgentConfig) => {
@@ -112,6 +116,10 @@ export function AgentCreationDialog({
 	const [agentConfigs, setAgentConfigs] = useState<Record<string, Record<string, any>>>({});
 	const [availableModels, setAvailableModels] = useState<Record<string, string[]>>({});
 	const [loadingModels, setLoadingModels] = useState<Record<string, boolean>>({});
+	const [dynamicOptions, setDynamicOptions] = useState<Record<string, Record<string, string[]>>>(
+		{}
+	);
+	const [loadingDynamicOptions, setLoadingDynamicOptions] = useState<Record<string, boolean>>({});
 
 	// Reset all state when dialog opens
 	useEffect(() => {
@@ -171,6 +179,36 @@ export function AgentCreationDialog({
 		[availableModels]
 	);
 
+	// Load dynamic config options for an agent
+	const loadDynamicOptionsForAgent = useCallback(
+		async (agentId: string) => {
+			if (dynamicOptions[agentId]) return;
+			const agent = ac.detectedAgents.find((a) => a.id === agentId);
+			const dynamicSelects = agent?.configOptions?.filter(
+				(opt: any) => opt.type === 'select' && opt.dynamic
+			);
+			if (!dynamicSelects?.length) return;
+
+			setLoadingDynamicOptions((prev) => ({ ...prev, [agentId]: true }));
+			try {
+				const results: Record<string, string[]> = {};
+				await Promise.all(
+					dynamicSelects.map(async (opt: any) => {
+						try {
+							results[opt.key] = await window.maestro.agents.getConfigOptions(agentId, opt.key);
+						} catch {
+							/* fall back to static */
+						}
+					})
+				);
+				setDynamicOptions((prev) => ({ ...prev, [agentId]: results }));
+			} finally {
+				setLoadingDynamicOptions((prev) => ({ ...prev, [agentId]: false }));
+			}
+		},
+		[dynamicOptions, ac.detectedAgents]
+	);
+
 	// Refresh single agent detection (re-detects all agents via shared hook)
 	const handleRefreshAgent = useCallback(
 		async (_agentId: string) => {
@@ -185,6 +223,22 @@ export function AgentCreationDialog({
 		},
 		[ac.refreshAgent]
 	);
+
+	// Layer stack registration
+	useEffect(() => {
+		if (isOpen) {
+			const id = registerLayer({
+				type: 'modal',
+				priority: MODAL_PRIORITIES.SYMPHONY_AGENT_CREATION ?? 711,
+				blocksLowerLayers: true,
+				capturesFocus: true,
+				focusTrap: 'strict',
+				ariaLabel: 'Create Agent for Symphony Contribution',
+				onEscape: () => onCloseRef.current(),
+			});
+			return () => unregisterLayer(id);
+		}
+	}, [isOpen, registerLayer, unregisterLayer]);
 
 	// Handle folder selection
 	const handleSelectFolder = useCallback(async () => {
@@ -205,8 +259,10 @@ export function AgentCreationDialog({
 			if (agent?.capabilities?.supportsModelSelection) {
 				loadModelsForAgent(agentId);
 			}
+			// Load dynamic config options
+			loadDynamicOptionsForAgent(agentId);
 		},
-		[ac.detectedAgents, loadModelsForAgent]
+		[ac.detectedAgents, loadModelsForAgent, loadDynamicOptionsForAgent]
 	);
 
 	// Handle create
@@ -281,9 +337,13 @@ export function AgentCreationDialog({
 							Create Symphony Agent
 						</h2>
 					</div>
-					<GhostIconButton onClick={onClose} size="md" tooltip="Close (Esc)">
+					<button
+						onClick={onClose}
+						className="p-1.5 rounded hover:bg-white/10 transition-colors"
+						title="Close (Esc)"
+					>
 						<X className="w-4 h-4" style={{ color: theme.colors.textDim }} />
-					</GhostIconButton>
+					</button>
 				</div>
 
 				{/* Content - scrollable */}
@@ -317,7 +377,7 @@ export function AgentCreationDialog({
 
 						{ac.isDetecting ? (
 							<div className="flex items-center justify-center py-8">
-								<Spinner size="lg" style={{ color: theme.colors.accent }} />
+								<Loader2 className="w-6 h-6 animate-spin" style={{ color: theme.colors.accent }} />
 							</div>
 						) : ac.detectedAgents.length === 0 ? (
 							<div className="text-center py-4" style={{ color: theme.colors.textDim }}>
@@ -386,18 +446,19 @@ export function AgentCreationDialog({
 													>
 														Available
 													</span>
-													<GhostIconButton
+													<button
 														onClick={(e) => {
 															e.stopPropagation();
 															handleRefreshAgent(agent.id);
 														}}
-														tooltip="Refresh detection"
+														className="p-1 rounded hover:bg-white/10 transition-colors"
+														title="Refresh detection"
 														style={{ color: theme.colors.textDim }}
 													>
 														<RefreshCw
 															className={`w-3 h-3 ${refreshingAgent === agent.id ? 'animate-spin' : ''}`}
 														/>
-													</GhostIconButton>
+													</button>
 												</div>
 											</div>
 
@@ -500,6 +561,8 @@ export function AgentCreationDialog({
 														availableModels={availableModels[agent.id] || []}
 														loadingModels={loadingModels[agent.id] || false}
 														onRefreshModels={() => loadModelsForAgent(agent.id, true)}
+														dynamicOptions={dynamicOptions[agent.id] || {}}
+														loadingDynamicOptions={loadingDynamicOptions[agent.id] || false}
 														onRefreshAgent={() => handleRefreshAgent(agent.id)}
 														refreshingAgent={refreshingAgent === agent.id}
 														compact
@@ -598,7 +661,7 @@ export function AgentCreationDialog({
 					>
 						{isCreating ? (
 							<>
-								<Spinner />
+								<Loader2 className="w-4 h-4 animate-spin" />
 								Creating...
 							</>
 						) : (

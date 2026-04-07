@@ -14,7 +14,6 @@ import { render, screen } from '@testing-library/react';
 import { AppConfirmModals } from '../../../renderer/components/AppModals';
 import { LayerStackProvider } from '../../../renderer/contexts/LayerStackContext';
 import type { Theme, Session } from '../../../renderer/types';
-import { createMockSession } from '../../helpers/mockSession';
 
 // Mock lucide-react
 vi.mock('lucide-react', () => ({
@@ -43,6 +42,19 @@ const testTheme: Theme = {
 		success: '#89d185',
 	},
 };
+
+function createMockSession(overrides: Partial<Session>): Session {
+	return {
+		id: 'session-1',
+		name: 'Agent 1',
+		state: 'idle',
+		toolType: 'claude-code',
+		cwd: '/tmp',
+		terminalTabs: [],
+		activeTerminalTabId: null,
+		...overrides,
+	} as Session;
+}
 
 const defaultProps = {
 	theme: testTheme,

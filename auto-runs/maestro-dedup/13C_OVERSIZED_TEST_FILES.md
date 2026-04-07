@@ -72,14 +72,23 @@ Other notable files (4,000+ lines): `git.test.ts` (4,469), `AutoRun.test.tsx` (3
 - `useBatchProcessor.setup.ts` - 157 lines (shared test context factory)
   All 161 batch processor tests pass (0 failures).
 
-### 4. Split TabBar.test.tsx (was 5,752 lines)
+### 4. Split TabBar.test.tsx (was 5,757 lines)
 
-- [ ] Read the test file to identify logical test groups
-- [ ] Extract AI tab tests into `TabBar.aiTabs.test.tsx`
-- [ ] Extract file tab tests into `TabBar.fileTabs.test.tsx`
-- [ ] Extract drag-and-drop tests into `TabBar.dragDrop.test.tsx`
-- [ ] Extract keyboard navigation tests into `TabBar.keyboard.test.tsx`
-- [ ] Run: `CI=1 rtk vitest run` (filter for TabBar test files)
+- [x] Read the test file to identify logical test groups
+- [x] Extract AI tab tests into `TabBar.aiTabs.test.tsx`
+- [x] Extract file tab tests into `TabBar.fileTabs.test.tsx`
+- [x] Extract drag-and-drop tests into `TabBar.dragDrop.test.tsx`
+- [x] No distinct keyboard navigation section found - keyboard shortcuts are tested inline within tab indicators and other sections (skipped `TabBar.keyboard.test.tsx`)
+- [x] Run: `CI=1 rtk vitest run` (filter for TabBar test files)
+
+**Result:** Split 5,757-line file into 4 focused modules + shared setup:
+
+- `TabBar.test.tsx` - 1,580 lines (rendering, display names, selection, close, new tab, indicators, unread filter, tab search, AI-only DnD, separators, scroll, styling, edge cases, overflow)
+- `TabBar.aiTabs.test.tsx` - 2,131 lines (hover overlay, tab move operations, Send to Agent, Publish as GitHub Gist)
+- `TabBar.fileTabs.test.tsx` - 2,163 lines (FileTab overlay menu, content/SSH support, extension badge styling, colorblind mode, performance)
+- `TabBar.dragDrop.test.tsx` - 849 lines (unified tabs DnD, active tab styling consistency)
+- `TabBar.setup.ts` - 62 lines (shared theme, createTab, createFileTab helpers)
+  All 180 TabBar tests pass (0 failures).
 
 ### 5. Create shared test utilities if patterns emerge
 

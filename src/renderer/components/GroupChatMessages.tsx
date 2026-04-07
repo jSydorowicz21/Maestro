@@ -22,7 +22,6 @@ import { generateParticipantColor, buildParticipantColorMap } from '../utils/par
 import { generateTerminalProseStyles } from '../utils/markdownConfig';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import { safeClipboardWrite } from '../utils/clipboard';
-import { formatTimestamp } from '../../shared/formatters';
 
 interface GroupChatMessagesProps {
 	theme: Theme;
@@ -166,11 +165,11 @@ export const GroupChatMessages = forwardRef<GroupChatMessagesHandle, GroupChatMe
 
 		// Format timestamp like AI Terminal (outside bubble)
 		// Accepts both ISO string and Unix timestamp
-		const formatMessageTimestamp = (timestamp: string | number) => {
+		const formatTimestamp = (timestamp: string | number) => {
 			const date = new Date(timestamp);
 			const today = new Date();
 			const isToday = date.toDateString() === today.toDateString();
-			const time = formatTimestamp(timestamp, 'time');
+			const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 			if (isToday) {
 				return time;
 			}
@@ -256,7 +255,7 @@ export const GroupChatMessages = forwardRef<GroupChatMessagesHandle, GroupChatMe
 									className={`w-20 shrink-0 text-[10px] pt-2 ${isUser ? 'text-right' : 'text-left'}`}
 									style={{ color: theme.colors.textDim, opacity: 0.6 }}
 								>
-									{formatMessageTimestamp(msg.timestamp)}
+									{formatTimestamp(msg.timestamp)}
 								</div>
 
 								{/* Message bubble */}

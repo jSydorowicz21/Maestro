@@ -7,7 +7,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
-import { createMockSession as _createMockSession } from '../../helpers/mockSession';
 
 // Mock gitService before any imports that use it
 vi.mock('../../../renderer/services/git', () => ({
@@ -24,9 +23,9 @@ vi.mock('../../../renderer/utils/ids', () => ({
 	generateId: vi.fn(() => `mock-id-${++idCounter}`),
 }));
 
-// Mock PLAYBOOKS_DIR
-vi.mock('../../../shared/maestro-paths', () => ({
-	PLAYBOOKS_DIR: '.maestro-autorun',
+// Mock AUTO_RUN_FOLDER_NAME
+vi.mock('../../../renderer/components/Wizard', () => ({
+	AUTO_RUN_FOLDER_NAME: '.maestro-autorun',
 }));
 
 import { useSessionRestoration } from '../../../renderer/hooks/session/useSessionRestoration';
@@ -35,13 +34,28 @@ import { useGroupChatStore } from '../../../renderer/stores/groupChatStore';
 import { gitService } from '../../../renderer/services/git';
 import type { Session } from '../../../renderer/types';
 
-// Wrapper: restoration tests depend on rich defaults (every field is tested during migration)
+// Cast to access mock methods
+const mockGitService = gitService as {
+	isRepo: ReturnType<typeof vi.fn>;
+	getBranches: ReturnType<typeof vi.fn>;
+	getTags: ReturnType<typeof vi.fn>;
+};
+
+// ============================================================================
+// Test Helpers
+// ============================================================================
+
 function createMockSession(overrides: Partial<Session> = {}): Session {
-	return _createMockSession({
+	return {
+		id: 'session-1',
+		name: 'Test Agent',
 		cwd: '/projects/myapp',
 		fullPath: '/projects/myapp',
 		projectRoot: '/projects/myapp',
+		toolType: 'claude-code' as any,
 		groupId: 'group-1',
+		inputMode: 'ai' as any,
+		state: 'idle' as any,
 		aiTabs: [
 			{
 				id: 'tab-1',
@@ -54,19 +68,32 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 				stagedImages: [],
 				createdAt: Date.now(),
 			},
-		] as any,
+		],
 		activeTabId: 'tab-1',
+		aiLogs: [],
 		shellLogs: [{ id: 'log-1', timestamp: Date.now(), source: 'system' as const, text: 'hello' }],
+		workLog: [],
+		contextUsage: 0,
 		aiPid: 123,
 		terminalPid: 456,
 		port: 3000,
 		isLive: true,
 		liveUrl: 'http://localhost:3000',
+		changedFiles: [],
 		isGitRepo: true,
+		fileTree: [],
+		fileExplorerExpanded: [],
+		fileExplorerScrollPos: 0,
 		autoRunFolderPath: '/projects/myapp/.maestro-autorun',
 		fileTreeAutoRefreshInterval: 180,
+		executionQueue: [],
 		activeTimeMs: 5000,
-		busySource: 'user' as any,
+		closedTabHistory: [],
+		filePreviewTabs: [],
+		activeFileTabId: null,
+		unifiedTabOrder: [{ type: 'ai' as const, id: 'tab-1' }],
+		unifiedClosedTabHistory: [],
+		busySource: 'user',
 		thinkingStartTime: Date.now(),
 		currentCycleTokens: 100,
 		currentCycleBytes: 2000,
@@ -74,19 +101,8 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 		agentError: { message: 'stale error' } as any,
 		agentErrorPaused: true,
 		...overrides,
-	}) as any;
+	} as any;
 }
-
-// Cast to access mock methods
-const mockGitService = gitService as {
-	isRepo: ReturnType<typeof vi.fn>;
-	getBranches: ReturnType<typeof vi.fn>;
-	getTags: ReturnType<typeof vi.fn>;
-};
-
-// ============================================================================
-// Test Helpers
-// ============================================================================
 
 // Mock IPC
 const mockGetAll = vi.fn();
@@ -115,12 +131,19 @@ beforeEach(() => {
 	} as any);
 
 	// Setup IPC mocks
-	Object.assign(window.maestro.sessions, { getAll: mockGetAll });
-	Object.assign(window.maestro.groups, { getAll: mockGroupsGetAll });
-	Object.assign(window.maestro, { groupChat: { list: mockGroupChatList } });
-	Object.assign(window.maestro.agents, {
+	if (!(window as any).maestro) {
+		(window as any).maestro = {};
+	}
+	(window as any).maestro.sessions = {
+		getAll: mockGetAll,
+		getActiveSessionId: vi.fn().mockResolvedValue(''),
+		setActiveSessionId: vi.fn(),
+	};
+	(window as any).maestro.groups = { getAll: mockGroupsGetAll };
+	(window as any).maestro.groupChat = { list: mockGroupChatList };
+	(window as any).maestro.agents = {
 		get: mockAgentsGet.mockResolvedValue({ id: 'claude-code', name: 'Claude Code' }),
-	});
+	};
 
 	mockGetAll.mockResolvedValue([]);
 	mockGroupsGetAll.mockResolvedValue([]);
@@ -959,6 +982,25 @@ describe('Session & Group loading effect', () => {
 		});
 
 		expect(useSessionStore.getState().activeSessionId).toBe('real-1');
+	});
+
+	it('restores persisted activeSessionId from disk', async () => {
+		useSessionStore.setState({ activeSessionId: '' } as any);
+		const session1 = createMockSession({ id: 'sess-1' });
+		const session2 = createMockSession({ id: 'sess-2' });
+		mockGetAll.mockResolvedValueOnce([session1, session2]);
+		// Mock the persisted active session ID to be the second session
+		(window as any).maestro.sessions.getActiveSessionId = vi.fn().mockResolvedValue('sess-2');
+
+		renderHook(() => useSessionRestoration());
+
+		await act(async () => {
+			await new Promise((r) => setTimeout(r, 50));
+		});
+
+		expect(useSessionStore.getState().activeSessionId).toBe('sess-2');
+		// Reset mock
+		(window as any).maestro.sessions.getActiveSessionId = vi.fn().mockResolvedValue('');
 	});
 
 	it('keeps activeSessionId when it matches a loaded session', async () => {

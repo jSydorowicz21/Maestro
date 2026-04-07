@@ -4,7 +4,6 @@ import type { Theme } from '../types';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { Modal } from './ui/Modal';
 import { safeClipboardWrite } from '../utils/clipboard';
-import { GhostIconButton } from './ui/GhostIconButton';
 
 export interface GistInfo {
 	gistUrl: string;
@@ -180,22 +179,24 @@ export function GistPublishModal({
 							style={{ color: theme.colors.textMain }}
 							onClick={(e) => (e.target as HTMLInputElement).select()}
 						/>
-						<GhostIconButton
-							size="md"
+						<button
+							type="button"
 							onClick={handleCopyUrl}
+							className="p-1.5 rounded hover:bg-white/10 transition-colors"
 							style={{ color: copied ? theme.colors.success : theme.colors.textDim }}
-							tooltip="Copy URL"
+							title="Copy URL"
 						>
 							{copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-						</GhostIconButton>
-						<GhostIconButton
-							size="md"
+						</button>
+						<button
+							type="button"
 							onClick={handleOpenGist}
+							className="p-1.5 rounded hover:bg-white/10 transition-colors"
 							style={{ color: theme.colors.textDim }}
-							tooltip="Open in browser"
+							title="Open in browser"
 						>
 							<ExternalLink className="w-4 h-4" />
-						</GhostIconButton>
+						</button>
 					</div>
 
 					<p className="text-xs" style={{ color: theme.colors.textDim }}>

@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
-import { useEventListener } from '../../hooks/utils/useEventListener';
 import { createPortal } from 'react-dom';
-import { X, History, Sparkles, Clapperboard, HelpCircle } from 'lucide-react';
-import { Spinner } from '../ui';
+import { X, History, Sparkles, Loader2, Clapperboard, HelpCircle } from 'lucide-react';
 import type { Theme } from '../../types';
-import { useModalLayer } from '../../hooks/ui/useModalLayer';
+import { useLayerStack } from '../../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
 import { OverviewTab, type TabFocusHandle } from './OverviewTab';
 import { hasCachedSynopsis } from './AIOverviewTab';
 import { useSettings } from '../../hooks';
-import { GhostIconButton } from '../ui/GhostIconButton';
+import { useModalStore, selectModalData } from '../../stores/modalStore';
 
 // Lazy load tab components
 const UnifiedHistoryTab = lazy(() =>
@@ -45,12 +43,16 @@ export function DirectorNotesModal({
 	onFileClick,
 }: DirectorNotesModalProps) {
 	const { directorNotesSettings: _directorNotesSettings, shortcuts } = useSettings();
+	const directorNotesData = useModalStore(selectModalData('directorNotes'));
 	const cached = hasCachedSynopsis();
-	const [activeTab, setActiveTab] = useState<TabId>('history');
+	const [activeTab, setActiveTab] = useState<TabId>(directorNotesData?.initialTab ?? 'history');
 	const [overviewReady, setOverviewReady] = useState(cached);
 	const [overviewGenerating, setOverviewGenerating] = useState(false);
 	const [overviewProgress, setOverviewProgress] = useState(0);
 
+	// Layer stack registration for Escape handling
+	const { registerLayer, unregisterLayer } = useLayerStack();
+	const layerIdRef = useRef<string>();
 	const modalRef = useRef<HTMLDivElement>(null);
 
 	// Tab content refs for focus management
@@ -80,21 +82,30 @@ export function DirectorNotesModal({
 	const activeTabRef = useRef(activeTab);
 	activeTabRef.current = activeTab;
 
-	// Layer registration via useModalLayer
-	const handleEscape = useCallback(() => {
-		const tabRef =
-			activeTabRef.current === 'history'
-				? historyTabRef
-				: activeTabRef.current === 'overview'
-					? overviewTabRef
-					: null;
-		if (tabRef?.current?.onEscape?.()) return;
-		onCloseRef.current();
-	}, []);
-
-	useModalLayer(MODAL_PRIORITIES.DIRECTOR_NOTES, "Director's Notes", handleEscape, {
-		focusTrap: 'lenient',
-	});
+	// Register modal layer
+	useEffect(() => {
+		layerIdRef.current = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.DIRECTOR_NOTES,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'lenient',
+			onEscape: () => {
+				// Delegate Escape to the active tab first (e.g. to close search)
+				const tabRef =
+					activeTabRef.current === 'history'
+						? historyTabRef
+						: activeTabRef.current === 'overview'
+							? overviewTabRef
+							: null;
+				if (tabRef?.current?.onEscape?.()) return;
+				onCloseRef.current();
+			},
+		});
+		return () => {
+			if (layerIdRef.current) unregisterLayer(layerIdRef.current);
+		};
+	}, [registerLayer, unregisterLayer]);
 
 	// Focus the active tab content when tab changes (including initial mount)
 	useEffect(() => {
@@ -121,12 +132,13 @@ export function DirectorNotesModal({
 	}, []);
 
 	// Check if a tab can be navigated to
+	// Allow navigating to AI Overview during generation so user can see the progress bar
 	const isTabEnabled = useCallback(
 		(tabId: TabId) => {
-			if (tabId === 'ai-overview') return overviewReady;
+			if (tabId === 'ai-overview') return overviewReady || overviewGenerating;
 			return true;
 		},
-		[overviewReady]
+		[overviewReady, overviewGenerating]
 	);
 
 	// Navigate to adjacent tab
@@ -148,9 +160,8 @@ export function DirectorNotesModal({
 	);
 
 	// Global keyboard handler for Cmd+Shift+[/]
-	useEventListener(
-		'keydown',
-		(e: KeyboardEvent) => {
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
 			// Cmd+Shift+[ / Cmd+Shift+]
 			if (e.metaKey && e.shiftKey && (e.key === '[' || e.key === ']')) {
 				e.preventDefault();
@@ -158,10 +169,11 @@ export function DirectorNotesModal({
 				navigateTab(e.key === '[' ? -1 : 1);
 				return;
 			}
-		},
-		window,
-		{ capture: true }
-	);
+		};
+
+		window.addEventListener('keydown', handleKeyDown, true);
+		return () => window.removeEventListener('keydown', handleKeyDown, true);
+	}, [navigateTab]);
 
 	return createPortal(
 		<div
@@ -205,9 +217,9 @@ export function DirectorNotesModal({
 					</div>
 
 					{/* Close button */}
-					<GhostIconButton onClick={onClose}>
+					<button onClick={onClose} className="p-1 rounded hover:bg-white/10 transition-colors">
 						<X className="w-4 h-4" style={{ color: theme.colors.textDim }} />
-					</GhostIconButton>
+					</button>
 				</div>
 
 				{/* Tab navigation */}
@@ -234,11 +246,15 @@ export function DirectorNotesModal({
 									cursor: isDisabled ? 'default' : 'pointer',
 								}}
 							>
-								{showGenerating ? <Spinner /> : <Icon className="w-4 h-4" />}
+								{showGenerating ? (
+									<Loader2 className="w-4 h-4 animate-spin" />
+								) : (
+									<Icon className="w-4 h-4" />
+								)}
 								{tab.label}
 								{showGenerating && (
-									<span className="text-[10px] font-normal">
-										({overviewProgress > 0 ? `${overviewProgress}%` : 'generating...'})
+									<span className="text-[10px] font-normal tabular-nums">
+										{overviewProgress > 0 ? `${overviewProgress}%` : 'starting…'}
 									</span>
 								)}
 							</button>
@@ -254,7 +270,7 @@ export function DirectorNotesModal({
 					<Suspense
 						fallback={
 							<div className="flex items-center justify-center h-full">
-								<Spinner size="xl" style={{ color: theme.colors.textDim }} />
+								<Loader2 className="w-8 h-8 animate-spin" style={{ color: theme.colors.textDim }} />
 							</div>
 						}
 					>

@@ -18,6 +18,7 @@ export {
 export {
 	phaseGenerator,
 	phaseGeneratorUtils,
+	AUTO_RUN_FOLDER_NAME,
 	type GenerationConfig,
 	type GenerationResult,
 	type GenerationCallbacks,

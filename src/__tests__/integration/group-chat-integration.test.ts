@@ -40,7 +40,7 @@ const TEST_TIMEOUT = 300_000; // 5 minutes total for multi-agent tests
 // Test directory
 const TEST_CWD = process.cwd();
 
-interface TestAgentConfig {
+interface AgentConfig {
 	id: string;
 	name: string;
 	command: string;
@@ -59,7 +59,7 @@ interface TestAgentConfig {
 	isSuccessful: (output: string, exitCode: number) => boolean;
 }
 
-const AGENTS: TestAgentConfig[] = [
+const AGENTS: AgentConfig[] = [
 	{
 		id: 'claude-code',
 		name: 'Claude Code',
@@ -222,7 +222,7 @@ const AGENTS: TestAgentConfig[] = [
 /**
  * Check if an agent CLI is available
  */
-async function isAgentAvailable(agent: TestAgentConfig): Promise<boolean> {
+async function isAgentAvailable(agent: AgentConfig): Promise<boolean> {
 	try {
 		await execAsync(agent.checkCommand);
 		return true;
@@ -235,7 +235,7 @@ async function isAgentAvailable(agent: TestAgentConfig): Promise<boolean> {
  * Run an agent command and capture output
  */
 function runAgent(
-	agent: TestAgentConfig,
+	agent: AgentConfig,
 	prompt: string,
 	timeout: number = AGENT_TIMEOUT
 ): Promise<{ stdout: string; stderr: string; exitCode: number; response: string | null }> {
@@ -309,9 +309,9 @@ function shuffle<T>(array: T[]): T[] {
 }
 
 describe.skipIf(SKIP_INTEGRATION)('Group Chat Integration Tests (Real Agents)', () => {
-	let availableAgents: TestAgentConfig[] = [];
-	let moderator: TestAgentConfig;
-	let participants: TestAgentConfig[];
+	let availableAgents: AgentConfig[] = [];
+	let moderator: AgentConfig;
+	let participants: AgentConfig[];
 
 	beforeAll(async () => {
 		console.log('\n🔍 Detecting available agents...');
@@ -714,7 +714,7 @@ if (require.main === module) {
 
 		// Detect available agents
 		console.log('🔍 Detecting available agents...');
-		const available: TestAgentConfig[] = [];
+		const available: AgentConfig[] = [];
 		for (const agent of AGENTS) {
 			if (await isAgentAvailable(agent)) {
 				available.push(agent);

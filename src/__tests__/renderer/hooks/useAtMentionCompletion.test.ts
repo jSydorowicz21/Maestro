@@ -7,11 +7,46 @@ import {
 } from '../../../renderer/hooks';
 import type { Session } from '../../../renderer/types';
 import type { FileNode } from '../../../renderer/types/fileTree';
-import { createMockSession } from '../../helpers/mockSession';
 
 // =============================================================================
 // TEST HELPERS
 // =============================================================================
+
+/**
+ * Creates a minimal mock Session with just the fields needed for useAtMentionCompletion
+ */
+function createMockSession(fileTree: FileNode[] | null = []): Session {
+	return {
+		id: 'test-session-1',
+		name: 'Test Session',
+		toolType: 'claude-code',
+		state: 'idle',
+		cwd: '/test/project',
+		fullPath: '/test/project',
+		projectRoot: '/test/project',
+		aiLogs: [],
+		shellLogs: [],
+		workLog: [],
+		contextUsage: 0,
+		inputMode: 'ai',
+		aiPid: 0,
+		terminalPid: 0,
+		port: 0,
+		isLive: false,
+		changedFiles: [],
+		isGitRepo: false,
+		fileTree: fileTree as any[],
+		fileExplorerExpanded: [],
+		fileExplorerScrollPos: 0,
+		executionQueue: [],
+		activeTimeMs: 0,
+		aiTabs: [],
+		activeTabId: '',
+		closedTabHistory: [],
+		terminalTabs: [],
+		activeTerminalTabId: null,
+	};
+}
 
 /**
  * Creates a file node
@@ -50,7 +85,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('UseAtMentionCompletionReturn has getSuggestions function', () => {
-			const session = createMockSession();
+			const session = createMockSession([]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			expect(result.current).toHaveProperty('getSuggestions');
@@ -64,7 +99,7 @@ describe('useAtMentionCompletion', () => {
 
 	describe('hook initialization', () => {
 		it('returns getSuggestions function', () => {
-			const session = createMockSession();
+			const session = createMockSession([]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			expect(result.current.getSuggestions).toBeDefined();
@@ -72,7 +107,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('getSuggestions has stable reference across re-renders when session does not change', () => {
-			const session = createMockSession({ fileTree: [createFile('test.ts')] });
+			const session = createMockSession([createFile('test.ts')]);
 			const { result, rerender } = renderHook(() => useAtMentionCompletion(session));
 
 			const firstRef = result.current.getSuggestions;
@@ -83,8 +118,8 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('getSuggestions updates when session changes', () => {
-			const session1 = createMockSession({ fileTree: [createFile('test.ts')] });
-			const session2 = createMockSession({ fileTree: [createFile('other.ts')] });
+			const session1 = createMockSession([createFile('test.ts')]);
+			const session2 = createMockSession([createFile('other.ts')]);
 
 			const { result, rerender } = renderHook(({ session }) => useAtMentionCompletion(session), {
 				initialProps: { session: session1 },
@@ -102,7 +137,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('allFiles memo updates when session.fileTree changes', () => {
-			const session = createMockSession({ fileTree: [createFile('file1.ts')] });
+			const session = createMockSession([createFile('file1.ts')]);
 			const { result, rerender } = renderHook(({ s }) => useAtMentionCompletion(s), {
 				initialProps: { s: session },
 			});
@@ -110,9 +145,7 @@ describe('useAtMentionCompletion', () => {
 			expect(result.current.getSuggestions('').length).toBe(1);
 
 			// Create new session with different fileTree
-			const updatedSession = createMockSession({
-				fileTree: [createFile('file1.ts'), createFile('file2.ts')],
-			});
+			const updatedSession = createMockSession([createFile('file1.ts'), createFile('file2.ts')]);
 			rerender({ s: updatedSession });
 
 			expect(result.current.getSuggestions('').length).toBe(2);
@@ -132,7 +165,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('session without fileTree returns empty array', () => {
-			const session = createMockSession({ fileTree: null as any });
+			const session = createMockSession(null);
 			(session as any).fileTree = undefined;
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
@@ -141,7 +174,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('session with empty fileTree array returns empty array', () => {
-			const session = createMockSession();
+			const session = createMockSession([]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -149,7 +182,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('session with null fileTree returns empty array', () => {
-			const session = createMockSession({ fileTree: null as any });
+			const session = createMockSession(null);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('anything');
@@ -163,7 +196,7 @@ describe('useAtMentionCompletion', () => {
 
 	describe('file tree traversal', () => {
 		it('processes single file at root', () => {
-			const session = createMockSession({ fileTree: [createFile('index.ts')] });
+			const session = createMockSession([createFile('index.ts')]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -173,7 +206,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('processes single folder at root', () => {
-			const session = createMockSession({ fileTree: [createFolder('src')] });
+			const session = createMockSession([createFolder('src')]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -183,9 +216,11 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('processes multiple files at root', () => {
-			const session = createMockSession({
-				fileTree: [createFile('index.ts'), createFile('app.tsx'), createFile('utils.ts')],
-			});
+			const session = createMockSession([
+				createFile('index.ts'),
+				createFile('app.tsx'),
+				createFile('utils.ts'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -197,9 +232,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('processes nested files (1 level deep)', () => {
-			const session = createMockSession({
-				fileTree: [createFolder('src', [createFile('index.ts')])],
-			});
+			const session = createMockSession([createFolder('src', [createFile('index.ts')])]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -211,15 +244,13 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('processes deeply nested files (3+ levels)', () => {
-			const session = createMockSession({
-				fileTree: [
-					createFolder('src', [
-						createFolder('components', [
-							createFolder('Button', [createFile('index.tsx'), createFile('Button.styles.ts')]),
-						]),
+			const session = createMockSession([
+				createFolder('src', [
+					createFolder('components', [
+						createFolder('Button', [createFile('index.tsx'), createFile('Button.styles.ts')]),
 					]),
-				],
-			});
+				]),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -232,9 +263,9 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('builds correct paths for nested items', () => {
-			const session = createMockSession({
-				fileTree: [createFolder('level1', [createFolder('level2', [createFile('deep.ts')])])],
-			});
+			const session = createMockSession([
+				createFolder('level1', [createFolder('level2', [createFile('deep.ts')])]),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -249,14 +280,12 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('handles mixed files and folders', () => {
-			const session = createMockSession({
-				fileTree: [
-					createFile('README.md'),
-					createFolder('src', [createFile('app.ts')]),
-					createFile('package.json'),
-					createFolder('docs'),
-				],
-			});
+			const session = createMockSession([
+				createFile('README.md'),
+				createFolder('src', [createFile('app.ts')]),
+				createFile('package.json'),
+				createFolder('docs'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -270,7 +299,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('handles folder without children', () => {
-			const session = createMockSession({ fileTree: [createFolder('empty-folder')] });
+			const session = createMockSession([createFolder('empty-folder')]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -281,7 +310,7 @@ describe('useAtMentionCompletion', () => {
 
 		it('handles folder with undefined children', () => {
 			const folder: FileNode = { name: 'folder', type: 'folder' };
-			const session = createMockSession({ fileTree: [folder] });
+			const session = createMockSession([folder]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -295,9 +324,11 @@ describe('useAtMentionCompletion', () => {
 
 	describe('getSuggestions - empty filter', () => {
 		it('returns all files when filter is empty string', () => {
-			const session = createMockSession({
-				fileTree: [createFile('a.ts'), createFile('b.ts'), createFile('c.ts')],
-			});
+			const session = createMockSession([
+				createFile('a.ts'),
+				createFile('b.ts'),
+				createFile('c.ts'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -305,9 +336,11 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('returns all folders when filter is empty string', () => {
-			const session = createMockSession({
-				fileTree: [createFolder('src'), createFolder('lib'), createFolder('tests')],
-			});
+			const session = createMockSession([
+				createFolder('src'),
+				createFolder('lib'),
+				createFolder('tests'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -315,9 +348,11 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('maintains sort order with empty filter', () => {
-			const session = createMockSession({
-				fileTree: [createFile('charlie.ts'), createFile('alpha.ts'), createFile('bravo.ts')],
-			});
+			const session = createMockSession([
+				createFile('charlie.ts'),
+				createFile('alpha.ts'),
+				createFile('bravo.ts'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -334,9 +369,7 @@ describe('useAtMentionCompletion', () => {
 
 	describe('getSuggestions - filter matching', () => {
 		it('matches exact filename', () => {
-			const session = createMockSession({
-				fileTree: [createFile('index.ts'), createFile('other.ts')],
-			});
+			const session = createMockSession([createFile('index.ts'), createFile('other.ts')]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('index.ts');
@@ -345,9 +378,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('matches partial filename', () => {
-			const session = createMockSession({
-				fileTree: [createFile('index.ts'), createFile('utils.ts')],
-			});
+			const session = createMockSession([createFile('index.ts'), createFile('utils.ts')]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('ind');
@@ -356,9 +387,11 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('matches by file extension', () => {
-			const session = createMockSession({
-				fileTree: [createFile('app.tsx'), createFile('index.ts'), createFile('style.css')],
-			});
+			const session = createMockSession([
+				createFile('app.tsx'),
+				createFile('index.ts'),
+				createFile('style.css'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('.tsx');
@@ -367,12 +400,10 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('matches by path component', () => {
-			const session = createMockSession({
-				fileTree: [
-					createFolder('components', [createFile('Button.tsx')]),
-					createFolder('utils', [createFile('helpers.ts')]),
-				],
-			});
+			const session = createMockSession([
+				createFolder('components', [createFile('Button.tsx')]),
+				createFolder('utils', [createFile('helpers.ts')]),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('components');
@@ -383,9 +414,9 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('matches nested file by name', () => {
-			const session = createMockSession({
-				fileTree: [createFolder('src', [createFolder('components', [createFile('Button.tsx')])])],
-			});
+			const session = createMockSession([
+				createFolder('src', [createFolder('components', [createFile('Button.tsx')])]),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('Button');
@@ -395,9 +426,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('returns empty array for no matches', () => {
-			const session = createMockSession({
-				fileTree: [createFile('index.ts'), createFile('app.tsx')],
-			});
+			const session = createMockSession([createFile('index.ts'), createFile('app.tsx')]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('xyznonexistent');
@@ -405,9 +434,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('matches are case insensitive (from fuzzyMatchWithScore)', () => {
-			const session = createMockSession({
-				fileTree: [createFile('MyComponent.tsx'), createFile('other.ts')],
-			});
+			const session = createMockSession([createFile('MyComponent.tsx'), createFile('other.ts')]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			// Search lowercase should find PascalCase file
@@ -417,9 +444,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('matches folder names', () => {
-			const session = createMockSession({
-				fileTree: [createFolder('components'), createFolder('services')],
-			});
+			const session = createMockSession([createFolder('components'), createFolder('services')]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('comp');
@@ -434,9 +459,7 @@ describe('useAtMentionCompletion', () => {
 
 	describe('getSuggestions - scoring', () => {
 		it('uses name match score when better than path', () => {
-			const session = createMockSession({
-				fileTree: [createFolder('utils', [createFile('test.ts')])],
-			});
+			const session = createMockSession([createFolder('utils', [createFile('test.ts')])]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			// 'test' should match file name directly (better than matching path)
@@ -445,9 +468,10 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('uses path match score when better than name', () => {
-			const session = createMockSession({
-				fileTree: [createFolder('utils', [createFile('index.ts')]), createFile('main.ts')],
-			});
+			const session = createMockSession([
+				createFolder('utils', [createFile('index.ts')]),
+				createFile('main.ts'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			// 'utils/index' should match the nested file by path
@@ -457,9 +481,11 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('exact match scores higher than partial', () => {
-			const session = createMockSession({
-				fileTree: [createFile('index.ts'), createFile('indexer.ts'), createFile('main-index.ts')],
-			});
+			const session = createMockSession([
+				createFile('index.ts'),
+				createFile('indexer.ts'),
+				createFile('main-index.ts'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('index');
@@ -468,7 +494,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('scores are numeric', () => {
-			const session = createMockSession({ fileTree: [createFile('test.ts')] });
+			const session = createMockSession([createFile('test.ts')]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('test');
@@ -483,9 +509,11 @@ describe('useAtMentionCompletion', () => {
 
 	describe('getSuggestions - sorting', () => {
 		it('sorts by score descending', () => {
-			const session = createMockSession({
-				fileTree: [createFile('abc.ts'), createFile('ab.ts'), createFile('a.ts')],
-			});
+			const session = createMockSession([
+				createFile('abc.ts'),
+				createFile('ab.ts'),
+				createFile('a.ts'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('a');
@@ -500,12 +528,10 @@ describe('useAtMentionCompletion', () => {
 			// Note: The actual implementation sorts files before folders when scores are EQUAL
 			// We test the sorting logic by verifying that when we have a file and folder
 			// with similar match scores, the file appears first
-			const session = createMockSession({
-				fileTree: [
-					createFolder('test'),
-					createFile('test'), // File without extension, same name as folder
-				],
-			});
+			const session = createMockSession([
+				createFolder('test'),
+				createFile('test'), // File without extension, same name as folder
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('test');
@@ -526,9 +552,11 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('same score and type: alphabetical by displayText', () => {
-			const session = createMockSession({
-				fileTree: [createFile('charlie.ts'), createFile('alpha.ts'), createFile('bravo.ts')],
-			});
+			const session = createMockSession([
+				createFile('charlie.ts'),
+				createFile('alpha.ts'),
+				createFile('bravo.ts'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('.ts');
@@ -540,14 +568,12 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('complex sorting with mixed types and scores', () => {
-			const session = createMockSession({
-				fileTree: [
-					createFolder('test'),
-					createFile('test.ts'),
-					createFile('testing.ts'),
-					createFolder('testing'),
-				],
-			});
+			const session = createMockSession([
+				createFolder('test'),
+				createFile('test.ts'),
+				createFile('testing.ts'),
+				createFolder('testing'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('test');
@@ -577,7 +603,7 @@ describe('useAtMentionCompletion', () => {
 			for (let i = 0; i < 20; i++) {
 				files.push(createFile(`file${i.toString().padStart(2, '0')}.ts`));
 			}
-			const session = createMockSession({ fileTree: files as any[] });
+			const session = createMockSession(files);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -594,7 +620,7 @@ describe('useAtMentionCompletion', () => {
 			for (let i = 1; i <= 20; i++) {
 				files.push(createFile(`file${i.toString().padStart(2, '0')}.ts`));
 			}
-			const session = createMockSession({ fileTree: files as any[] });
+			const session = createMockSession(files);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('file');
@@ -609,7 +635,7 @@ describe('useAtMentionCompletion', () => {
 			for (let i = 0; i < 30; i++) {
 				files.push(createFile(`file${i}.ts`));
 			}
-			const session = createMockSession({ fileTree: files as any[] });
+			const session = createMockSession(files);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -623,9 +649,7 @@ describe('useAtMentionCompletion', () => {
 
 	describe('suggestion structure', () => {
 		it('value equals fullPath for files', () => {
-			const session = createMockSession({
-				fileTree: [createFolder('src', [createFile('index.ts')])],
-			});
+			const session = createMockSession([createFolder('src', [createFile('index.ts')])]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('index');
@@ -635,7 +659,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('value equals fullPath for folders', () => {
-			const session = createMockSession({ fileTree: [createFolder('components')] });
+			const session = createMockSession([createFolder('components')]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -645,13 +669,11 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('displayText is filename only (not path)', () => {
-			const session = createMockSession({
-				fileTree: [
-					createFolder('very', [
-						createFolder('deep', [createFolder('nested', [createFile('myfile.ts')])]),
-					]),
-				],
-			});
+			const session = createMockSession([
+				createFolder('very', [
+					createFolder('deep', [createFolder('nested', [createFile('myfile.ts')])]),
+				]),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('myfile');
@@ -660,7 +682,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('type is "file" for files', () => {
-			const session = createMockSession({ fileTree: [createFile('test.ts')] });
+			const session = createMockSession([createFile('test.ts')]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -668,7 +690,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('type is "folder" for folders', () => {
-			const session = createMockSession({ fileTree: [createFolder('testfolder')] });
+			const session = createMockSession([createFolder('testfolder')]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -676,7 +698,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('score is a number', () => {
-			const session = createMockSession({ fileTree: [createFile('test.ts')] });
+			const session = createMockSession([createFile('test.ts')]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('test');
@@ -685,9 +707,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('all suggestion fields are defined', () => {
-			const session = createMockSession({
-				fileTree: [createFolder('src', [createFile('app.tsx')])],
-			});
+			const session = createMockSession([createFolder('src', [createFile('app.tsx')])]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -707,7 +727,7 @@ describe('useAtMentionCompletion', () => {
 
 	describe('memoization behavior', () => {
 		it('allFiles recomputes when fileTree changes', () => {
-			const session1 = createMockSession({ fileTree: [createFile('old.ts')] });
+			const session1 = createMockSession([createFile('old.ts')]);
 			const { result, rerender } = renderHook(({ s }) => useAtMentionCompletion(s), {
 				initialProps: { s: session1 },
 			});
@@ -717,9 +737,7 @@ describe('useAtMentionCompletion', () => {
 			expect(suggestions[0].displayText).toBe('old.ts');
 
 			// Change fileTree
-			const session2 = createMockSession({
-				fileTree: [createFile('new1.ts'), createFile('new2.ts')],
-			});
+			const session2 = createMockSession([createFile('new1.ts'), createFile('new2.ts')]);
 			rerender({ s: session2 });
 
 			suggestions = result.current.getSuggestions('');
@@ -729,7 +747,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('getSuggestions is stable when session does not change', () => {
-			const session = createMockSession({ fileTree: [createFile('stable.ts')] });
+			const session = createMockSession([createFile('stable.ts')]);
 			const { result, rerender } = renderHook(() => useAtMentionCompletion(session));
 
 			const firstFn = result.current.getSuggestions;
@@ -741,12 +759,12 @@ describe('useAtMentionCompletion', () => {
 
 		it('handles rapid session changes', () => {
 			const { result, rerender } = renderHook(({ s }) => useAtMentionCompletion(s), {
-				initialProps: { s: createMockSession({ fileTree: [createFile('a.ts')] }) },
+				initialProps: { s: createMockSession([createFile('a.ts')]) },
 			});
 
 			// Rapidly change sessions
 			for (let i = 0; i < 10; i++) {
-				const newSession = createMockSession({ fileTree: [createFile(`file${i}.ts`)] });
+				const newSession = createMockSession([createFile(`file${i}.ts`)]);
 				rerender({ s: newSession });
 			}
 
@@ -762,13 +780,11 @@ describe('useAtMentionCompletion', () => {
 
 	describe('edge cases and special scenarios', () => {
 		it('handles files with special characters in names', () => {
-			const session = createMockSession({
-				fileTree: [
-					createFile('file-with-dashes.ts'),
-					createFile('file_with_underscores.ts'),
-					createFile('file.multiple.dots.ts'),
-				],
-			});
+			const session = createMockSession([
+				createFile('file-with-dashes.ts'),
+				createFile('file_with_underscores.ts'),
+				createFile('file.multiple.dots.ts'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -781,7 +797,7 @@ describe('useAtMentionCompletion', () => {
 			for (let i = 10; i >= 0; i--) {
 				tree = createFolder(`level${i}`, [tree]);
 			}
-			const session = createMockSession({ fileTree: [tree] });
+			const session = createMockSession([tree]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('leaf');
@@ -791,7 +807,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('handles empty folder name', () => {
-			const session = createMockSession({ fileTree: [createFolder('', [createFile('test.ts')])] });
+			const session = createMockSession([createFolder('', [createFile('test.ts')])]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('test');
@@ -799,9 +815,11 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('handles files with no extension', () => {
-			const session = createMockSession({
-				fileTree: [createFile('Makefile'), createFile('README'), createFile('Dockerfile')],
-			});
+			const session = createMockSession([
+				createFile('Makefile'),
+				createFile('README'),
+				createFile('Dockerfile'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('Make');
@@ -810,9 +828,7 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('handles unicode characters in filenames', () => {
-			const session = createMockSession({
-				fileTree: [createFile('日本語.ts'), createFile('émoji.ts')],
-			});
+			const session = createMockSession([createFile('日本語.ts'), createFile('émoji.ts')]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -820,9 +836,11 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('returns consistent results for same input', () => {
-			const session = createMockSession({
-				fileTree: [createFile('alpha.ts'), createFile('beta.ts'), createFile('gamma.ts')],
-			});
+			const session = createMockSession([
+				createFile('alpha.ts'),
+				createFile('beta.ts'),
+				createFile('gamma.ts'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions1 = result.current.getSuggestions('');
@@ -832,9 +850,10 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('handles filter with spaces', () => {
-			const session = createMockSession({
-				fileTree: [createFile('file with spaces.ts'), createFile('nospace.ts')],
-			});
+			const session = createMockSession([
+				createFile('file with spaces.ts'),
+				createFile('nospace.ts'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('with spaces');
@@ -861,7 +880,7 @@ describe('useAtMentionCompletion', () => {
 			}
 			// This tree has 200 folders + 60,000 files = 60,200 nodes total
 
-			const session = createMockSession({ fileTree: largeFolder as any[] });
+			const session = createMockSession(largeFolder);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			// With empty filter, should return at most 15 suggestions
@@ -874,9 +893,11 @@ describe('useAtMentionCompletion', () => {
 		});
 
 		it('empty filter skips fuzzy matching and returns sorted results', () => {
-			const session = createMockSession({
-				fileTree: [createFolder('zebra'), createFile('banana.ts'), createFile('apple.ts')],
-			});
+			const session = createMockSession([
+				createFolder('zebra'),
+				createFile('banana.ts'),
+				createFile('apple.ts'),
+			]);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('');
@@ -900,7 +921,7 @@ describe('useAtMentionCompletion', () => {
 				files.push(createFile(`m_a_t_c_h_${i}.ts`));
 			}
 
-			const session = createMockSession({ fileTree: files as any[] });
+			const session = createMockSession(files);
 			const { result } = renderHook(() => useAtMentionCompletion(session));
 
 			const suggestions = result.current.getSuggestions('match');

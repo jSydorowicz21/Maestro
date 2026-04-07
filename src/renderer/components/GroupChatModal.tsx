@@ -17,7 +17,6 @@ import { isBetaAgent } from '../../shared/agentMetadata';
 import type { Theme, AgentConfig, ModeratorConfig, GroupChat } from '../types';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { Modal, ModalFooter, FormInput } from './ui';
-import { GhostIconButton } from './ui/GhostIconButton';
 import { AGENT_TILES } from './Wizard/screens/AgentSelectionScreen';
 import { AgentConfigPanel } from './shared/AgentConfigPanel';
 import { SshRemoteSelector } from './shared/SshRemoteSelector';
@@ -243,13 +242,15 @@ export function GroupChatModal(props: GroupChatModalProps): JSX.Element | null {
 								Beta
 							</span>
 						</div>
-						<GhostIconButton
+						<button
+							type="button"
 							onClick={onClose}
+							className="p-1 rounded hover:bg-white/10 transition-colors"
 							style={{ color: theme.colors.textDim }}
 							aria-label="Close modal"
 						>
 							<X className="w-4 h-4" />
-						</GhostIconButton>
+						</button>
 					</div>
 				) : undefined
 			}
@@ -453,6 +454,8 @@ export function GroupChatModal(props: GroupChatModalProps): JSX.Element | null {
 								availableModels={ac.availableModels}
 								loadingModels={ac.loadingModels}
 								onRefreshModels={ac.refreshModels}
+								dynamicOptions={ac.dynamicOptions}
+								loadingDynamicOptions={ac.loadingDynamicOptions}
 								onRefreshAgent={ac.refreshAgent}
 								refreshingAgent={ac.refreshingAgent}
 								compact

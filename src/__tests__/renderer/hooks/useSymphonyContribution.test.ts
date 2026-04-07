@@ -99,9 +99,7 @@ const mockMaestro = {
 	},
 };
 
-Object.assign(window.maestro.agents, mockMaestro.agents);
-Object.assign(window.maestro.symphony, mockMaestro.symphony);
-Object.assign(window.maestro.stats, mockMaestro.stats);
+(window as any).maestro = mockMaestro;
 
 // ============================================================================
 // Test data factories

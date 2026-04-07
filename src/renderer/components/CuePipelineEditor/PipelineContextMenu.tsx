@@ -5,7 +5,6 @@
  */
 
 import React, { useRef, useEffect } from 'react';
-import { useEventListener } from '../../hooks/utils/useEventListener';
 import type { Theme } from '../../types';
 import { useClickOutside, useContextMenuPosition } from '../../hooks/ui';
 
@@ -38,16 +37,16 @@ export const PipelineContextMenu = React.memo(function PipelineContextMenu({
 
 	useClickOutside(menuRef, onDismiss);
 
-	useEventListener(
-		'keydown',
-		(e: KeyboardEvent) => {
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.key === 'Escape') {
 				e.stopPropagation();
 				onDismiss();
 			}
-		},
-		document
-	);
+		};
+		document.addEventListener('keydown', handleKeyDown);
+		return () => document.removeEventListener('keydown', handleKeyDown);
+	}, [onDismiss]);
 
 	const { left, top, ready } = useContextMenuPosition(menuRef, contextMenu.x, contextMenu.y);
 

@@ -14,7 +14,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { CueYamlEditor } from '../../../renderer/components/CueYamlEditor';
 import type { Theme } from '../../../renderer/types';
-import { mockTheme } from '../../helpers/mockTheme';
 
 // Mock the Modal component
 vi.mock('../../../renderer/components/ui/Modal', () => ({
@@ -24,14 +23,17 @@ vi.mock('../../../renderer/components/ui/Modal', () => ({
 		title,
 		testId,
 		onClose,
+		customHeader,
 	}: {
 		children: React.ReactNode;
 		footer?: React.ReactNode;
 		title: string;
 		testId?: string;
 		onClose: () => void;
+		customHeader?: React.ReactNode;
 	}) => (
 		<div data-testid={testId} role="dialog" aria-label={title}>
+			{customHeader && <div data-testid="custom-header">{customHeader}</div>}
 			<button data-testid={`${testId}-close`} onClick={onClose}>
 				Close
 			</button>
@@ -70,6 +72,22 @@ vi.mock('../../../renderer/constants/modalPriorities', () => ({
 	},
 }));
 
+// Mock modalStore
+const mockOpenCueModalWithTab = vi.fn();
+let mockCueModalOpen = false;
+
+vi.mock('../../../renderer/stores/modalStore', () => ({
+	useModalStore: vi.fn((selector: (s: any) => any) =>
+		selector({
+			modals: new Map([['cueModal', { open: mockCueModalOpen, data: undefined }]]),
+		})
+	),
+	selectModalOpen: (id: string) => (state: any) => state.modals.get(id)?.open ?? false,
+	getModalActions: () => ({
+		openCueModalWithTab: mockOpenCueModalWithTab,
+	}),
+}));
+
 // Mock sessionStore
 const mockSession = {
 	id: 'sess-1',
@@ -105,22 +123,30 @@ const mockOnExit = vi.fn();
 const mockOnSessionId = vi.fn();
 const mockOnAgentError = vi.fn();
 
+const existingWindowMaestro = (window as any).maestro;
+
 beforeEach(() => {
 	vi.clearAllMocks();
+	mockCueModalOpen = false;
 
-	Object.assign(window.maestro.cue, {
-		readYaml: mockReadYaml,
-		writeYaml: mockWriteYaml,
-		validateYaml: mockValidateYaml,
-		refreshSession: mockRefreshSession,
-	});
-	Object.assign(window.maestro.process, {
-		spawn: mockSpawn,
-		onData: mockOnData,
-		onExit: mockOnExit,
-		onSessionId: mockOnSessionId,
-		onAgentError: mockOnAgentError,
-	});
+	(window as any).maestro = {
+		...existingWindowMaestro,
+		cue: {
+			...existingWindowMaestro?.cue,
+			readYaml: mockReadYaml,
+			writeYaml: mockWriteYaml,
+			validateYaml: mockValidateYaml,
+			refreshSession: mockRefreshSession,
+		},
+		process: {
+			...existingWindowMaestro?.process,
+			spawn: mockSpawn,
+			onData: mockOnData,
+			onExit: mockOnExit,
+			onSessionId: mockOnSessionId,
+			onAgentError: mockOnAgentError,
+		},
+	};
 
 	// Default: file doesn't exist, YAML is valid
 	mockReadYaml.mockResolvedValue(null);
@@ -146,7 +172,30 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks();
+	(window as any).maestro = existingWindowMaestro;
 });
+
+const mockTheme: Theme = {
+	id: 'dracula',
+	name: 'Dracula',
+	mode: 'dark',
+	colors: {
+		bgMain: '#282a36',
+		bgSidebar: '#21222c',
+		bgActivity: '#343746',
+		textMain: '#f8f8f2',
+		textDim: '#6272a4',
+		accent: '#bd93f9',
+		accentForeground: '#f8f8f2',
+		border: '#44475a',
+		success: '#50fa7b',
+		warning: '#ffb86c',
+		error: '#ff5555',
+		scrollbar: '#44475a',
+		scrollbarHover: '#6272a4',
+	},
+};
+
 const defaultProps = {
 	isOpen: true,
 	onClose: vi.fn(),
@@ -686,6 +735,82 @@ describe('CueYamlEditor', () => {
 			fireEvent.click(screen.getByText('Exit'));
 
 			expect(defaultProps.onClose).toHaveBeenCalledOnce();
+
+			mockConfirm.mockRestore();
+		});
+	});
+
+	describe('navigation buttons (opened directly)', () => {
+		it('should show Dashboard and Pipeline Editor buttons when CueModal is not open', async () => {
+			mockCueModalOpen = false;
+			render(<CueYamlEditor {...defaultProps} />);
+
+			await waitFor(() => {
+				expect(screen.getByText('Dashboard')).toBeInTheDocument();
+				expect(screen.getByText('Pipeline Editor')).toBeInTheDocument();
+			});
+		});
+
+		it('should NOT show nav buttons when CueModal is already open', async () => {
+			mockCueModalOpen = true;
+			render(<CueYamlEditor {...defaultProps} />);
+
+			await waitFor(() => {
+				expect(screen.getByTestId('cue-yaml-editor')).toBeInTheDocument();
+			});
+
+			expect(screen.queryByText('Dashboard')).not.toBeInTheDocument();
+			expect(screen.queryByText('Pipeline Editor')).not.toBeInTheDocument();
+		});
+
+		it('should close YAML editor and open CueModal with dashboard tab', async () => {
+			mockCueModalOpen = false;
+			render(<CueYamlEditor {...defaultProps} />);
+
+			await waitFor(() => {
+				expect(screen.getByText('Dashboard')).toBeInTheDocument();
+			});
+
+			fireEvent.click(screen.getByText('Dashboard'));
+
+			expect(defaultProps.onClose).toHaveBeenCalledOnce();
+			expect(mockOpenCueModalWithTab).toHaveBeenCalledWith('dashboard');
+		});
+
+		it('should close YAML editor and open CueModal with pipeline tab', async () => {
+			mockCueModalOpen = false;
+			render(<CueYamlEditor {...defaultProps} />);
+
+			await waitFor(() => {
+				expect(screen.getByText('Pipeline Editor')).toBeInTheDocument();
+			});
+
+			fireEvent.click(screen.getByText('Pipeline Editor'));
+
+			expect(defaultProps.onClose).toHaveBeenCalledOnce();
+			expect(mockOpenCueModalWithTab).toHaveBeenCalledWith('pipeline');
+		});
+
+		it('should prompt for confirmation when navigating with unsaved changes', async () => {
+			mockCueModalOpen = false;
+			const mockConfirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+			mockReadYaml.mockResolvedValue('original');
+
+			render(<CueYamlEditor {...defaultProps} />);
+
+			await waitFor(() => {
+				expect(screen.getByTestId('yaml-editor')).toBeInTheDocument();
+			});
+
+			fireEvent.change(screen.getByTestId('yaml-editor'), {
+				target: { value: 'modified' },
+			});
+
+			fireEvent.click(screen.getByText('Dashboard'));
+
+			expect(mockConfirm).toHaveBeenCalledWith('You have unsaved changes. Discard them?');
+			expect(defaultProps.onClose).not.toHaveBeenCalled();
+			expect(mockOpenCueModalWithTab).not.toHaveBeenCalled();
 
 			mockConfirm.mockRestore();
 		});

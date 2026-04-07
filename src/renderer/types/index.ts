@@ -9,9 +9,6 @@ export { isValidThemeId } from '../../shared/theme-types';
 
 // Re-export types from shared location
 export type {
-	AgentCapabilities,
-	AgentConfig,
-	AgentConfigOption,
 	AgentError,
 	AgentErrorType,
 	AgentErrorRecovery,
@@ -23,10 +20,7 @@ export type {
 	Playbook,
 	ThinkingMode,
 	WorktreeRunTarget,
-	SessionMessage,
-	SessionMessagesResult,
 } from '../../shared/types';
-export { DEFAULT_CAPABILITIES } from '../../shared/types';
 
 // Re-export Symphony types for session metadata
 export type { SymphonySessionMetadata } from '../../shared/symphony-types';
@@ -35,7 +29,6 @@ import type { SymphonySessionMetadata } from '../../shared/symphony-types';
 
 // Import for extension in this file
 import type {
-	AgentCapabilities,
 	WorktreeConfig as BaseWorktreeConfig,
 	WorktreeRunTarget,
 	BatchDocumentEntry,
@@ -199,6 +192,8 @@ export interface LogEntry {
 	delivered?: boolean;
 	// For user messages - tracks if message was sent in read-only mode
 	readOnly?: boolean;
+	// For user messages - tracks if message was sent via forced parallel execution
+	forceParallel?: boolean;
 	// For error entries - stores the full AgentError for "View Details" functionality
 	agentError?: AgentError;
 	// For tool execution entries - stores tool state and details
@@ -722,6 +717,7 @@ export interface Session {
 	customArgs?: string; // Custom CLI arguments (overrides agent-level)
 	customEnvVars?: Record<string, string>; // Custom environment variables (overrides agent-level)
 	customModel?: string; // Custom model ID (overrides agent-level)
+	customEffort?: string; // Custom effort/reasoning level (overrides agent-level)
 	customProviderPath?: string; // Custom provider path (overrides agent-level)
 	customContextWindow?: number; // Custom context window size (overrides agent-level)
 	documentGraphLayout?: 'mindmap' | 'radial' | 'force'; // Document Graph layout algorithm preference (overrides global default)
@@ -742,13 +738,111 @@ export interface Session {
 	symphonyMetadata?: SymphonySessionMetadata;
 }
 
-// AgentConfigOption and AgentConfig are re-exported from shared/types.ts at top of file
+export interface AgentConfigOption {
+	key: string;
+	type: 'checkbox' | 'text' | 'number' | 'select';
+	label: string;
+	description: string;
+	default: any;
+	options?: string[];
+	dynamic?: boolean; // If true, options are fetched at runtime via agents:getConfigOptions IPC
+	argBuilder?: (value: any) => string[];
+}
 
-// ProcessConfig - canonical definition in shared/types.ts
-export type { ProcessConfig } from '../../shared/types';
+export interface AgentCapabilities {
+	supportsResume: boolean;
+	supportsReadOnlyMode: boolean;
+	supportsJsonOutput: boolean;
+	supportsSessionId: boolean;
+	supportsImageInput: boolean;
+	supportsImageInputOnResume: boolean;
+	supportsSlashCommands: boolean;
+	supportsSessionStorage: boolean;
+	supportsCostTracking: boolean;
+	supportsUsageStats: boolean;
+	supportsBatchMode: boolean;
+	requiresPromptToStart: boolean;
+	supportsStreaming: boolean;
+	supportsResultMessages: boolean;
+	supportsModelSelection?: boolean;
+	supportsStreamJsonInput?: boolean;
+	supportsThinkingDisplay?: boolean;
+	supportsContextMerge?: boolean;
+	supportsContextExport?: boolean;
+	supportsWizard?: boolean;
+	supportsGroupChatModeration?: boolean;
+	usesJsonLineOutput?: boolean;
+	usesCombinedContextWindow?: boolean;
+	supportsAppendSystemPrompt?: boolean;
+}
 
-// DirectoryEntry and ShellInfo - canonical definitions in shared/types.ts
-export type { DirectoryEntry, ShellInfo } from '../../shared/types';
+export interface AgentConfig {
+	id: string;
+	name: string;
+	binaryName?: string;
+	available: boolean;
+	path?: string;
+	customPath?: string; // User-specified custom path (shown in UI even if not available)
+	command?: string;
+	args?: string[];
+	hidden?: boolean; // If true, agent is hidden from UI (internal use only)
+	configOptions?: AgentConfigOption[]; // Agent-specific configuration options
+	yoloModeArgs?: string[]; // Args for YOLO/full-access mode (e.g., ['--dangerously-skip-permissions'])
+	readOnlyCliEnforced?: boolean; // Whether the agent's CLI enforces read-only mode (false = prompt-only enforcement)
+	capabilities?: AgentCapabilities; // Agent capabilities (added at runtime)
+}
+
+// Process spawning configuration
+export interface ProcessConfig {
+	sessionId: string;
+	toolType: string;
+	cwd: string;
+	command: string;
+	args: string[];
+	prompt?: string; // For batch mode agents like Claude (passed as CLI argument)
+	shell?: string; // Shell to use for terminal sessions (e.g., 'zsh', 'bash', 'fish')
+	images?: string[]; // Base64 data URLs for images
+	// Agent-specific spawn options (used to build args via agent config)
+	agentSessionId?: string; // For session resume (uses agent's resumeArgs builder)
+	readOnlyMode?: boolean; // For read-only/plan mode (uses agent's readOnlyArgs)
+	modelId?: string; // For model selection (uses agent's modelArgs builder)
+	yoloMode?: boolean; // For YOLO/full-access mode (uses agent's yoloModeArgs)
+	// Per-session overrides (take precedence over agent-level config)
+	sessionCustomPath?: string;
+	sessionCustomArgs?: string;
+	sessionCustomEnvVars?: Record<string, string>;
+	sessionCustomModel?: string;
+	sessionCustomEffort?: string;
+	sessionCustomContextWindow?: number;
+	// Per-session SSH remote config (takes precedence over agent-level SSH config)
+	sessionSshRemoteConfig?: {
+		enabled: boolean;
+		remoteId: string | null;
+		workingDirOverride?: string;
+		syncHistory?: boolean;
+	};
+	// System prompt delivery (separate from user message for token efficiency)
+	appendSystemPrompt?: string; // System prompt to pass via --append-system-prompt or embed in prompt
+	// Windows command line length workaround
+	sendPromptViaStdin?: boolean; // If true, send the prompt via stdin as JSON instead of command line
+	sendPromptViaStdinRaw?: boolean; // If true, send the prompt via stdin as raw text instead of command line
+}
+
+// Directory entry from fs:readDir
+export interface DirectoryEntry {
+	name: string;
+	isDirectory: boolean;
+	isFile: boolean;
+	path: string;
+}
+
+// Shell information from shells:detect
+export interface ShellInfo {
+	id: string;
+	name: string;
+	available: boolean;
+	path?: string;
+}
 
 // Custom AI command definition for user-configurable slash commands
 export interface CustomAICommand {
@@ -769,8 +863,13 @@ export interface SpecKitCommand {
 	isModified: boolean; // true if user has edited
 }
 
-// SpecKitMetadata - canonical definition in main/speckit-manager.ts
-export type { SpecKitMetadata } from '../../main/speckit-manager';
+// Spec Kit metadata for tracking version and refresh status
+export interface SpecKitMetadata {
+	lastRefreshed: string; // ISO date
+	commitSha: string; // Git commit SHA or version tag
+	sourceVersion: string; // Semantic version (e.g., '0.0.90')
+	sourceUrl: string; // GitHub repo URL
+}
 
 // OpenSpec command definition (bundled from Fission-AI/OpenSpec)
 export interface OpenSpecCommand {
@@ -782,8 +881,13 @@ export interface OpenSpecCommand {
 	isModified: boolean; // true if user has edited
 }
 
-// OpenSpecMetadata - canonical definition in main/openspec-manager.ts
-export type { OpenSpecMetadata } from '../../main/openspec-manager';
+// OpenSpec metadata for tracking version and refresh status
+export interface OpenSpecMetadata {
+	lastRefreshed: string; // ISO date
+	commitSha: string; // Git commit SHA or version tag
+	sourceVersion: string; // Semantic version
+	sourceUrl: string; // GitHub repo URL
+}
 
 // BMAD command definition (bundled from bmad-code-org/BMAD-METHOD)
 export interface BmadCommand {
@@ -801,12 +905,6 @@ export interface BmadMetadata {
 	commitSha: string; // Git commit SHA or version tag
 	sourceVersion: string; // Semantic version
 	sourceUrl: string; // GitHub repo URL
-}
-
-// Shared editing state for command panel components (SpecKit, OpenSpec, Bmad)
-export interface EditingCommand {
-	id: string;
-	prompt: string;
 }
 
 // Leaderboard registration data for runmaestro.ai integration

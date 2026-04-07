@@ -12,11 +12,9 @@ import {
 	Folder,
 	CheckSquare,
 } from 'lucide-react';
-import { GhostIconButton } from './ui/GhostIconButton';
-import { EmptyState } from './ui';
 import type { Theme, BatchDocumentEntry } from '../types';
 import { generateId } from '../utils/ids';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { formatMetaKey } from '../utils/shortcutFormatter';
 
@@ -67,8 +65,26 @@ function DocumentSelectorModal({
 	onAdd,
 	onRefresh,
 }: DocumentSelectorModalProps) {
+	// Layer stack for escape handling
+	const { registerLayer, unregisterLayer } = useLayerStack();
+	const onCloseRef = useRef(onClose);
+	onCloseRef.current = onClose;
+
 	// Register with layer stack for escape handling
-	useModalLayer(MODAL_PRIORITIES.DOCUMENT_SELECTOR, 'Select Documents', onClose);
+	useEffect(() => {
+		const id = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.DOCUMENT_SELECTOR,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'strict',
+			ariaLabel: 'Select Documents',
+			onEscape: () => {
+				onCloseRef.current();
+			},
+		});
+		return () => unregisterLayer(id);
+	}, [registerLayer, unregisterLayer]);
 
 	// Pre-select currently added documents
 	const [selectedDocs, setSelectedDocs] = useState<Set<string>>(() => {
@@ -459,25 +475,31 @@ function DocumentSelectorModal({
 							<CheckSquare className="w-3.5 h-3.5" />
 							{allSelected ? 'Deselect All' : 'Select All'}
 						</button>
-						<GhostIconButton
+						<button
 							onClick={handleRefresh}
 							disabled={refreshing}
-							className="disabled:opacity-50"
+							className="p-1 rounded hover:bg-white/10 transition-colors disabled:opacity-50"
 							style={{ color: theme.colors.textDim }}
-							tooltip="Refresh document list"
+							title="Refresh document list"
 						>
 							<RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-						</GhostIconButton>
-						<GhostIconButton onClick={onClose} style={{ color: theme.colors.textDim }}>
+						</button>
+						<button
+							onClick={onClose}
+							className="p-1 rounded hover:bg-white/10 transition-colors"
+							style={{ color: theme.colors.textDim }}
+						>
 							<X className="w-4 h-4" />
-						</GhostIconButton>
+						</button>
 					</div>
 				</div>
 
 				{/* Document Checkboxes */}
 				<div className="flex-1 overflow-y-auto p-2">
 					{allDocuments.length === 0 ? (
-						<EmptyState theme={theme} message="No documents found in folder" className="p-4" />
+						<div className="p-4 text-center" style={{ color: theme.colors.textDim }}>
+							<p className="text-sm">No documents found in folder</p>
+						</div>
 					) : documentTree && documentTree.length > 0 ? (
 						// Render tree structure with folder checkboxes
 						<div className="space-y-0.5">{documentTree.map((node) => renderTreeNode(node))}</div>
@@ -1057,14 +1079,14 @@ export function DocumentsPanel({
 
 											{/* Duplicate Button (invisible placeholder when not applicable) */}
 											{doc.resetOnCompletion && !doc.isMissing ? (
-												<GhostIconButton
+												<button
 													onClick={() => handleDuplicateDocument(doc.id)}
-													className="shrink-0"
+													className="p-1 rounded hover:bg-white/10 transition-colors shrink-0"
 													style={{ color: theme.colors.textDim }}
-													tooltip="Duplicate document"
+													title="Duplicate document"
 												>
 													<Plus className="w-3.5 h-3.5" />
-												</GhostIconButton>
+												</button>
 											) : (
 												<span className="p-1 shrink-0 invisible">
 													<Plus className="w-3.5 h-3.5" />
@@ -1072,16 +1094,16 @@ export function DocumentsPanel({
 											)}
 
 											{/* Remove Button */}
-											<GhostIconButton
+											<button
 												onClick={() => handleRemoveDocument(doc.id)}
-												className="shrink-0"
+												className="p-1 rounded hover:bg-white/10 transition-colors shrink-0"
 												style={{
 													color: doc.isMissing ? theme.colors.error : theme.colors.textDim,
 												}}
-												tooltip={doc.isMissing ? 'Remove missing document' : 'Remove document'}
+												title={doc.isMissing ? 'Remove missing document' : 'Remove document'}
 											>
 												<X className="w-3.5 h-3.5" />
-											</GhostIconButton>
+											</button>
 										</div>
 
 										{/* Drop Indicator Line - After (only for last item) */}

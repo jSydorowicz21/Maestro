@@ -14,7 +14,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
 import type { Session, CustomAICommand } from '../../../renderer/types';
-import { createMockSession as _createMockSession } from '../../helpers/mockSession';
 
 // ============================================================================
 // Mock modules BEFORE importing the hook
@@ -67,9 +66,13 @@ import { useUIStore } from '../../../renderer/stores/uiStore';
 // Helpers
 // ============================================================================
 
-// Wrapper: old factory had a pre-populated AI tab, cwd '/test', and projectRoot '/test'
 function createMockSession(overrides: Partial<Session> = {}): Session {
-	return _createMockSession({
+	return {
+		id: 'session-1',
+		name: 'Test Agent',
+		state: 'idle',
+		busySource: undefined,
+		toolType: 'claude-code',
 		aiTabs: [
 			{
 				id: 'tab-1',
@@ -81,10 +84,17 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 			},
 		],
 		activeTabId: 'tab-1',
+		inputMode: 'ai',
+		isGitRepo: false,
 		cwd: '/test',
 		projectRoot: '/test',
+		shellLogs: [],
+		shellCwd: '/test',
+		terminalDraftInput: '',
+		terminalTabs: [],
+		activeTerminalTabId: null,
 		...overrides,
-	} as Partial<Session>);
+	} as Session;
 }
 
 function createMockDeps(overrides: Partial<UseRemoteHandlersDeps> = {}): UseRemoteHandlersDeps {
@@ -123,17 +133,19 @@ beforeEach(() => {
 	} as any);
 
 	// Mock window.maestro APIs
-	Object.assign(window.maestro.process, {
-		spawn: vi.fn().mockResolvedValue(undefined),
-		runCommand: vi.fn().mockResolvedValue(undefined),
-	});
-	Object.assign(window.maestro.agents, {
-		get: vi.fn().mockResolvedValue({
-			command: 'claude',
-			path: '/usr/local/bin/claude',
-			args: [],
-		}),
-	});
+	(window as any).maestro = {
+		process: {
+			spawn: vi.fn().mockResolvedValue(undefined),
+			runCommand: vi.fn().mockResolvedValue(undefined),
+		},
+		agents: {
+			get: vi.fn().mockResolvedValue({
+				command: 'claude',
+				path: '/usr/local/bin/claude',
+				args: [],
+			}),
+		},
+	};
 
 	// Spy on addEventListener/removeEventListener for event listener tests
 	vi.spyOn(window, 'addEventListener');
@@ -343,19 +355,16 @@ describe('useRemoteHandlers', () => {
 		it('registers event listener on mount and removes on unmount', () => {
 			const { unmount } = renderHook(() => useRemoteHandlers(createMockDeps()));
 
-			// useEventListener passes options (undefined) as 3rd arg
 			expect(window.addEventListener).toHaveBeenCalledWith(
 				'maestro:remoteCommand',
-				expect.any(Function),
-				undefined
+				expect.any(Function)
 			);
 
 			unmount();
 
 			expect(window.removeEventListener).toHaveBeenCalledWith(
 				'maestro:remoteCommand',
-				expect.any(Function),
-				undefined
+				expect.any(Function)
 			);
 		});
 

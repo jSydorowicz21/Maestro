@@ -16,7 +16,6 @@ import { useCallback } from 'react';
 import type { Session, UsageStats } from '../../types';
 import { substituteTemplateVariables, TemplateContext } from '../../utils/templateVariables';
 import { countUnfinishedTasks, countCheckedTasks } from './batchUtils';
-import { captureException } from '../../utils/sentry';
 
 /**
  * Configuration for document processing
@@ -81,6 +80,11 @@ export interface TaskResult {
 	 * Token usage statistics from the agent run
 	 */
 	usageStats?: UsageStats;
+
+	/**
+	 * Context usage percentage estimated from the last usage event
+	 */
+	contextUsage?: number;
 
 	/**
 	 * Time elapsed processing this task (ms)
@@ -171,6 +175,7 @@ export interface DocumentProcessorCallbacks {
 		response?: string;
 		agentSessionId?: string;
 		usageStats?: UsageStats;
+		contextUsage?: number;
 	}>;
 }
 
@@ -345,12 +350,9 @@ export function useDocumentProcessor(): UseDocumentProcessorReturn {
 				// Use effectiveCwd (worktree path when active) so session can be found later
 				window.maestro.agentSessions
 					.registerSessionOrigin(effectiveCwd, result.agentSessionId, 'auto')
-					.catch((err) => {
-						console.error('[DocumentProcessor] Failed to register session origin:', err);
-						captureException(err, {
-							extra: { context: 'useDocumentProcessor.registerSessionOrigin' },
-						});
-					});
+					.catch((err) =>
+						console.error('[DocumentProcessor] Failed to register session origin:', err)
+					);
 			}
 
 			// Re-read document to get updated task count and content
@@ -423,6 +425,7 @@ export function useDocumentProcessor(): UseDocumentProcessorReturn {
 				success: result.success,
 				agentSessionId: result.agentSessionId,
 				usageStats: result.usageStats,
+				contextUsage: result.contextUsage,
 				elapsedTimeMs,
 				tasksCompletedThisRun,
 				newRemainingTasks,

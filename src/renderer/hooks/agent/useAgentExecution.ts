@@ -10,8 +10,7 @@ import type {
 import { getActiveTab } from '../../utils/tabHelpers';
 import { getStdinFlags } from '../../utils/spawnHelpers';
 import { generateId } from '../../utils/ids';
-import { updateSessionWith } from '../../stores/sessionStore';
-import { captureException } from '../../utils/sentry';
+import { estimateContextUsage } from '../../utils/contextUsage';
 
 /**
  * Result from agent spawn operations.
@@ -21,6 +20,8 @@ export interface AgentSpawnResult {
 	response?: string;
 	agentSessionId?: string;
 	usageStats?: UsageStats;
+	/** Context usage percentage estimated from the last usage event (not accumulated) */
+	contextUsage?: number;
 }
 
 /**
@@ -31,6 +32,8 @@ export interface UseAgentExecutionDeps {
 	activeSession: Session | null;
 	/** Ref to sessions for accessing latest state without re-renders */
 	sessionsRef: React.MutableRefObject<Session[]>;
+	/** Session state setter */
+	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	/** Ref to processQueuedItem function for processing queue after agent exit */
 	processQueuedItemRef: React.MutableRefObject<
 		((sessionId: string, item: QueuedItem) => Promise<void>) | null
@@ -124,6 +127,7 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 	const {
 		activeSession,
 		sessionsRef,
+		setSessions,
 		processQueuedItemRef,
 		setFlashNotification,
 		setSuccessFlashNotification,
@@ -180,12 +184,6 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 				const agent = await window.maestro.agents.get(session.toolType);
 				if (!agent) {
 					console.error(`[spawnAgentForSession] Agent not found for toolType: ${session.toolType}`);
-					captureException(new Error(`Agent not found for toolType: ${session.toolType}`), {
-						extra: {
-							context: 'useAgentExecution.spawnAgentForSession',
-							toolType: session.toolType,
-						},
-					});
 					return { success: false };
 				}
 
@@ -202,6 +200,7 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 					let agentSessionId: string | undefined;
 					let responseText = '';
 					let taskUsageStats: UsageStats | undefined;
+					let lastUsageEvent: UsageStats | undefined; // Last (non-accumulated) event for context estimation
 					const queryStartTime = Date.now(); // Track start time for stats
 
 					// Array to collect cleanup functions as listeners are registered
@@ -234,6 +233,8 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 							if (sid === targetSessionId) {
 								// Accumulate usage stats for this task (there may be multiple usage events per task)
 								taskUsageStats = accumulateUsageStats(taskUsageStats, usageStats);
+								// Keep the last event for context estimation (accumulated totals can exceed context window)
+								lastUsageEvent = usageStats;
 							}
 						})
 					);
@@ -263,6 +264,11 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 										console.warn('[spawnAgentForSession] Failed to record query stats:', err);
 									});
 
+								// Estimate context usage from the last single-turn event (not accumulated totals)
+								const taskContextUsage = lastUsageEvent
+									? (estimateContextUsage(lastUsageEvent, session.toolType) ?? undefined)
+									: undefined;
+
 								// Check for queued items BEFORE updating state (using sessionsRef for latest state)
 								const currentSession = sessionsRef.current.find((s) => s.id === sessionId);
 								let queuedItemToProcess: { sessionId: string; item: QueuedItem } | null = null;
@@ -276,18 +282,50 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 								}
 
 								// Update state - if there are queued items, keep busy and process next
-								updateSessionWith(sessionId, (s) => {
-									if (s.executionQueue.length > 0) {
-										const [nextItem, ...remainingQueue] = s.executionQueue;
-										const targetTab =
-											s.aiTabs.find((tab) => tab.id === nextItem.tabId) || getActiveTab(s);
+								setSessions((prev) =>
+									prev.map((s) => {
+										if (s.id !== sessionId) return s;
 
-										if (!targetTab) {
-											// Fallback: no tabs exist
+										if (s.executionQueue.length > 0) {
+											const [nextItem, ...remainingQueue] = s.executionQueue;
+											const targetTab =
+												s.aiTabs.find((tab) => tab.id === nextItem.tabId) || getActiveTab(s);
+
+											if (!targetTab) {
+												// Fallback: no tabs exist
+												return {
+													...s,
+													state: 'busy' as SessionState,
+													busySource: 'ai',
+													executionQueue: remainingQueue,
+													thinkingStartTime: Date.now(),
+													currentCycleTokens: 0,
+													currentCycleBytes: 0,
+													pendingAICommandForSynopsis: undefined,
+												};
+											}
+
+											// For message items, add a log entry to the target tab
+											let updatedAiTabs = s.aiTabs;
+											if (nextItem.type === 'message' && nextItem.text) {
+												const logEntry: LogEntry = {
+													id: generateId(),
+													timestamp: Date.now(),
+													source: 'user',
+													text: nextItem.text,
+													images: nextItem.images,
+												};
+												updatedAiTabs = s.aiTabs.map((tab) =>
+													tab.id === targetTab.id ? { ...tab, logs: [...tab.logs, logEntry] } : tab
+												);
+											}
+
 											return {
 												...s,
 												state: 'busy' as SessionState,
 												busySource: 'ai',
+												aiTabs: updatedAiTabs,
+												activeTabId: targetTab.id,
 												executionQueue: remainingQueue,
 												thinkingStartTime: Date.now(),
 												currentCycleTokens: 0,
@@ -296,55 +334,27 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 											};
 										}
 
-										// For message items, add a log entry to the target tab
-										let updatedAiTabs = s.aiTabs;
-										if (nextItem.type === 'message' && nextItem.text) {
-											const logEntry: LogEntry = {
-												id: generateId(),
-												timestamp: Date.now(),
-												source: 'user',
-												text: nextItem.text,
-												images: nextItem.images,
-											};
-											updatedAiTabs = s.aiTabs.map((tab) =>
-												tab.id === targetTab.id ? { ...tab, logs: [...tab.logs, logEntry] } : tab
-											);
-										}
+										// No queued items - set to idle
+										// Set ALL busy tabs to 'idle' for write-mode tracking
+										const updatedAiTabs =
+											s.aiTabs?.length > 0
+												? s.aiTabs.map((tab) =>
+														tab.state === 'busy'
+															? { ...tab, state: 'idle' as const, thinkingStartTime: undefined }
+															: tab
+													)
+												: s.aiTabs;
 
 										return {
 											...s,
-											state: 'busy' as SessionState,
-											busySource: 'ai',
-											aiTabs: updatedAiTabs,
-											activeTabId: targetTab.id,
-											executionQueue: remainingQueue,
-											thinkingStartTime: Date.now(),
-											currentCycleTokens: 0,
-											currentCycleBytes: 0,
+											state: 'idle' as SessionState,
+											busySource: undefined,
+											thinkingStartTime: undefined,
 											pendingAICommandForSynopsis: undefined,
+											aiTabs: updatedAiTabs,
 										};
-									}
-
-									// No queued items - set to idle
-									// Set ALL busy tabs to 'idle' for write-mode tracking
-									const updatedAiTabs =
-										s.aiTabs?.length > 0
-											? s.aiTabs.map((tab) =>
-													tab.state === 'busy'
-														? { ...tab, state: 'idle' as const, thinkingStartTime: undefined }
-														: tab
-												)
-											: s.aiTabs;
-
-									return {
-										...s,
-										state: 'idle' as SessionState,
-										busySource: undefined,
-										thinkingStartTime: undefined,
-										pendingAICommandForSynopsis: undefined,
-										aiTabs: updatedAiTabs,
-									};
-								});
+									})
+								);
 
 								// Process queued item AFTER state update
 								if (queuedItemToProcess && processQueuedItemRef.current) {
@@ -377,6 +387,7 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 												response: responseText,
 												agentSessionId,
 												usageStats: taskUsageStats,
+												contextUsage: taskContextUsage,
 											});
 										} else {
 											// Queue still processing - check again
@@ -392,6 +403,7 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 										response: responseText,
 										agentSessionId,
 										usageStats: taskUsageStats,
+										contextUsage: taskContextUsage,
 									});
 								}
 							}
@@ -434,11 +446,10 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 				});
 			} catch (error) {
 				console.error('Error spawning agent:', error);
-				captureException(error, { extra: { context: 'useAgentExecution.spawnAgentForSession' } });
 				return { success: false };
 			}
 		},
-		[accumulateUsageStats, processQueuedItemRef, sessionsRef]
+		[accumulateUsageStats, processQueuedItemRef, sessionsRef, setSessions]
 	); // Uses sessionsRef for latest sessions
 
 	/**
@@ -487,9 +498,6 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 				const agent = await window.maestro.agents.get(toolType);
 				if (!agent) {
 					console.error(`[spawnBackgroundSynopsis] Agent not found for toolType: ${toolType}`);
-					captureException(new Error(`Agent not found for toolType: ${toolType}`), {
-						extra: { context: 'useAgentExecution.spawnBackgroundSynopsis', toolType },
-					});
 					return { success: false };
 				}
 
@@ -506,6 +514,7 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 					let agentSessionId: string | undefined;
 					let responseText = '';
 					let synopsisUsageStats: UsageStats | undefined;
+					let lastSynopsisUsageEvent: UsageStats | undefined;
 
 					// Array to collect cleanup functions as listeners are registered
 					const cleanupFns: (() => void)[] = [];
@@ -538,6 +547,8 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 							if (sid === targetSessionId) {
 								// Accumulate usage stats (there may be multiple events)
 								synopsisUsageStats = accumulateUsageStats(synopsisUsageStats, usageStats);
+								// Keep the last event for context estimation
+								lastSynopsisUsageEvent = usageStats;
 							}
 						})
 					);
@@ -546,11 +557,15 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 						window.maestro.process.onExit((sid: string) => {
 							if (sid === targetSessionId) {
 								cleanup();
+								const ctx = lastSynopsisUsageEvent
+									? (estimateContextUsage(lastSynopsisUsageEvent, toolType) ?? undefined)
+									: undefined;
 								resolve({
 									success: true,
 									response: responseText,
 									agentSessionId,
 									usageStats: synopsisUsageStats,
+									contextUsage: ctx,
 								});
 							}
 						})
@@ -599,9 +614,6 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 				});
 			} catch (error) {
 				console.error('Error spawning background synopsis:', error);
-				captureException(error, {
-					extra: { context: 'useAgentExecution.spawnBackgroundSynopsis' },
-				});
 				return { success: false };
 			}
 		},

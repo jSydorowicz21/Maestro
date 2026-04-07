@@ -1,6 +1,5 @@
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, ReactNode } from 'react';
 import { useLayerStack as useLayerStackHook, type LayerStackAPI } from '../hooks';
-import { useEventListener } from '../hooks/utils/useEventListener';
 
 // Create context with null as default (will throw if used outside provider)
 const LayerStackContext = createContext<LayerStackAPI | null>(null);
@@ -30,10 +29,8 @@ export function LayerStackProvider({ children }: LayerStackProviderProps) {
 	const layerStackRef = React.useRef(layerStack);
 	layerStackRef.current = layerStack;
 
-	// Use capture phase to handle Escape before it reaches child components
-	useEventListener(
-		'keydown',
-		(e: KeyboardEvent) => {
+	useEffect(() => {
+		const handleEscape = (e: KeyboardEvent) => {
 			if (e.key === 'Escape') {
 				const stack = layerStackRef.current;
 				const topLayer = stack.getTopLayer();
@@ -47,10 +44,15 @@ export function LayerStackProvider({ children }: LayerStackProviderProps) {
 					void stack.closeTopLayer();
 				}
 			}
-		},
-		window,
-		{ capture: true }
-	);
+		};
+
+		// Use capture phase to handle Escape before it reaches child components
+		window.addEventListener('keydown', handleEscape, { capture: true });
+
+		return () => {
+			window.removeEventListener('keydown', handleEscape, { capture: true });
+		};
+	}, []); // Empty deps - handler uses ref to get latest stack
 
 	return <LayerStackContext.Provider value={layerStack}>{children}</LayerStackContext.Provider>;
 }

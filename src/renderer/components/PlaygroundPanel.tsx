@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useEventListener } from '../hooks/utils/useEventListener';
 import {
 	X,
 	Trophy,
@@ -14,8 +13,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { Theme, AutoRunStats, ThemeMode } from '../types';
-import { GhostIconButton } from './ui/GhostIconButton';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { AchievementCard } from './AchievementCard';
 import { StandingOvationOverlay } from './StandingOvationOverlay';
@@ -107,9 +105,13 @@ const DEFAULT_CONFETTI_COLORS = [
 ];
 
 export function PlaygroundPanel({ theme, themeMode, onClose }: PlaygroundPanelProps) {
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
+	const layerIdRef = useRef<string>();
 	const containerRef = useRef<HTMLDivElement>(null);
+	const onCloseRef = useRef(onClose);
 
-	useModalLayer(MODAL_PRIORITIES.STANDING_OVATION - 1, 'Developer Playground', onClose);
+	// Keep ref up to date
+	onCloseRef.current = onClose;
 
 	const [activeTab, setActiveTab] = useState<TabId>('achievements');
 
@@ -156,31 +158,59 @@ export function PlaygroundPanel({ theme, themeMode, onClose }: PlaygroundPanelPr
 	const batonStyleRef = useRef<HTMLStyleElement | null>(null);
 
 	// Handle keyboard shortcuts for tab switching
-	useEventListener('keydown', (e: KeyboardEvent) => {
-		// Cmd+Shift+[ or Cmd+Shift+] to switch tabs
-		if (e.metaKey && e.shiftKey) {
-			if (e.key === '[' || e.key === '{') {
-				e.preventDefault();
-				setActiveTab((prev) => {
-					const currentIdx = TABS.findIndex((t) => t.id === prev);
-					const newIdx = currentIdx <= 0 ? TABS.length - 1 : currentIdx - 1;
-					return TABS[newIdx].id;
-				});
-			} else if (e.key === ']' || e.key === '}') {
-				e.preventDefault();
-				setActiveTab((prev) => {
-					const currentIdx = TABS.findIndex((t) => t.id === prev);
-					const newIdx = currentIdx >= TABS.length - 1 ? 0 : currentIdx + 1;
-					return TABS[newIdx].id;
-				});
-			}
-		}
-	});
-
-	// Focus container on mount
 	useEffect(() => {
-		containerRef.current?.focus();
+		const handleKeyDown = (e: KeyboardEvent) => {
+			// Cmd+Shift+[ or Cmd+Shift+] to switch tabs
+			if (e.metaKey && e.shiftKey) {
+				if (e.key === '[' || e.key === '{') {
+					e.preventDefault();
+					setActiveTab((prev) => {
+						const currentIdx = TABS.findIndex((t) => t.id === prev);
+						const newIdx = currentIdx <= 0 ? TABS.length - 1 : currentIdx - 1;
+						return TABS[newIdx].id;
+					});
+				} else if (e.key === ']' || e.key === '}') {
+					e.preventDefault();
+					setActiveTab((prev) => {
+						const currentIdx = TABS.findIndex((t) => t.id === prev);
+						const newIdx = currentIdx >= TABS.length - 1 ? 0 : currentIdx + 1;
+						return TABS[newIdx].id;
+					});
+				}
+			}
+		};
+
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
 	}, []);
+
+	// Register layer on mount
+	useEffect(() => {
+		const id = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.STANDING_OVATION - 1, // Just below standing ovation
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'strict',
+			ariaLabel: 'Developer Playground',
+			onEscape: () => onCloseRef.current(),
+		});
+		layerIdRef.current = id;
+		containerRef.current?.focus();
+
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [registerLayer, unregisterLayer]);
+
+	// Update handler when dependencies change
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, () => onCloseRef.current());
+		}
+	}, [updateLayerHandler]);
 
 	// Build mock AutoRunStats
 	const mockAutoRunStats: AutoRunStats = {
@@ -565,9 +595,13 @@ ${staggerDelays.map((delay, i) => `svg.wand-sparkle-active path:nth-child(${i + 
 								Developer Playground
 							</h2>
 						</div>
-						<GhostIconButton onClick={onClose} style={{ color: theme.colors.textDim }}>
+						<button
+							onClick={onClose}
+							className="p-1 rounded hover:bg-white/10 transition-colors"
+							style={{ color: theme.colors.textDim }}
+						>
 							<X className="w-5 h-5" />
-						</GhostIconButton>
+						</button>
 					</div>
 
 					{/* Tabs */}

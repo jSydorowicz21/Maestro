@@ -6,7 +6,6 @@
  */
 
 import type { AgentCapabilities } from './capabilities';
-import type { AgentConfig as BaseAgentConfig } from '../../shared/types';
 import { isWindows } from '../../shared/platformDetection';
 
 // ============ Configuration Types ============
@@ -49,11 +48,17 @@ interface NumberConfigOption extends BaseConfigOption {
 
 /**
  * Select configuration option (string value from predefined options)
+ *
+ * Options can be:
+ * - Static: `options` array provided directly (e.g., Factory Droid reasoning effort)
+ * - Dynamic: `dynamic: true` with optional `options` as fallback.
+ *   Dynamic options are fetched at runtime via `agents:getConfigOptions` IPC.
  */
 interface SelectConfigOption extends BaseConfigOption {
 	type: 'select';
 	default: string;
-	options: string[];
+	options?: string[]; // Static options (or fallback for dynamic). Optional when dynamic is true.
+	dynamic?: boolean; // If true, options are fetched at runtime via discoverConfigOptions()
 	argBuilder?: (value: string) => string[];
 }
 
@@ -68,24 +73,38 @@ export type AgentConfigOption =
 	| SelectConfigOption;
 
 /**
- * Full agent configuration including runtime detection state.
- * Extends the serializable BaseAgentConfig from shared/types.ts with
- * function-typed arg builders that are only available in the main process.
+ * Full agent configuration including runtime detection state
  */
-export interface AgentConfig extends BaseAgentConfig {
-	binaryName: string; // Required in main process (optional in shared for IPC)
-	command: string; // Required in main process (optional in shared for IPC)
-	args: string[]; // Required in main process (optional in shared for IPC)
-	configOptions?: AgentConfigOption[]; // Narrowed to discriminated union (richer than shared type)
-	capabilities: AgentCapabilities; // Required in main process (optional in shared for IPC)
+export interface AgentConfig {
+	id: string;
+	name: string;
+	binaryName: string;
+	command: string;
+	args: string[]; // Base args always included (excludes batch mode prefix)
+	available: boolean;
+	path?: string;
+	customPath?: string; // User-specified custom path (shown in UI even if not available)
+	requiresPty?: boolean; // Whether this agent needs a pseudo-terminal
+	configOptions?: AgentConfigOption[]; // Agent-specific configuration
+	hidden?: boolean; // If true, agent is hidden from UI (internal use only)
+	capabilities: AgentCapabilities; // Agent feature capabilities
 
-	// Argument builders for dynamic CLI construction (function types, main-process only)
+	// Argument builders for dynamic CLI construction
 	// These are optional - agents that don't have them use hardcoded behavior
+	batchModePrefix?: string[]; // Args added before base args for batch mode (e.g., ['run'] for OpenCode)
+	batchModeArgs?: string[]; // Args only applied in batch mode (e.g., ['--skip-git-repo-check'] for Codex exec)
+	jsonOutputArgs?: string[]; // Args for JSON output format (e.g., ['--format', 'json'])
 	resumeArgs?: (sessionId: string) => string[]; // Function to build resume args
+	readOnlyArgs?: string[]; // Args for read-only/plan mode (e.g., ['--agent', 'plan'])
 	modelArgs?: (modelId: string) => string[]; // Function to build model selection args (e.g., ['--model', modelId])
+	yoloModeArgs?: string[]; // Args for YOLO/full-access mode (e.g., ['--dangerously-bypass-approvals-and-sandbox'])
 	workingDirArgs?: (dir: string) => string[]; // Function to build working directory args (e.g., ['-C', dir])
 	imageArgs?: (imagePath: string) => string[]; // Function to build image attachment args (e.g., ['-i', imagePath] for Codex)
 	promptArgs?: (prompt: string) => string[]; // Function to build prompt args (e.g., ['-p', prompt] for OpenCode)
+	noPromptSeparator?: boolean; // If true, don't add '--' before the prompt in batch mode (OpenCode doesn't support it)
+	defaultEnvVars?: Record<string, string>; // Default environment variables for this agent (merged with user customEnvVars)
+	readOnlyEnvOverrides?: Record<string, string>; // Env var overrides applied in read-only mode (replaces keys from defaultEnvVars)
+	readOnlyCliEnforced?: boolean; // Whether the agent's CLI enforces read-only mode (false = prompt-only enforcement)
 }
 
 /**
@@ -126,6 +145,32 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
 		resumeArgs: (sessionId: string) => ['--resume', sessionId], // Resume with session ID
 		readOnlyArgs: ['--permission-mode', 'plan'], // Read-only/plan mode
 		readOnlyCliEnforced: true, // CLI enforces read-only via --permission-mode plan
+		modelArgs: (modelId: string) => ['--model', modelId], // Model selection: claude --model sonnet
+		configOptions: [
+			{
+				key: 'model',
+				type: 'text',
+				label: 'Model',
+				description:
+					'Model override (e.g., "sonnet", "opus", "haiku", or full name like "claude-sonnet-4-6"). Leave empty to use the default.',
+				default: '',
+				argBuilder: (value: string) => {
+					if (value && value.trim()) {
+						return ['--model', value.trim()];
+					}
+					return [];
+				},
+			},
+			{
+				key: 'effort',
+				type: 'select',
+				label: 'Effort',
+				description: 'How much effort the model should put into its response.',
+				dynamic: true,
+				default: '',
+				argBuilder: (value: string) => (value && value.trim() ? ['--effort', value.trim()] : []),
+			},
+		],
 	},
 	{
 		id: 'codex',
@@ -166,12 +211,14 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
 				},
 			},
 			{
-				key: 'contextWindow',
-				type: 'number',
-				label: 'Context Window Size',
-				description:
-					'Maximum context window size in tokens. Required for context usage display. Common values: 400000 (GPT-5.2/5.3), 128000 (GPT-4o).',
-				default: 400000, // Default for GPT-5.2+ models
+				key: 'reasoningEffort',
+				type: 'select',
+				label: 'Reasoning Effort',
+				description: 'How much the model should reason before responding.',
+				dynamic: true,
+				default: '',
+				argBuilder: (value: string) =>
+					value && value.trim() ? ['-c', `reasoning.effort="${value.trim()}"`] : [],
 			},
 		],
 	},

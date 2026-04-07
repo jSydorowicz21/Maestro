@@ -12,6 +12,7 @@ import {
 	Trophy,
 	Mail,
 	User,
+	Loader2,
 	Check,
 	AlertCircle,
 	ExternalLink,
@@ -22,15 +23,13 @@ import {
 	DownloadCloud,
 } from 'lucide-react';
 import type { Theme, AutoRunStats, LeaderboardRegistration, KeyboardMasteryStats } from '../types';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { getBadgeForTime } from '../constants/conductorBadges';
 import { KEYBOARD_MASTERY_LEVELS } from '../constants/keyboardMastery';
 import { DEFAULT_SHORTCUTS, TAB_SHORTCUTS, FIXED_SHORTCUTS } from '../constants/shortcuts';
 import { generateId } from '../utils/ids';
 import { buildMaestroUrl } from '../utils/buildMaestroUrl';
-import { GhostIconButton } from './ui/GhostIconButton';
-import { Spinner } from './ui';
 
 // Total shortcuts for calculating mastery percentage
 const TOTAL_SHORTCUTS_COUNT =
@@ -132,7 +131,11 @@ export function LeaderboardRegistrationModal({
 	onOptOut,
 	onSyncStats,
 }: LeaderboardRegistrationModalProps) {
+	const { registerLayer, unregisterLayer } = useLayerStack();
+	const layerIdRef = useRef<string>();
 	const containerRef = useRef<HTMLDivElement>(null);
+	const onCloseRef = useRef(onClose);
+	onCloseRef.current = onClose;
 
 	// Form state
 	const [displayName, setDisplayName] = useState(existingRegistration?.displayName || '');
@@ -734,12 +737,26 @@ export function LeaderboardRegistrationModal({
 	}, [onOptOut]);
 
 	// Register layer on mount
-	useModalLayer(MODAL_PRIORITIES.LEADERBOARD_REGISTRATION, 'Register for Leaderboard', onClose);
-
-	// Focus container on mount
 	useEffect(() => {
+		const id = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.LEADERBOARD_REGISTRATION,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'strict',
+			ariaLabel: 'Register for Leaderboard',
+			onEscape: () => onCloseRef.current(),
+		});
+		layerIdRef.current = id;
+
 		containerRef.current?.focus();
-	}, []);
+
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [registerLayer, unregisterLayer]);
 
 	// Handle Enter key for form submission
 	const handleKeyDown = useCallback(
@@ -779,9 +796,13 @@ export function LeaderboardRegistrationModal({
 								: 'Register for Leaderboard'}
 						</h2>
 					</div>
-					<GhostIconButton onClick={onClose} style={{ color: theme.colors.textDim }}>
+					<button
+						onClick={onClose}
+						className="p-1 rounded hover:bg-white/10 transition-colors"
+						style={{ color: theme.colors.textDim }}
+					>
 						<X className="w-4 h-4" />
-					</GhostIconButton>
+					</button>
 				</div>
 
 				{/* Content */}
@@ -1128,7 +1149,7 @@ export function LeaderboardRegistrationModal({
 								>
 									{isResending ? (
 										<>
-											<Spinner size="xs" className="w-3.5 h-3.5" />
+											<Loader2 className="w-3.5 h-3.5 animate-spin" />
 											Sending...
 										</>
 									) : (
@@ -1287,7 +1308,7 @@ export function LeaderboardRegistrationModal({
 							>
 								{submitState === 'submitting' ? (
 									<>
-										<Spinner />
+										<Loader2 className="w-4 h-4 animate-spin" />
 										Pushing...
 									</>
 								) : (
@@ -1316,7 +1337,7 @@ export function LeaderboardRegistrationModal({
 							>
 								{isSyncing ? (
 									<>
-										<Spinner />
+										<Loader2 className="w-4 h-4 animate-spin" />
 										Pulling...
 									</>
 								) : (

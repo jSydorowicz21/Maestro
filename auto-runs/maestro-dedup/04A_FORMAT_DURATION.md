@@ -14,7 +14,7 @@ Replace 22 local `formatDuration` definitions with the canonical implementation 
 
 - [x] Phase 03 (test mocks) is complete
 - [x] `rtk npm run lint` passes
-- [x] `rtk vitest run` passes
+- [x] `CI=1 rtk vitest run` passes
 
 ---
 
@@ -53,7 +53,7 @@ For each of the 9 files in `src/renderer/components/UsageDashboard/`:
 - [x] Remove the local `formatDuration` function
 - [x] Add: `import { formatElapsedTime as formatDuration } from '../../../shared/formatters';` (or direct name if signatures match)
 - [x] Verify output format matches the local definition it replaced
-- [x] Run tests: `rtk vitest run src/__tests__/renderer/components/UsageDashboard/`
+- [x] Run tests: `CI=1 rtk vitest run src/__tests__/renderer/components/UsageDashboard/`
 
 > **Note:** Actually 11 files in UsageDashboard had local definitions (not 9). PeakHoursChart used compact format (no seconds in minute range) so it imports `formatDurationCompact` instead. All other 10 use `formatElapsedTime`.
 
@@ -104,7 +104,7 @@ For each of the 9 files in `src/renderer/components/UsageDashboard/`:
 
 - [x] Run lint: `rtk npm run lint`
 - [x] Find related test files: `rtk grep "formatDuration\|formatElapsed" src/__tests__/ --glob "*.test.{ts,tsx}" -l`
-- [x] Run related tests: `rtk vitest run <related-test-files>`
+- [x] Run related tests: `CI=1 rtk vitest run <related-test-files>`
 - [x] Confirm zero new test failures
 
 > **Note:** Both `tsc` configs pass. All 490 related tests pass (formatters: 146, HistoryPanel/AboutModal/etc: 344).
@@ -123,7 +123,7 @@ For each of the 9 files in `src/renderer/components/UsageDashboard/`:
 After completing changes, run targeted tests for the files you modified:
 
 ```bash
-rtk vitest run <path-to-relevant-test-files>
+CI=1 rtk vitest run <path-to-relevant-test-files>
 ```
 
 **Rule: Zero new test failures from your changes.** Pre-existing failures on the baseline are acceptable. If a test you didn't touch starts failing, investigate whether your refactoring broke it. If your change removed code that a test depended on, update that test.
@@ -149,4 +149,4 @@ rtk tsc -p tsconfig.lint.json --noEmit
 - All usages import from `src/shared/formatters.ts` (or `performance-metrics.ts`)
 - Output behavior unchanged for every call site
 - `rtk npm run lint` passes
-- `rtk vitest run` passes
+- `CI=1 rtk vitest run` passes

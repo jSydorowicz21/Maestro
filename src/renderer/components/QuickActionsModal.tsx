@@ -1,9 +1,8 @@
 import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
-import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { Search } from 'lucide-react';
 import type { Session, Group, Theme, Shortcut, RightPanelTab, SettingsTab } from '../types';
 import type { GroupChat } from '../../shared/group-chat-types';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { notifyToast } from '../stores/notificationStore';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { gitService } from '../services/git';
@@ -15,9 +14,7 @@ import { useListNavigation } from '../hooks';
 import { useUIStore } from '../stores/uiStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useFileExplorerStore } from '../stores/fileExplorerStore';
-import { useSessionStore, updateSessionWith } from '../stores/sessionStore';
 import { buildMaestroUrl } from '../utils/buildMaestroUrl';
-import { EmptyState } from './ui';
 
 interface QuickAction {
 	id: string;
@@ -30,6 +27,7 @@ interface QuickAction {
 interface QuickActionsModalProps {
 	theme: Theme;
 	sessions: Session[];
+	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	activeSessionId: string;
 	groups: Group[];
 	setGroups: React.Dispatch<React.SetStateAction<Group[]>>;
@@ -108,6 +106,7 @@ interface QuickActionsModalProps {
 	autoRunSelectedDocument?: string | null;
 	autoRunCompletedTaskCount?: number;
 	onAutoRunResetTasks?: () => void;
+	onClearActiveTerminal?: () => void;
 	// Tab close operations
 	onCloseAllTabs?: () => void;
 	onCloseOtherTabs?: () => void;
@@ -138,6 +137,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 	const {
 		theme,
 		sessions,
+		setSessions,
 		activeSessionId,
 		groups,
 		setGroups,
@@ -205,6 +205,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		autoRunSelectedDocument,
 		autoRunCompletedTaskCount,
 		onAutoRunResetTasks,
+		onClearActiveTerminal,
 		onCloseAllTabs,
 		onCloseOtherTabs,
 		onCloseTabsLeft,
@@ -240,25 +241,57 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 	const inputRef = useRef<HTMLInputElement>(null);
 	const selectedItemRef = useRef<HTMLButtonElement>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
+	const layerIdRef = useRef<string>();
 	const modalRef = useRef<HTMLDivElement>(null);
 
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
 	const activeSession = sessions.find((s) => s.id === activeSessionId);
 
-	// Escape handler: in sub-mode go back, otherwise close
-	const handleEscape = useCallback(() => {
-		if (mode === 'move-to-group') {
-			setMode('main');
-			// Note: Selection will be reset by the search/mode change useEffect
-		} else {
-			setQuickActionOpen(false);
-		}
+	// Register layer on mount (handler will be updated by separate effect)
+	useEffect(() => {
+		layerIdRef.current = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.QUICK_ACTION,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'strict',
+			ariaLabel: 'Quick Actions',
+			onEscape: () => setQuickActionOpen(false), // Initial handler, updated below
+		});
+
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [registerLayer, unregisterLayer, setQuickActionOpen]);
+
+	// Update handler when mode changes - use a ref-based approach to avoid stale closure
+	const handleEscapeRef = useRef<() => void>(() => setQuickActionOpen(false));
+	useEffect(() => {
+		handleEscapeRef.current = () => {
+			// Handle escape based on current mode
+			if (mode === 'move-to-group') {
+				setMode('main');
+				// Note: Selection will be reset by the search/mode change useEffect
+			} else {
+				setQuickActionOpen(false);
+			}
+		};
 	}, [mode, setQuickActionOpen]);
 
-	// Register layer on mount
-	useModalLayer(MODAL_PRIORITIES.QUICK_ACTION, 'Quick Actions', handleEscape);
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, () => handleEscapeRef.current());
+		}
+	}, [updateLayerHandler]);
 
-	// Focus input on mount (small delay to ensure DOM is ready and layer is registered)
-	useFocusAfterRender(inputRef, true, 50);
+	// Focus input on mount
+	useEffect(() => {
+		// Small delay to ensure DOM is ready and layer is registered
+		const timer = setTimeout(() => inputRef.current?.focus(), 50);
+		return () => clearTimeout(timer);
+	}, []);
 
 	// Track scroll position to determine which items are visible
 	const handleScroll = () => {
@@ -272,13 +305,17 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 
 	const handleRenameSession = () => {
 		if (renameValue.trim()) {
-			updateSessionWith(activeSessionId, (s) => ({ ...s, name: renameValue.trim() }));
+			const updatedSessions = sessions.map((s) =>
+				s.id === activeSessionId ? { ...s, name: renameValue.trim() } : s
+			);
+			setSessions(updatedSessions);
 			setQuickActionOpen(false);
 		}
 	};
 
 	const handleMoveToGroup = (groupId: string) => {
-		updateSessionWith(activeSessionId, (s) => ({ ...s, groupId }));
+		const updatedSessions = sessions.map((s) => (s.id === activeSessionId ? { ...s, groupId } : s));
+		setSessions(updatedSessions);
 		setQuickActionOpen(false);
 	};
 
@@ -384,7 +421,11 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 							? `Unbookmark: ${activeSession.name}`
 							: `Bookmark: ${activeSession.name}`,
 						action: () => {
-							updateSessionWith(activeSessionId, (s) => ({ ...s, bookmarked: !s.bookmarked }));
+							setSessions((prev) =>
+								prev.map((s) =>
+									s.id === activeSessionId ? { ...s, bookmarked: !s.bookmarked } : s
+								)
+							);
 							setQuickActionOpen(false);
 						},
 					},
@@ -591,13 +632,14 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 					},
 				]
 			: []),
-		...(activeSession
+		...(activeSession && activeSession.inputMode === 'terminal' && onClearActiveTerminal
 			? [
 					{
 						id: 'clearTerminal',
 						label: 'Clear Terminal History',
+						shortcut: shortcuts.clearTerminal,
 						action: () => {
-							updateSessionWith(activeSessionId, (s) => ({ ...s, shellLogs: [] }));
+							onClearActiveTerminal();
 							setQuickActionOpen(false);
 						},
 					},
@@ -1260,7 +1302,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			subtext: 'Clear stuck thinking/busy state for all sessions',
 			action: () => {
 				// Reset all sessions and tabs to idle state
-				useSessionStore.getState().setSessions((prev) =>
+				setSessions((prev) =>
 					prev.map((s) => ({
 						...s,
 						state: 'idle' as const,
@@ -1286,19 +1328,24 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 						label: 'Debug: Reset Current Session',
 						subtext: `Clear busy state for ${activeSession.name}`,
 						action: () => {
-							updateSessionWith(activeSessionId, (s) => ({
-								...s,
-								state: 'idle' as const,
-								busySource: undefined,
-								thinkingStartTime: undefined,
-								currentCycleTokens: undefined,
-								currentCycleBytes: undefined,
-								aiTabs: s.aiTabs?.map((tab) => ({
-									...tab,
-									state: 'idle' as const,
-									thinkingStartTime: undefined,
-								})),
-							}));
+							setSessions((prev) =>
+								prev.map((s) => {
+									if (s.id !== activeSessionId) return s;
+									return {
+										...s,
+										state: 'idle' as const,
+										busySource: undefined,
+										thinkingStartTime: undefined,
+										currentCycleTokens: undefined,
+										currentCycleBytes: undefined,
+										aiTabs: s.aiTabs?.map((tab) => ({
+											...tab,
+											state: 'idle' as const,
+											thinkingStartTime: undefined,
+										})),
+									};
+								})
+							);
 							console.log('[Debug] Reset busy state for session:', activeSessionId);
 							setQuickActionOpen(false);
 						},
@@ -1651,11 +1698,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 							);
 						})}
 						{filtered.length === 0 && (
-							<EmptyState
-								theme={theme}
-								message="No actions found"
-								className="px-4 py-4 opacity-50"
-							/>
+							<div className="px-4 py-4 text-center opacity-50 text-sm">No actions found</div>
 						)}
 					</div>
 				)}

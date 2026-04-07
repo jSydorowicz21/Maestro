@@ -86,7 +86,6 @@ export function useTabExportHandlers(deps: UseTabExportHandlersDeps): UseTabExpo
 				});
 			})
 			.catch((err) => {
-				// Expected: tab export/file operations can fail for filesystem reasons
 				console.error('Failed to copy context:', err);
 				notifyToast({
 					type: 'error',
@@ -119,7 +118,6 @@ export function useTabExportHandlers(deps: UseTabExportHandlersDeps): UseTabExpo
 				message: 'Conversation exported as HTML.',
 			});
 		} catch (err) {
-			// Expected: tab export/file operations can fail for filesystem reasons
 			console.error('Failed to export tab:', err);
 			notifyToast({
 				type: 'error',

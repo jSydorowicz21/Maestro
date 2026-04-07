@@ -3,7 +3,6 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { useAvailableAgents, useAvailableAgentsForCapability } from '../../../renderer/hooks';
 import type { Session } from '../../../renderer/types';
 import { DEFAULT_CAPABILITIES, type AgentCapabilities } from '../../../renderer/hooks';
-import { createMockSession } from '../../helpers/mockSession';
 
 // Define agent config type matching what detect() returns
 interface AgentConfigDetected {
@@ -50,6 +49,44 @@ const mockAgentConfigs: AgentConfigDetected[] = [
 		capabilities: DEFAULT_CAPABILITIES,
 	},
 ];
+
+// Create a minimal session for testing
+function createMockSession(
+	id: string,
+	toolType: string,
+	state: 'idle' | 'busy' | 'error' | 'connecting' = 'idle'
+): Session {
+	return {
+		id,
+		name: `Session ${id}`,
+		toolType: toolType as any,
+		state,
+		cwd: '/test',
+		fullPath: '/test',
+		projectRoot: '/test',
+		aiLogs: [],
+		shellLogs: [],
+		workLog: [],
+		contextUsage: 0,
+		inputMode: 'ai',
+		aiPid: 0,
+		terminalPid: 0,
+		port: 0,
+		isLive: false,
+		changedFiles: [],
+		isGitRepo: false,
+		fileTree: [],
+		fileExplorerExpanded: [],
+		fileExplorerScrollPos: 0,
+		activeTimeMs: 0,
+		executionQueue: [],
+		aiTabs: [],
+		activeTabId: '',
+		closedTabHistory: [],
+		terminalTabs: [],
+		activeTerminalTabId: null,
+	};
+}
 
 describe('useAvailableAgents', () => {
 	beforeEach(() => {
@@ -100,9 +137,7 @@ describe('useAvailableAgents', () => {
 	});
 
 	it('marks agents with busy sessions as "busy"', async () => {
-		const sessions: Session[] = [
-			createMockSession({ id: '1', toolType: 'opencode', state: 'busy' }),
-		];
+		const sessions: Session[] = [createMockSession('1', 'opencode', 'busy')];
 
 		const { result } = renderHook(() => useAvailableAgents('claude-code', sessions));
 
@@ -117,9 +152,9 @@ describe('useAvailableAgents', () => {
 
 	it('counts active sessions per agent', async () => {
 		const sessions: Session[] = [
-			createMockSession({ id: '1', toolType: 'claude-code', state: 'idle' }),
-			createMockSession({ id: '2', toolType: 'claude-code', state: 'idle' }),
-			createMockSession({ id: '3', toolType: 'opencode', state: 'idle' }),
+			createMockSession('1', 'claude-code', 'idle'),
+			createMockSession('2', 'claude-code', 'idle'),
+			createMockSession('3', 'opencode', 'idle'),
 		];
 
 		const { result } = renderHook(() => useAvailableAgents(null, sessions));

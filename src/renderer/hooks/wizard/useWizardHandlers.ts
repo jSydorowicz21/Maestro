@@ -26,8 +26,7 @@ import type {
 	WizardMode,
 	SessionWizardState,
 } from '../../types';
-import { useSessionStore } from '../../stores/sessionStore';
-import { useActiveSession } from '../session/useActiveSession';
+import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUIStore } from '../../stores/uiStore';
 import { getModalActions, useModalStore } from '../../stores/modalStore';
@@ -40,7 +39,7 @@ import { autorunSynopsisPrompt } from '../../../prompts';
 import { parseSynopsis } from '../../../shared/synopsis';
 import { formatRelativeTime } from '../../../shared/formatters';
 import { gitService } from '../../services/git';
-import { PLAYBOOKS_DIR } from '../../../shared/maestro-paths';
+import { AUTO_RUN_FOLDER_NAME } from '../../components/Wizard';
 import { DEFAULT_BATCH_PROMPT } from '../../components/BatchRunnerModal';
 import type { PreviousUIState, UseInlineWizardReturn } from '../batch/useInlineWizard';
 import type { WizardState } from '../../components/Wizard/WizardContext';
@@ -150,7 +149,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 	} = deps;
 
 	// --- Store subscriptions (reactive) ---
-	const activeSession = useActiveSession();
+	const activeSession = useSessionStore(selectActiveSession);
 
 	// --- Store actions (stable) ---
 	const { setSessions, setActiveSessionId } = useMemo(() => useSessionStore.getState(), []);
@@ -227,7 +226,6 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				}
 			} catch (error) {
 				if (!cancelled) {
-					// Expected: wizard validation/file operations handle user input
 					console.error('[SlashCommandDiscovery] Failed to fetch custom commands:', error);
 				}
 			}
@@ -262,7 +260,6 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				}
 			} catch (error) {
 				if (!cancelled) {
-					// Expected: wizard validation/file operations handle user input
 					console.error('[SlashCommandDiscovery] Failed to discover agent commands:', error);
 				}
 			}
@@ -595,6 +592,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 					projectPath: currentSession.cwd,
 					sessionName: activeTab.name || undefined,
 					usageStats: result.usageStats,
+					contextUsage: result.contextUsage,
 					elapsedTimeMs,
 				});
 
@@ -651,7 +649,6 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				);
 			}
 		} catch (error) {
-			// Expected: wizard validation/file operations handle user input
 			console.error('[handleHistoryCommand] Error:', error);
 			setSessions((prev) =>
 				prev.map((s) => {
@@ -769,7 +766,6 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 			};
 			addLogToTab(currentSession.id, skillsLog);
 		} catch (error) {
-			// Expected: wizard validation/file operations handle user input
 			console.error('[handleSkillsCommand] Error:', error);
 			const errorLog: LogEntry = {
 				id: generateId(),
@@ -1129,7 +1125,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				showThinking: currentDefaults.defaultShowThinking,
 			};
 
-			const autoRunFolderPath = `${directoryPath}/${PLAYBOOKS_DIR}`;
+			const autoRunFolderPath = `${directoryPath}/${AUTO_RUN_FOLDER_NAME}`;
 			const firstDoc = generatedDocuments[0];
 			const autoRunSelectedFile = firstDoc ? firstDoc.filename.replace(/\.md$/, '') : undefined;
 

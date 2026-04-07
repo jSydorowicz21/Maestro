@@ -8,14 +8,13 @@
  * Key advantages:
  * - Selector-based subscriptions: components only re-render when their slice changes
  * - No refs needed: store.getState() gives current state synchronously
- * - Works outside React: services can read/write via useSettingsStore.getState()
+ * - Works outside React: services can read/write via getSettingsState()/getSettingsActions()
  * - Single batch load on startup eliminates ~60 individual IPC calls
  *
  * Can be used outside React via useSettingsStore.getState() / useSettingsStore.setState().
  */
 
 import { create } from 'zustand';
-import { captureException } from '../utils/sentry';
 import { isWindowsPlatform } from '../utils/platformUtils';
 import type {
 	LLMProvider,
@@ -52,9 +51,9 @@ const DOCUMENT_GRAPH_LAYOUT_TYPES: DocumentGraphLayoutType[] = ['mindmap', 'radi
 // ============================================================================
 
 /** Default local ignore patterns for new installations (includes .git, node_modules, __pycache__) */
-const DEFAULT_LOCAL_IGNORE_PATTERNS = ['.git', 'node_modules', '__pycache__'];
+export const DEFAULT_LOCAL_IGNORE_PATTERNS = ['.git', 'node_modules', '__pycache__'];
 
-const DEFAULT_CONTEXT_MANAGEMENT_SETTINGS: ContextManagementSettings = {
+export const DEFAULT_CONTEXT_MANAGEMENT_SETTINGS: ContextManagementSettings = {
 	autoGroomContexts: true,
 	maxContextTokens: 100000,
 	showMergePreview: true,
@@ -65,7 +64,7 @@ const DEFAULT_CONTEXT_MANAGEMENT_SETTINGS: ContextManagementSettings = {
 	contextWarningRedThreshold: 90,
 };
 
-const DEFAULT_AUTO_RUN_STATS: AutoRunStats = {
+export const DEFAULT_AUTO_RUN_STATS: AutoRunStats = {
 	cumulativeTimeMs: 0,
 	longestRunMs: 0,
 	longestRunTimestamp: 0,
@@ -76,7 +75,7 @@ const DEFAULT_AUTO_RUN_STATS: AutoRunStats = {
 	badgeHistory: [],
 };
 
-const DEFAULT_USAGE_STATS: MaestroUsageStats = {
+export const DEFAULT_USAGE_STATS: MaestroUsageStats = {
 	maxAgents: 0,
 	maxDefinedAgents: 0,
 	maxSimultaneousAutoRuns: 0,
@@ -84,7 +83,7 @@ const DEFAULT_USAGE_STATS: MaestroUsageStats = {
 	maxQueueDepth: 0,
 };
 
-const DEFAULT_KEYBOARD_MASTERY_STATS: KeyboardMasteryStats = {
+export const DEFAULT_KEYBOARD_MASTERY_STATS: KeyboardMasteryStats = {
 	usedShortcuts: [],
 	currentLevel: 0,
 	lastLevelUpTimestamp: 0,
@@ -96,7 +95,7 @@ const TOTAL_SHORTCUTS_COUNT =
 	Object.keys(TAB_SHORTCUTS).length +
 	Object.keys(FIXED_SHORTCUTS).length;
 
-const DEFAULT_ONBOARDING_STATS: OnboardingStats = {
+export const DEFAULT_ONBOARDING_STATS: OnboardingStats = {
 	wizardStartCount: 0,
 	wizardCompletionCount: 0,
 	wizardAbandonCount: 0,
@@ -118,19 +117,19 @@ const DEFAULT_ONBOARDING_STATS: OnboardingStats = {
 	averageTasksPerPhase: 0,
 };
 
-const DEFAULT_ENCORE_FEATURES: EncoreFeatureFlags = {
+export const DEFAULT_ENCORE_FEATURES: EncoreFeatureFlags = {
 	directorNotes: false,
 	usageStats: true,
 	symphony: true,
 	maestroCue: false,
 };
 
-const DEFAULT_DIRECTOR_NOTES_SETTINGS: DirectorNotesSettings = {
+export const DEFAULT_DIRECTOR_NOTES_SETTINGS: DirectorNotesSettings = {
 	provider: 'claude-code',
 	defaultLookbackDays: 7,
 };
 
-const DEFAULT_AI_COMMANDS: CustomAICommand[] = [
+export const DEFAULT_AI_COMMANDS: CustomAICommand[] = [
 	{
 		id: 'commit',
 		command: '/commit',
@@ -144,7 +143,7 @@ const DEFAULT_AI_COMMANDS: CustomAICommand[] = [
 // Helper Functions
 // ============================================================================
 
-function getBadgeLevelForTime(cumulativeTimeMs: number): number {
+export function getBadgeLevelForTime(cumulativeTimeMs: number): number {
 	const MINUTE = 60 * 1000;
 	const HOUR = 60 * MINUTE;
 	const DAY = 24 * HOUR;
@@ -198,6 +197,8 @@ export interface SettingsStoreState {
 	customThemeBaseId: ThemeId;
 	enterToSendAI: boolean;
 	enterToSendTerminal: boolean;
+	forcedParallelExecution: boolean;
+	forcedParallelAcknowledged: boolean;
 	defaultSaveToHistory: boolean;
 	defaultShowThinking: ThinkingMode;
 	leftSidebarWidth: number;
@@ -235,6 +236,8 @@ export interface SettingsStoreState {
 	contextManagementSettings: ContextManagementSettings;
 	keyboardMasteryStats: KeyboardMasteryStats;
 	colorBlindMode: boolean;
+	showStarredInUnreadFilter: boolean;
+	showFilePreviewsInUnreadFilter: boolean;
 	documentGraphShowExternalLinks: boolean;
 	documentGraphMaxNodes: number;
 	documentGraphPreviewCharLimit: number;
@@ -261,6 +264,7 @@ export interface SettingsStoreState {
 	wakatimeDetailedTracking: boolean;
 	useNativeTitleBar: boolean;
 	autoHideMenuBar: boolean;
+	moderatorStandingInstructions: string;
 }
 
 export interface SettingsStoreActions {
@@ -281,6 +285,8 @@ export interface SettingsStoreActions {
 	setCustomThemeBaseId: (value: ThemeId) => void;
 	setEnterToSendAI: (value: boolean) => void;
 	setEnterToSendTerminal: (value: boolean) => void;
+	setForcedParallelExecution: (value: boolean) => void;
+	setForcedParallelAcknowledged: (value: boolean) => void;
 	setDefaultSaveToHistory: (value: boolean) => void;
 	setDefaultShowThinking: (value: ThinkingMode) => void;
 	setLeftSidebarWidth: (value: number) => void;
@@ -310,6 +316,8 @@ export interface SettingsStoreActions {
 	setWebInterfaceUseCustomPort: (value: boolean) => void;
 	setWebInterfaceCustomPort: (value: number) => void;
 	setColorBlindMode: (value: boolean) => void;
+	setShowStarredInUnreadFilter: (value: boolean) => void;
+	setShowFilePreviewsInUnreadFilter: (value: boolean) => void;
 	setDocumentGraphShowExternalLinks: (value: boolean) => void;
 	setDocumentGraphMaxNodes: (value: number) => void;
 	setDocumentGraphPreviewCharLimit: (value: number) => void;
@@ -335,6 +343,7 @@ export interface SettingsStoreActions {
 	setWakatimeDetailedTracking: (value: boolean) => void;
 	setUseNativeTitleBar: (value: boolean) => void;
 	setAutoHideMenuBar: (value: boolean) => void;
+	setModeratorStandingInstructions: (value: string) => void;
 
 	// Async setters
 	setLogLevel: (value: string) => Promise<void>;
@@ -426,6 +435,8 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		customThemeBaseId: 'dracula',
 		enterToSendAI: false,
 		enterToSendTerminal: true,
+		forcedParallelExecution: false,
+		forcedParallelAcknowledged: false,
 		defaultSaveToHistory: true,
 		defaultShowThinking: 'off',
 		leftSidebarWidth: 256,
@@ -463,6 +474,8 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		contextManagementSettings: DEFAULT_CONTEXT_MANAGEMENT_SETTINGS,
 		keyboardMasteryStats: DEFAULT_KEYBOARD_MASTERY_STATS,
 		colorBlindMode: false,
+		showStarredInUnreadFilter: false,
+		showFilePreviewsInUnreadFilter: false,
 		documentGraphShowExternalLinks: false,
 		documentGraphMaxNodes: 50,
 		documentGraphPreviewCharLimit: 100,
@@ -489,6 +502,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		wakatimeDetailedTracking: false,
 		useNativeTitleBar: isWindowsPlatform(),
 		autoHideMenuBar: false,
+		moderatorStandingInstructions: '',
 
 		// ============================================================================
 		// Simple Setters
@@ -573,6 +587,16 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		setEnterToSendTerminal: (value) => {
 			set({ enterToSendTerminal: value });
 			window.maestro.settings.set('enterToSendTerminal', value);
+		},
+
+		setForcedParallelExecution: (value) => {
+			set({ forcedParallelExecution: value });
+			window.maestro.settings.set('forcedParallelExecution', value);
+		},
+
+		setForcedParallelAcknowledged: (value) => {
+			set({ forcedParallelAcknowledged: value });
+			window.maestro.settings.set('forcedParallelAcknowledged', value);
 		},
 
 		setDefaultSaveToHistory: (value) => {
@@ -722,7 +746,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 							try {
 								await window.maestro.live.clearPersistentToken();
 							} catch (clearError) {
-								// Expected: race condition cleanup - stale request may fail harmlessly
 								console.error('[Settings] Failed to clear stale persistent web link:', clearError);
 							}
 						}
@@ -737,7 +760,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 					if (requestSeq === persistentWebLinkRequestSeq) {
 						// Rollback optimistic update on hard failure
 						set({ persistentWebLink: false });
-						// Expected: network/IPC failure during web link toggle - rolled back above
 						console.error('[Settings] Failed to persist web link token:', error);
 					}
 				}
@@ -759,7 +781,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 					if (requestSeq === persistentWebLinkRequestSeq) {
 						// Clear failed — rollback Zustand to match main-side state
 						set({ persistentWebLink: true });
-						// Expected: network/IPC failure during web link toggle - rolled back above
 						console.error('[Settings] Failed to clear persistent web link:', error);
 					}
 					// else: stale — a newer call is in charge, nothing to do
@@ -784,6 +805,16 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		setColorBlindMode: (value) => {
 			set({ colorBlindMode: value });
 			window.maestro.settings.set('colorBlindMode', value);
+		},
+
+		setShowStarredInUnreadFilter: (value) => {
+			set({ showStarredInUnreadFilter: value });
+			window.maestro.settings.set('showStarredInUnreadFilter', value);
+		},
+
+		setShowFilePreviewsInUnreadFilter: (value) => {
+			set({ showFilePreviewsInUnreadFilter: value });
+			window.maestro.settings.set('showFilePreviewsInUnreadFilter', value);
 		},
 
 		setDocumentGraphShowExternalLinks: (value) => {
@@ -912,6 +943,12 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		setAutoHideMenuBar: (value) => {
 			set({ autoHideMenuBar: value });
 			window.maestro.settings.set('autoHideMenuBar', value);
+		},
+
+		setModeratorStandingInstructions: (value) => {
+			const trimmed = value.slice(0, 2000);
+			set({ moderatorStandingInstructions: trimmed });
+			window.maestro.settings.set('moderatorStandingInstructions', trimmed);
 		},
 
 		// ============================================================================
@@ -1471,6 +1508,11 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['enterToSendTerminal'] !== undefined)
 			patch.enterToSendTerminal = allSettings['enterToSendTerminal'] as boolean;
 
+		if (allSettings['forcedParallelExecution'] !== undefined)
+			patch.forcedParallelExecution = allSettings['forcedParallelExecution'] as boolean;
+		if (allSettings['forcedParallelAcknowledged'] !== undefined)
+			patch.forcedParallelAcknowledged = allSettings['forcedParallelAcknowledged'] as boolean;
+
 		if (allSettings['defaultSaveToHistory'] !== undefined)
 			patch.defaultSaveToHistory = allSettings['defaultSaveToHistory'] as boolean;
 
@@ -1709,6 +1751,14 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['colorBlindMode'] !== undefined)
 			patch.colorBlindMode = allSettings['colorBlindMode'] as boolean;
 
+		if (allSettings['showStarredInUnreadFilter'] !== undefined)
+			patch.showStarredInUnreadFilter = allSettings['showStarredInUnreadFilter'] as boolean;
+
+		if (allSettings['showFilePreviewsInUnreadFilter'] !== undefined)
+			patch.showFilePreviewsInUnreadFilter = allSettings[
+				'showFilePreviewsInUnreadFilter'
+			] as boolean;
+
 		// Document Graph settings (with validation)
 		if (allSettings['documentGraphShowExternalLinks'] !== undefined)
 			patch.documentGraphShowExternalLinks = allSettings[
@@ -1837,13 +1887,130 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['autoHideMenuBar'] !== undefined)
 			patch.autoHideMenuBar = allSettings['autoHideMenuBar'] as boolean;
 
+		if (allSettings['moderatorStandingInstructions'] !== undefined)
+			patch.moderatorStandingInstructions = allSettings['moderatorStandingInstructions'] as string;
+
 		// Apply the entire patch in one setState call
 		patch.settingsLoaded = true;
 		useSettingsStore.setState(patch);
 	} catch (error) {
 		console.error('[Settings] Failed to load settings:', error);
-		captureException(error, { extra: { operation: 'loadAllSettings' } });
 		// Mark settings as loaded even if there was an error (use defaults)
 		useSettingsStore.setState({ settingsLoaded: true });
 	}
+}
+
+// ============================================================================
+// Non-React Access
+// ============================================================================
+
+export function getSettingsState(): SettingsStoreState {
+	return useSettingsStore.getState();
+}
+
+export function getSettingsActions() {
+	const state = useSettingsStore.getState();
+	return {
+		setConductorProfile: state.setConductorProfile,
+		setLlmProvider: state.setLlmProvider,
+		setModelSlug: state.setModelSlug,
+		setApiKey: state.setApiKey,
+		setDefaultShell: state.setDefaultShell,
+		setCustomShellPath: state.setCustomShellPath,
+		setShellArgs: state.setShellArgs,
+		setShellEnvVars: state.setShellEnvVars,
+		setGhPath: state.setGhPath,
+		setFontFamily: state.setFontFamily,
+		setFontSize: state.setFontSize,
+		setActiveThemeId: state.setActiveThemeId,
+		setCustomThemeColors: state.setCustomThemeColors,
+		setCustomThemeBaseId: state.setCustomThemeBaseId,
+		setEnterToSendAI: state.setEnterToSendAI,
+		setEnterToSendTerminal: state.setEnterToSendTerminal,
+		setForcedParallelExecution: state.setForcedParallelExecution,
+		setForcedParallelAcknowledged: state.setForcedParallelAcknowledged,
+		setDefaultSaveToHistory: state.setDefaultSaveToHistory,
+		setDefaultShowThinking: state.setDefaultShowThinking,
+		setLeftSidebarWidth: state.setLeftSidebarWidth,
+		setRightPanelWidth: state.setRightPanelWidth,
+		setMarkdownEditMode: state.setMarkdownEditMode,
+		setChatRawTextMode: state.setChatRawTextMode,
+		setShowHiddenFiles: state.setShowHiddenFiles,
+		setFileExplorerIconTheme: state.setFileExplorerIconTheme,
+		setTerminalWidth: state.setTerminalWidth,
+		setLogLevel: state.setLogLevel,
+		setMaxLogBuffer: state.setMaxLogBuffer,
+		setMaxOutputLines: state.setMaxOutputLines,
+		setOsNotificationsEnabled: state.setOsNotificationsEnabled,
+		setAudioFeedbackEnabled: state.setAudioFeedbackEnabled,
+		setAudioFeedbackCommand: state.setAudioFeedbackCommand,
+		setToastDuration: state.setToastDuration,
+		setCheckForUpdatesOnStartup: state.setCheckForUpdatesOnStartup,
+		setEnableBetaUpdates: state.setEnableBetaUpdates,
+		setCrashReportingEnabled: state.setCrashReportingEnabled,
+		setLogViewerSelectedLevels: state.setLogViewerSelectedLevels,
+		setShortcuts: state.setShortcuts,
+		setTabShortcuts: state.setTabShortcuts,
+		setCustomAICommands: state.setCustomAICommands,
+		setTotalActiveTimeMs: state.setTotalActiveTimeMs,
+		addTotalActiveTimeMs: state.addTotalActiveTimeMs,
+		setAutoRunStats: state.setAutoRunStats,
+		recordAutoRunComplete: state.recordAutoRunComplete,
+		updateAutoRunProgress: state.updateAutoRunProgress,
+		acknowledgeBadge: state.acknowledgeBadge,
+		getUnacknowledgedBadgeLevel: state.getUnacknowledgedBadgeLevel,
+		setUsageStats: state.setUsageStats,
+		updateUsageStats: state.updateUsageStats,
+		setUngroupedCollapsed: state.setUngroupedCollapsed,
+		setTourCompleted: state.setTourCompleted,
+		setFirstAutoRunCompleted: state.setFirstAutoRunCompleted,
+		setOnboardingStats: state.setOnboardingStats,
+		recordWizardStart: state.recordWizardStart,
+		recordWizardComplete: state.recordWizardComplete,
+		recordWizardAbandon: state.recordWizardAbandon,
+		recordWizardResume: state.recordWizardResume,
+		recordTourStart: state.recordTourStart,
+		recordTourComplete: state.recordTourComplete,
+		recordTourSkip: state.recordTourSkip,
+		getOnboardingAnalytics: state.getOnboardingAnalytics,
+		setLeaderboardRegistration: state.setLeaderboardRegistration,
+		setPersistentWebLink: state.setPersistentWebLink,
+		setWebInterfaceUseCustomPort: state.setWebInterfaceUseCustomPort,
+		setWebInterfaceCustomPort: state.setWebInterfaceCustomPort,
+		setContextManagementSettings: state.setContextManagementSettings,
+		updateContextManagementSettings: state.updateContextManagementSettings,
+		setKeyboardMasteryStats: state.setKeyboardMasteryStats,
+		recordShortcutUsage: state.recordShortcutUsage,
+		acknowledgeKeyboardMasteryLevel: state.acknowledgeKeyboardMasteryLevel,
+		getUnacknowledgedKeyboardMasteryLevel: state.getUnacknowledgedKeyboardMasteryLevel,
+		setColorBlindMode: state.setColorBlindMode,
+		setShowStarredInUnreadFilter: state.setShowStarredInUnreadFilter,
+		setShowFilePreviewsInUnreadFilter: state.setShowFilePreviewsInUnreadFilter,
+		setDocumentGraphShowExternalLinks: state.setDocumentGraphShowExternalLinks,
+		setDocumentGraphMaxNodes: state.setDocumentGraphMaxNodes,
+		setDocumentGraphPreviewCharLimit: state.setDocumentGraphPreviewCharLimit,
+		setDocumentGraphLayoutType: state.setDocumentGraphLayoutType,
+		setStatsCollectionEnabled: state.setStatsCollectionEnabled,
+		setDefaultStatsTimeRange: state.setDefaultStatsTimeRange,
+		setPreventSleepEnabled: state.setPreventSleepEnabled,
+		setDisableGpuAcceleration: state.setDisableGpuAcceleration,
+		setDisableConfetti: state.setDisableConfetti,
+		setLocalIgnorePatterns: state.setLocalIgnorePatterns,
+		setLocalHonorGitignore: state.setLocalHonorGitignore,
+		setSshRemoteIgnorePatterns: state.setSshRemoteIgnorePatterns,
+		setSshRemoteHonorGitignore: state.setSshRemoteHonorGitignore,
+		setAutomaticTabNamingEnabled: state.setAutomaticTabNamingEnabled,
+		setFileTabAutoRefreshEnabled: state.setFileTabAutoRefreshEnabled,
+		setSuppressWindowsWarning: state.setSuppressWindowsWarning,
+		setAutoScrollAiMode: state.setAutoScrollAiMode,
+		setEncoreFeatures: state.setEncoreFeatures,
+		setSymphonyRegistryUrls: state.setSymphonyRegistryUrls,
+		setDirectorNotesSettings: state.setDirectorNotesSettings,
+		setWakatimeApiKey: state.setWakatimeApiKey,
+		setWakatimeEnabled: state.setWakatimeEnabled,
+		setWakatimeDetailedTracking: state.setWakatimeDetailedTracking,
+		setUseNativeTitleBar: state.setUseNativeTitleBar,
+		setAutoHideMenuBar: state.setAutoHideMenuBar,
+		setModeratorStandingInstructions: state.setModeratorStandingInstructions,
+	};
 }

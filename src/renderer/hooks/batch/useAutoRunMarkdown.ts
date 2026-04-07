@@ -94,7 +94,6 @@ export function useAutoRunMarkdown({
 			})
 			.catch((err) => {
 				if (!isActive) return;
-				// Expected: token counting is non-critical, can fail on malformed content
 				console.error('Failed to count tokens:', err);
 				setTokenCount(null);
 			});

@@ -8,7 +8,6 @@ import type { CueRunResult } from '../../hooks/useCue';
 import { CUE_COLOR } from '../../../shared/cue-pipeline-types';
 import { PipelineDot } from './StatusDot';
 import { formatElapsed, getPipelineForSubscription } from './cueModalUtils';
-import { GhostIconButton } from '../ui/GhostIconButton';
 
 interface ActiveRunsListProps {
 	runs: CueRunResult[];
@@ -53,13 +52,13 @@ export function ActiveRunsList({
 					className="flex items-center gap-3 px-3 py-2 rounded"
 					style={{ backgroundColor: theme.colors.bgActivity }}
 				>
-					<GhostIconButton
+					<button
 						onClick={() => onStopRun(run.runId)}
-						className="flex-shrink-0"
-						tooltip="Stop run"
+						className="flex-shrink-0 p-1 rounded hover:bg-white/10 transition-colors"
+						title="Stop run"
 					>
 						<Square className="w-3.5 h-3.5" style={{ color: theme.colors.error }} />
-					</GhostIconButton>
+					</button>
 					<div className="flex-1 min-w-0 flex items-center gap-1.5">
 						{(() => {
 							const pInfo = getPipelineForSubscription(

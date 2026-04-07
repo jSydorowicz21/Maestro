@@ -65,7 +65,7 @@ let reverseLinkIndexCache: CachedReverseLinkIndex | null = null;
 export function clearGraphDataCache(): void {
 	parsedFileCache.clear();
 	reverseLinkIndexCache = null;
-	console.debug('[DocumentGraph] Cache cleared');
+	console.log('[DocumentGraph] Cache cleared');
 }
 
 /**
@@ -77,7 +77,7 @@ export function invalidateCacheForFiles(filePaths: string[]): void {
 	}
 	// Invalidate reverse index since links may have changed
 	reverseLinkIndexCache = null;
-	console.debug(`[DocumentGraph] Invalidated cache for ${filePaths.length} file(s)`);
+	console.log(`[DocumentGraph] Invalidated cache for ${filePaths.length} file(s)`);
 }
 
 /**
@@ -399,7 +399,7 @@ export async function buildGraphData(options: BuildOptions): Promise<GraphData> 
 
 	const buildStart = perfMetrics.start();
 
-	console.debug('[DocumentGraph] Building graph from focus file (outgoing links only):', {
+	console.log('[DocumentGraph] Building graph from focus file (outgoing links only):', {
 		rootPath,
 		focusFile,
 		maxDepth,
@@ -410,7 +410,7 @@ export async function buildGraphData(options: BuildOptions): Promise<GraphData> 
 	// Step 0: Scan all markdown files upfront (fast - just directory traversal, no content parsing)
 	// This enables wiki-link resolution in the preview panel for files not yet loaded in the graph
 	const allMarkdownFiles = await scanMarkdownFiles(rootPath, onProgress, sshRemoteId);
-	console.debug(`[DocumentGraph] Found ${allMarkdownFiles.length} markdown files in ${rootPath}`);
+	console.log(`[DocumentGraph] Found ${allMarkdownFiles.length} markdown files in ${rootPath}`);
 
 	// Build parse options with file tree for fallback link resolution
 	const parseOptions: ParseMarkdownLinksOptions = { allFiles: allMarkdownFiles };
@@ -517,7 +517,7 @@ export async function buildGraphData(options: BuildOptions): Promise<GraphData> 
 	const parsedFiles = Array.from(parsedFileMap.values());
 	const loadedPaths = new Set(parsedFileMap.keys());
 
-	console.debug('[DocumentGraph] BFS traversal complete (outgoing only):', {
+	console.log('[DocumentGraph] BFS traversal complete (outgoing only):', {
 		focusFile,
 		filesLoaded: parsedFiles.length,
 		maxDepth,
@@ -648,7 +648,7 @@ export async function buildGraphData(options: BuildOptions): Promise<GraphData> 
 		let aborted = false;
 
 		const runScan = async () => {
-			console.debug('[DocumentGraph] Starting background backlink scan...');
+			console.log('[DocumentGraph] Starting background backlink scan...');
 			const scanStart = perfMetrics.start();
 
 			try {
@@ -656,7 +656,7 @@ export async function buildGraphData(options: BuildOptions): Promise<GraphData> 
 				const allFiles = await scanMarkdownFiles(rootPath, undefined, sshRemoteId);
 				const totalFiles = allFiles.length;
 
-				console.debug(`[DocumentGraph] Backlink scan: found ${totalFiles} markdown files to check`);
+				console.log(`[DocumentGraph] Backlink scan: found ${totalFiles} markdown files to check`);
 
 				// Track which new nodes/edges we discover
 				const newNodes: GraphNode[] = [];
@@ -669,7 +669,7 @@ export async function buildGraphData(options: BuildOptions): Promise<GraphData> 
 
 				for (const filePath of allFiles) {
 					if (aborted) {
-						console.debug('[DocumentGraph] Backlink scan aborted');
+						console.log('[DocumentGraph] Backlink scan aborted');
 						return;
 					}
 
@@ -766,7 +766,7 @@ export async function buildGraphData(options: BuildOptions): Promise<GraphData> 
 					newEdgesFound: newEdges.length,
 				});
 
-				console.debug(`[DocumentGraph] Backlink scan complete in ${scanTime.toFixed(0)}ms:`, {
+				console.log(`[DocumentGraph] Backlink scan complete in ${scanTime.toFixed(0)}ms:`, {
 					filesScanned,
 					newNodesFound: newNodes.length,
 					newEdgesFound: newEdges.length,
@@ -868,7 +868,7 @@ export interface ExpandNodeResult {
 export async function expandNode(options: ExpandNodeOptions): Promise<ExpandNodeResult> {
 	const { rootPath, filePath, loadedPaths, maxDepth = 1, sshRemoteId, allMarkdownFiles } = options;
 
-	console.debug('[DocumentGraph] Expanding node:', {
+	console.log('[DocumentGraph] Expanding node:', {
 		filePath,
 		loadedPaths: loadedPaths.size,
 		maxDepth,
@@ -1042,7 +1042,7 @@ export async function expandNode(options: ExpandNodeOptions): Promise<ExpandNode
 		});
 	}
 
-	console.debug('[DocumentGraph] Node expansion complete:', {
+	console.log('[DocumentGraph] Node expansion complete:', {
 		filePath,
 		newNodes: newNodes.length,
 		newEdges: newEdges.length,

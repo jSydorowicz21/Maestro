@@ -28,8 +28,11 @@ const mockProcess = {
 beforeEach(() => {
 	vi.clearAllMocks();
 
-	// Override window.maestro.process with local mocks (setup.ts provides base)
-	Object.assign(window.maestro.process, mockProcess);
+	// Ensure window.maestro.process is mocked
+	(window as any).maestro = {
+		...(window as any).maestro,
+		process: mockProcess,
+	};
 
 	// Mock console.error to prevent noise in test output
 	vi.spyOn(console, 'error').mockImplementation(() => {});

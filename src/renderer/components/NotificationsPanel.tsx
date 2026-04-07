@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, Volume2, Clock, Square, Check, AlertCircle } from 'lucide-react';
-import { Spinner } from './ui';
+import { Bell, Volume2, Clock, Square, Check, AlertCircle, Loader2 } from 'lucide-react';
 import type { Theme } from '../types';
 import { SettingCheckbox } from './SettingCheckbox';
 import { ToggleButtonGroup } from './ToggleButtonGroup';
@@ -64,7 +63,7 @@ export function NotificationsPanel({
 	return (
 		<div className="space-y-6">
 			{/* OS Notifications */}
-			<div>
+			<div data-setting-id="notifications-os">
 				<SettingCheckbox
 					icon={Bell}
 					sectionLabel="Operating System Notifications"
@@ -93,7 +92,7 @@ export function NotificationsPanel({
 			</div>
 
 			{/* Custom Notification */}
-			<div>
+			<div data-setting-id="notifications-custom">
 				<SettingCheckbox
 					icon={Volume2}
 					sectionLabel="Custom Notification"
@@ -193,7 +192,7 @@ export function NotificationsPanel({
 							>
 								{testStatus === 'running' ? (
 									<>
-										<Spinner size="xs" />
+										<Loader2 className="w-3 h-3 animate-spin" />
 										Running
 									</>
 								) : testStatus === 'success' ? (
@@ -266,7 +265,7 @@ export function NotificationsPanel({
 			</div>
 
 			{/* Toast Duration */}
-			<div>
+			<div data-setting-id="notifications-toast">
 				<label className="block text-xs font-bold opacity-70 uppercase mb-2 flex items-center gap-2">
 					<Clock className="w-3 h-3" />
 					Toast Notification Duration

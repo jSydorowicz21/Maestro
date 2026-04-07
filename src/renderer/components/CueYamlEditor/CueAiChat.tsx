@@ -4,8 +4,7 @@
  * Shows message history, streaming indicator, and input field.
  */
 
-import { Send } from 'lucide-react';
-import { Spinner } from '../ui';
+import { Loader2, Send } from 'lucide-react';
 import { CUE_COLOR } from '../../../shared/cue-pipeline-types';
 import type { Theme } from '../../types';
 import type { ChatMessage } from '../../hooks/cue/useCueAiChat';
@@ -69,7 +68,7 @@ export function CueAiChat({
 						style={{ color: theme.colors.textDim }}
 						data-testid="chat-busy-indicator"
 					>
-						<Spinner size="xs" />
+						<Loader2 className="w-3 h-3 animate-spin" />
 						Agent is working...
 					</div>
 				)}

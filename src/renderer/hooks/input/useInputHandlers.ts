@@ -15,8 +15,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo, useDeferredValue } from 'react';
 import type { Session, BatchRunState, QueuedItem, CustomAICommand } from '../../types';
-import { useSessionStore } from '../../stores/sessionStore';
-import { useActiveSession } from '../session/useActiveSession';
+import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useGroupChatStore } from '../../stores/groupChatStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -101,9 +100,11 @@ export interface UseInputHandlersReturn {
 	/** Set staged images for the current message */
 	setStagedImages: (images: string[] | ((prev: string[]) => string[])) => void;
 	/** Process and send the current input */
-	processInput: (text?: string) => void;
+	processInput: (text?: string, options?: { forceParallel?: boolean }) => void;
 	/** Ref to latest processInput for use in memoized callbacks */
-	processInputRef: React.MutableRefObject<(text?: string) => void>;
+	processInputRef: React.MutableRefObject<
+		(text?: string, options?: { forceParallel?: boolean }) => void
+	>;
 	/** Keyboard event handler for the input textarea */
 	handleInputKeyDown: (e: React.KeyboardEvent) => void;
 	/** Handler for input blur (persists input to session state) */
@@ -155,7 +156,7 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 	} = deps;
 
 	// --- Store subscriptions (reactive) ---
-	const activeSession = useActiveSession();
+	const activeSession = useSessionStore(selectActiveSession);
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
 	const setSessions = useMemo(() => useSessionStore.getState().setSessions, []);
 	const activeGroupChatId = useGroupChatStore((s) => s.activeGroupChatId);
@@ -422,7 +423,9 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 	});
 
 	// processInputRef — maintained for access in memoized callbacks without stale closures
-	const processInputRef = useRef<(text?: string) => void>(() => {});
+	const processInputRef = useRef<(text?: string, options?: { forceParallel?: boolean }) => void>(
+		() => {}
+	);
 	useEffect(() => {
 		processInputRef.current = processInput;
 	}, [processInput]);

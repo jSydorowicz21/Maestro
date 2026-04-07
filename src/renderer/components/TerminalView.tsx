@@ -8,7 +8,7 @@ import {
 	updateTerminalTabState,
 	updateTerminalTabPid,
 } from '../utils/terminalTabHelpers';
-import { useSessionStore, updateSessionWith } from '../stores/sessionStore';
+import { useSessionStore } from '../stores/sessionStore';
 import { useTabStore } from '../stores/tabStore';
 import { captureException } from '../utils/sentry';
 import { notifyToast } from '../stores/notificationStore';
@@ -151,7 +151,11 @@ export const TerminalView = memo(
 				// to sshRemoteId which is set after an AI agent connects. Without this fallback,
 				// terminal tabs under running SSH agents spawn locally instead of on the remote host.
 				const effectiveSshConfig = session.sessionSshRemoteConfig?.enabled
-					? session.sessionSshRemoteConfig
+					? {
+							...session.sessionSshRemoteConfig,
+							workingDirOverride:
+								session.sessionSshRemoteConfig.workingDirOverride || session.cwd || undefined,
+						}
 					: session.sshRemoteId
 						? {
 								enabled: true,
@@ -169,6 +173,8 @@ export const TerminalView = memo(
 						shell: defaultShell || undefined,
 						shellArgs,
 						shellEnvVars,
+						toolType: session.toolType,
+						sessionCustomEnvVars: session.customEnvVars,
 						sessionSshRemoteConfig: effectiveSshConfig,
 					})
 					.then((result) => {
@@ -375,6 +381,7 @@ export const TerminalView = memo(
 								theme={theme}
 								fontFamily={fontFamily}
 								fontSize={fontSize}
+								isActive={isActive}
 							/>
 						</div>
 					);
@@ -394,7 +401,13 @@ export const TerminalView = memo(
  */
 export function createTabStateChangeHandler(sessionId: string) {
 	return (tabId: string, state: TerminalTab['state'], exitCode?: number) => {
-		updateSessionWith(sessionId, (s) => updateTerminalTabState(s, tabId, state, exitCode));
+		useSessionStore
+			.getState()
+			.setSessions((prev) =>
+				prev.map((s) =>
+					s.id === sessionId ? updateTerminalTabState(s, tabId, state, exitCode) : s
+				)
+			);
 	};
 }
 
@@ -404,6 +417,10 @@ export function createTabStateChangeHandler(sessionId: string) {
  */
 export function createTabPidChangeHandler(sessionId: string) {
 	return (tabId: string, pid: number) => {
-		updateSessionWith(sessionId, (s) => updateTerminalTabPid(s, tabId, pid));
+		useSessionStore
+			.getState()
+			.setSessions((prev) =>
+				prev.map((s) => (s.id === sessionId ? updateTerminalTabPid(s, tabId, pid) : s))
+			);
 	};
 }

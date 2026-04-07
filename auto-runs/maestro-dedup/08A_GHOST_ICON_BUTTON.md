@@ -71,20 +71,20 @@ Replace 100+ instances of the ghost icon button pattern (`p-1 rounded hover:bg-w
 
 ### 6. Handle edge cases
 
-- [ ] Check for buttons with additional active state classes - add `active` prop if needed
-- [ ] Check for buttons with custom hover colors - accept via `className` prop
-- [ ] Verify disabled state looks correct on the component
+- [x] Check for buttons with additional active state classes - add `active` prop if needed - **No active-state classes found** on any GhostIconButton usage or remaining raw ghost patterns. No `active` prop needed.
+- [x] Check for buttons with custom hover colors - accept via `className` prop - **Already supported.** `className` prop is used extensively (e.g., `disabled:opacity-30`, `shrink-0`, `flex items-center gap-1`). 3 buttons with `hover:bg-red-500/20` (SessionList, ExecutionQueueBrowser) intentionally remain raw `<button>` elements since overriding the default `hover:bg-white/10` via className is unreliable in Tailwind.
+- [x] Verify disabled state looks correct on the component - **Works correctly.** `disabled` passes through via `...buttonProps`. 6+ files use it in production (AutoRunSearchBar, FilePreview, FilePreviewHeader, DocumentsPanel, SymphonyModal, UpdateCheckModal) with visual styles like `disabled:opacity-30` and `disabled:opacity-50` via className.
 
 ### 7. Verify full build
 
-- [ ] Run lint: `rtk npm run lint`
-- [ ] Run tests: `CI=1 rtk vitest run`
-- [ ] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
+- [x] Run lint: `rtk npm run lint` - **passes**
+- [x] Run tests: `CI=1 rtk vitest run` - **23,515 pass, 55 fail (all pre-existing baseline failures in pathUtils, cue, SSH remote ops, stats, AgentSessionsBrowser, TransferProgressModal, etc. - zero failures related to GhostIconButton or migrated files)**
+- [x] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit` - **both pass clean**
 
 ### 8. Count remaining raw patterns
 
-- [ ] Run: `rtk grep "p-1 rounded hover:bg-white/10" src/renderer/ --glob "*.tsx"` (exclude GhostIconButton)
-- [ ] Target: fewer than 5 remaining (edge cases only)
+- [x] Run: `rtk grep "p-1 rounded hover:bg-white/10" src/renderer/ --glob "*.tsx"` (exclude GhostIconButton) - **1 match: the doc comment in GhostIconButton.tsx itself. Zero `p-1.5` pattern matches.**
+- [x] Target: fewer than 5 remaining (edge cases only) - **Achieved: 0 raw patterns remain outside the component's own docstring**
 
 ---
 

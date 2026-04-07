@@ -13,12 +13,10 @@
  */
 
 import React, { memo, useState, useMemo, useCallback, useId } from 'react';
-import { EmptyState } from '../ui';
 import { format, parseISO } from 'date-fns';
 import type { Theme } from '../../types';
 import type { StatsTimeRange, StatsAggregation } from '../../hooks/stats/useStats';
 import { COLORBLIND_LINE_COLORS } from '../../constants/colorblindPalettes';
-import { formatElapsedTime as formatDuration } from '../../../shared/formatters';
 
 // Data point for the chart
 interface DataPoint {
@@ -58,6 +56,26 @@ function calculateMovingAverage(values: number[], windowSize: number): number[] 
 	}
 
 	return result;
+}
+
+/**
+ * Format duration in milliseconds to human-readable string
+ */
+function formatDuration(ms: number): string {
+	if (ms === 0) return '0s';
+
+	const totalSeconds = Math.floor(ms / 1000);
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+
+	if (hours > 0) {
+		return `${hours}h ${minutes}m`;
+	}
+	if (minutes > 0) {
+		return `${minutes}m ${seconds}s`;
+	}
+	return `${seconds}s`;
 }
 
 /**
@@ -319,8 +337,11 @@ export const DurationTrendsChart = memo(function DurationTrendsChart({
 			{/* Chart container */}
 			<div className="relative">
 				{chartData.length === 0 ? (
-					<div style={{ height: chartHeight }}>
-						<EmptyState theme={theme} className="h-full" message="No duration data available" />
+					<div
+						className="flex items-center justify-center"
+						style={{ height: chartHeight, color: theme.colors.textDim }}
+					>
+						<span className="text-sm">No duration data available</span>
 					</div>
 				) : (
 					<svg

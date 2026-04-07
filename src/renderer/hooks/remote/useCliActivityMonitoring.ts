@@ -1,10 +1,13 @@
 import { useEffect } from 'react';
-import { useSessionStore } from '../../stores/sessionStore';
+import { Session } from '../../types';
 
 /**
  * Dependencies for the useCliActivityMonitoring hook.
  */
-export interface UseCliActivityMonitoringDeps {}
+export interface UseCliActivityMonitoringDeps {
+	/** Function to update sessions state */
+	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
+}
 
 /**
  * Return type for useCliActivityMonitoring hook.
@@ -30,6 +33,8 @@ export interface UseCliActivityMonitoringReturn {
 export function useCliActivityMonitoring(
 	deps: UseCliActivityMonitoringDeps
 ): UseCliActivityMonitoringReturn {
+	const { setSessions } = deps;
+
 	// Listen for CLI activity changes (when CLI is running playbooks)
 	// Update session states to show busy when CLI is active
 	useEffect(() => {
@@ -42,7 +47,7 @@ export function useCliActivityMonitoring(
 			try {
 				const activities = await window.maestro.cli.getActivity();
 				if (!Array.isArray(activities)) return;
-				useSessionStore.getState().setSessions((prev) =>
+				setSessions((prev) =>
 					prev.map((session) => {
 						const cliActivity = activities.find((a) => a.sessionId === session.id);
 						if (cliActivity) {
@@ -73,7 +78,6 @@ export function useCliActivityMonitoring(
 					})
 				);
 			} catch (error) {
-				// Expected: CLI activity polling can fail transiently
 				console.error('[CLI Activity] Error checking activity:', error);
 			}
 		};
@@ -86,7 +90,7 @@ export function useCliActivityMonitoring(
 			checkCliActivity();
 		});
 		return unsubscribe;
-	}, []);
+	}, [setSessions]);
 
 	return {};
 }

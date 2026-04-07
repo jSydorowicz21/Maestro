@@ -39,50 +39,50 @@ Verification: `tsc --noEmit` passes for both `tsconfig.lint.json` and `tsconfig.
 
 ### Task 1: Inventory all AgentCapabilities definitions
 
-- [ ] Find all interface definitions: `rtk grep "interface AgentCapabilities" src/ --glob "*.{ts,tsx}"`
-- [ ] Find all type alias definitions: `rtk grep "type AgentCapabilities" src/ --glob "*.{ts,tsx}"`
-- [ ] Document each location and its fields (expect 6 definitions in: `shared/types.ts`, `main/agents/capabilities.ts`, `renderer/global.d.ts` line ~61, `renderer/global.d.ts` line ~104 (BUG), `renderer/types/index.ts`, `main/preload.ts`)
+- [x] Find all interface definitions: `rtk grep "interface AgentCapabilities" src/ --glob "*.{ts,tsx}"`
+- [x] Find all type alias definitions: `rtk grep "type AgentCapabilities" src/ --glob "*.{ts,tsx}"`
+- [x] Document each location and its fields (expect 6 definitions in: `shared/types.ts`, `main/agents/capabilities.ts`, `renderer/global.d.ts` line ~61, `renderer/global.d.ts` line ~104 (BUG), `renderer/types/index.ts`, `main/preload.ts`)
 
 ### Task 2: Compare all definitions for field differences
 
-- [ ] Read each definition and list its fields
-- [ ] Identify any fields present in one definition but missing from others
-- [ ] Identify any optional vs required mismatches
-- [ ] The canonical version must be a superset of all fields used anywhere
+- [x] Read each definition and list its fields
+- [x] Identify any fields present in one definition but missing from others
+- [x] Identify any optional vs required mismatches
+- [x] The canonical version must be a superset of all fields used anywhere
 
 ### Task 3: Establish canonical definition
 
-- [ ] Ensure `src/shared/types.ts` contains the canonical `AgentCapabilities` with ALL fields from every definition
-- [ ] If any definition has unique fields, add them to the canonical version
+- [x] Ensure `src/shared/types.ts` contains the canonical `AgentCapabilities` with ALL fields from every definition
+- [x] If any definition has unique fields, add them to the canonical version
 
 ### Task 4: Fix the double-definition in global.d.ts
 
-- [ ] Open `src/renderer/global.d.ts`
-- [ ] Remove the duplicate `AgentCapabilities` at line ~104
-- [ ] Remove or replace the definition at line ~61 with an `import()` type alias referencing `src/shared/types.ts`
+- [x] Open `src/renderer/global.d.ts`
+- [x] Remove the duplicate `AgentCapabilities` at line ~104
+- [x] Remove or replace the definition at line ~61 with an `import()` type alias referencing `src/shared/types.ts`
 
 ### Task 5: Remove redundant definitions
 
-- [ ] Remove local `AgentCapabilities` from `src/main/agents/capabilities.ts`, replace with import from `src/shared/types.ts`
-- [ ] Remove local `AgentCapabilities` from `src/renderer/types/index.ts`, replace with re-export from `src/shared/types.ts`
-- [ ] Remove local `AgentCapabilities` from `src/main/preload.ts`, replace with import from `src/shared/types.ts`
-- [ ] Also consolidate any duplicate `DEFAULT_CAPABILITIES` constants to `src/shared/types.ts`
+- [x] Remove local `AgentCapabilities` from `src/main/agents/capabilities.ts`, replace with import from `src/shared/types.ts`
+- [x] Remove local `AgentCapabilities` from `src/renderer/types/index.ts`, replace with re-export from `src/shared/types.ts`
+- [x] Remove local `AgentCapabilities` from `src/main/preload.ts`, replace with import from `src/shared/types.ts`
+- [x] Also consolidate any duplicate `DEFAULT_CAPABILITIES` constants to `src/shared/types.ts`
 
 ### Task 6: Update imports across the codebase
 
-- [ ] Find all imports: `rtk grep "AgentCapabilities" src/ --glob "*.{ts,tsx}" | rtk grep "import"`
-- [ ] Update each file to import from `src/shared/types.ts` (or `src/renderer/types/index.ts` re-export for renderer files)
+- [x] Find all imports: `rtk grep "AgentCapabilities" src/ --glob "*.{ts,tsx}" | rtk grep "import"`
+- [x] Update each file to import from `src/shared/types.ts` (or `src/renderer/types/index.ts` re-export for renderer files)
 
 ### Task 7: Verify no type mismatches
 
-- [ ] Run type checking: `rtk tsc -p tsconfig.lint.json --noEmit && rtk tsc -p tsconfig.main.json --noEmit`
-- [ ] Fix any type errors that arise from field mismatches
+- [x] Run type checking: `rtk tsc -p tsconfig.lint.json --noEmit && rtk tsc -p tsconfig.main.json --noEmit`
+- [x] Fix any type errors that arise from field mismatches
 
 ### Task 8: Run tests
 
-- [ ] Find related test files: `rtk grep "AgentCapabilities\|DEFAULT_CAPABILITIES" src/__tests__/ --glob "*.test.{ts,tsx}" -l`
-- [ ] Run related tests: `rtk vitest run <related-test-files>`
-- [ ] Confirm zero new test failures from your changes
+- [x] Find related test files: `rtk grep "AgentCapabilities\|DEFAULT_CAPABILITIES" src/__tests__/ --glob "*.test.{ts,tsx}" -l`
+- [x] Run related tests: `CI=1 rtk vitest run <related-test-files>`
+- [x] Confirm zero new test failures from your changes
 
 ---
 
@@ -91,7 +91,7 @@ Verification: `tsc --noEmit` passes for both `tsconfig.lint.json` and `tsconfig.
 After completing changes, run targeted tests for the files you modified:
 
 ```bash
-rtk vitest run <path-to-relevant-test-files>
+CI=1 rtk vitest run <path-to-relevant-test-files>
 ```
 
 **Rule: Zero new test failures from your changes.** Pre-existing failures on the baseline are acceptable. If a test you didn't touch starts failing, investigate whether your refactoring broke it. If your change removed code that a test depended on, update that test.
@@ -117,4 +117,4 @@ rtk tsc -p tsconfig.lint.json --noEmit
 - The double-definition in `global.d.ts` is fixed
 - All imports point to canonical source
 - `rtk npm run lint` passes (no type errors)
-- `rtk vitest run` passes
+- `CI=1 rtk vitest run` passes

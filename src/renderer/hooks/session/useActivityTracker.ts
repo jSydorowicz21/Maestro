@@ -1,7 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
+import type { Session } from '../../types';
 import { subscribeToActivity } from '../../utils/activityBus';
-import { updateSessionWith } from '../../stores/sessionStore';
-import { useEventListener } from '../utils/useEventListener';
 
 const ACTIVITY_TIMEOUT_MS = 60000; // 1 minute of inactivity = idle
 const TICK_INTERVAL_MS = 1000; // Update every second
@@ -23,15 +22,20 @@ export interface UseActivityTrackerReturn {
  * CPU optimization: The interval stops after 60s of inactivity and restarts
  * when user activity is detected. This means zero CPU usage when truly idle.
  */
-export function useActivityTracker(activeSessionId: string | null): UseActivityTrackerReturn {
+export function useActivityTracker(
+	activeSessionId: string | null,
+	setSessions: React.Dispatch<React.SetStateAction<Session[]>>
+): UseActivityTrackerReturn {
 	const lastActivityRef = useRef<number>(Date.now());
 	const isActiveRef = useRef<boolean>(false);
 	const accumulatedTimeRef = useRef<number>(0);
 	const lastBatchUpdateRef = useRef<number>(Date.now());
 	const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+	const setSessionsRef = useRef(setSessions);
 	const activeSessionIdRef = useRef(activeSessionId);
 
 	// Keep refs in sync
+	setSessionsRef.current = setSessions;
 	activeSessionIdRef.current = activeSessionId;
 
 	const startInterval = useCallback(() => {
@@ -52,10 +56,17 @@ export function useActivityTracker(activeSessionId: string | null): UseActivityT
 						accumulatedTimeRef.current = 0;
 						lastBatchUpdateRef.current = now;
 
-						updateSessionWith(activeSessionIdRef.current, (session) => ({
-							...session,
-							activeTimeMs: (session.activeTimeMs || 0) + accumulatedTime,
-						}));
+						setSessionsRef.current((prev) =>
+							prev.map((session) => {
+								if (session.id === activeSessionIdRef.current) {
+									return {
+										...session,
+										activeTimeMs: (session.activeTimeMs || 0) + accumulatedTime,
+									};
+								}
+								return session;
+							})
+						);
 					}
 				} else {
 					// Mark as inactive and stop the interval to save CPU
@@ -77,18 +88,22 @@ export function useActivityTracker(activeSessionId: string | null): UseActivityT
 	}, []);
 
 	// Handle visibility changes
-	useEventListener(
-		'visibilitychange',
-		() => {
+	useEffect(() => {
+		const handleVisibilityChange = () => {
 			if (document.hidden) {
 				stopInterval();
 			} else if (isActiveRef.current) {
 				// Only restart if user was active
 				startInterval();
 			}
-		},
-		document
-	);
+		};
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+		};
+	}, [startInterval, stopInterval]);
 
 	// Cleanup on unmount or session change
 	useEffect(() => {
@@ -101,10 +116,17 @@ export function useActivityTracker(activeSessionId: string | null): UseActivityT
 			if (accumulatedTimeRef.current > 0 && sessionIdAtMount) {
 				const accumulatedTime = accumulatedTimeRef.current;
 				accumulatedTimeRef.current = 0;
-				updateSessionWith(sessionIdAtMount, (session) => ({
-					...session,
-					activeTimeMs: (session.activeTimeMs || 0) + accumulatedTime,
-				}));
+				setSessionsRef.current((prev) =>
+					prev.map((session) => {
+						if (session.id === sessionIdAtMount) {
+							return {
+								...session,
+								activeTimeMs: (session.activeTimeMs || 0) + accumulatedTime,
+							};
+						}
+						return session;
+					})
+				);
 			}
 		};
 	}, [activeSessionId, stopInterval]);

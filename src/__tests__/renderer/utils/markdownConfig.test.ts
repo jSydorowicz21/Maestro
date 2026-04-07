@@ -21,7 +21,6 @@ import {
 	REMARK_GFM_PLUGINS,
 } from '../../../renderer/utils/markdownConfig';
 import type { Theme } from '../../../shared/theme-types';
-import { mockTheme } from '../../helpers/mockTheme';
 
 /**
  * Tests for markdown configuration utilities.
@@ -36,6 +35,28 @@ import { mockTheme } from '../../helpers/mockTheme';
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
+
+const mockTheme: Theme = {
+	id: 'dracula',
+	name: 'Dracula',
+	mode: 'dark',
+	colors: {
+		textMain: '#ffffff',
+		textDim: '#888888',
+		accent: '#0066ff',
+		accentDim: 'rgba(0, 102, 255, 0.2)',
+		accentText: '#0066ff',
+		accentForeground: '#ffffff',
+		success: '#00cc00',
+		warning: '#ffaa00',
+		error: '#ff0000',
+		bgMain: '#1a1a1a',
+		bgSidebar: '#2a2a2a',
+		bgActivity: '#333333',
+		border: '#444444',
+	},
+};
+
 // ---------------------------------------------------------------------------
 // generateProseStyles
 // ---------------------------------------------------------------------------
@@ -762,6 +783,21 @@ describe('createMarkdownComponents link handling', () => {
 			const clickEvent = { preventDefault: vi.fn() } as any;
 			element.props.onClick(clickEvent);
 			expect(onExternalLinkClick).not.toHaveBeenCalled();
+		}
+	});
+
+	it('should forward id and other props through heading components (rehype-slug support)', () => {
+		const components = createMarkdownComponents({
+			theme: mockTheme,
+			searchHighlight: { query: '', currentMatchIndex: 0 },
+		});
+
+		// rehype-slug adds an id prop to headings; the component overrides must forward it
+		for (const tag of ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const) {
+			const Component = components[tag] as any;
+			expect(Component).toBeDefined();
+			const element = Component({ node: null, id: 'my-heading', children: 'Title' });
+			expect(element.props.id).toBe('my-heading');
 		}
 	});
 

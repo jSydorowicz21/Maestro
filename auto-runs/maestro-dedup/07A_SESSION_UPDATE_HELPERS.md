@@ -104,9 +104,9 @@ updateAiTab(sessionId, tabId, (tab) => ({ ...tab, someField: newValue }));
 
 ### 8. Verify reduction in duplication
 
-- [ ] Count remaining setSessions: `rtk grep "setSessions" src/ --glob "*.{ts,tsx}" | wc -l` (exclude `__tests__` and `sessionStore`)
-- [ ] Count remaining aiTabs.map: `rtk grep "aiTabs\.map" src/ --glob "*.{ts,tsx}" | wc -l` (exclude `__tests__` and `sessionStore`)
-- [ ] Both counts should be significantly reduced from baseline
+- [x] Count remaining setSessions: `rtk grep "setSessions" src/ --glob "*.{ts,tsx}" | wc -l` (exclude `__tests__` and `sessionStore`) - **155 occurrences across 30 files** (renderer: 125 in 26 files, web: 30 in 4 files). Baseline was 378+ in 5+-occurrence renderer files alone across 68+ total files. **~67% reduction** in tracked files. 14 files fully eliminated from `setSessions` (useInputProcessing, useRemoteIntegration, FileExplorerPanel, useAppHandlers, useMergeTransferHandlers, useMainKeyboardHandler, AppModals, useFileExplorerEffects, RightPanel, useGroupManagement, useInputSync, useActivityTracker, useAgentSessionManagement, useModalHandlers).
+- [x] Count remaining aiTabs.map: `rtk grep "aiTabs\.map" src/ --glob "*.{ts,tsx}" | wc -l` (exclude `__tests__` and `sessionStore`) - **45 occurrences across 16 files**. Baseline was 82 across 25 files. **45% reduction** (37 calls eliminated). 8 files fully eliminated (useWizardHandlers removed 12, useMainKeyboardHandler 3, usePromptComposerHandlers 3, useQuickActionsHandlers 2, App.tsx 1, useInputSync 1, useModalHandlers 1, useMergeSession 1). Remaining 45 intentionally kept inline: complex multi-tab/batch/queue patterns where standalone helpers would break atomicity or readability.
+- [x] Both counts should be significantly reduced from baseline - Confirmed: setSessions down ~67%, aiTabs.map down 45%. Remaining inline calls are justified (complex multi-tab updates, batch atomicity, web/useState incompatibility).
 
 ---
 

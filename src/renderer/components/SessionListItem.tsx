@@ -28,7 +28,6 @@ import {
 } from 'lucide-react';
 import type { Theme } from '../types';
 import { formatSize, formatRelativeTime } from '../utils/formatters';
-import { GhostIconButton } from './ui/GhostIconButton';
 import type { ClaudeSession } from '../hooks';
 
 /**
@@ -137,14 +136,13 @@ export function SessionListItem({
 			</button>
 
 			{/* Quick Resume button */}
-			<GhostIconButton
+			<button
 				onClick={(e) => onQuickResume(session, e)}
-				showOnHover
-				className="shrink-0"
-				tooltip="Resume session in new tab"
+				className="p-1 rounded hover:bg-white/10 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+				title="Resume session in new tab"
 			>
 				<Play className="w-4 h-4" style={{ color: theme.colors.success }} />
-			</GhostIconButton>
+			</button>
 
 			<div className="flex-1 min-w-0">
 				{/* Session name row - inline rename input or display */}
@@ -219,7 +217,10 @@ export function SessionListItem({
 					{session.origin === 'user' && (
 						<span
 							className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-							style={{ backgroundColor: theme.colors.accent + '30', color: theme.colors.accent }}
+							style={{
+								backgroundColor: theme.colors.accent + '40',
+								color: theme.colors.accentText,
+							}}
 							title="User-initiated through Maestro"
 						>
 							MAESTRO
@@ -228,7 +229,7 @@ export function SessionListItem({
 					{session.origin === 'auto' && (
 						<span
 							className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-							style={{ backgroundColor: theme.colors.warning + '30', color: theme.colors.warning }}
+							style={{ backgroundColor: theme.colors.warning + '40', color: theme.colors.warning }}
 							title="Auto-run session"
 						>
 							AUTO
@@ -237,7 +238,7 @@ export function SessionListItem({
 					{!session.origin && (
 						<span
 							className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-							style={{ backgroundColor: theme.colors.border, color: theme.colors.textDim }}
+							style={{ backgroundColor: theme.colors.border, color: theme.colors.textMain }}
 							title="Claude Code CLI session"
 						>
 							CLI
@@ -247,7 +248,7 @@ export function SessionListItem({
 					{/* Session ID pill */}
 					<span
 						className="text-[10px] font-mono px-1.5 py-0.5 rounded"
-						style={{ backgroundColor: theme.colors.border + '60', color: theme.colors.textDim }}
+						style={{ backgroundColor: theme.colors.border, color: theme.colors.textMain }}
 					>
 						{session.sessionId.startsWith('agent-')
 							? `AGENT-${session.sessionId.split('-')[1]?.toUpperCase() || ''}`
@@ -283,7 +284,10 @@ export function SessionListItem({
 					{searchResultInfo && searchResultInfo.matchCount > 0 && searchMode !== 'title' && (
 						<span
 							className="flex items-center gap-1 px-1.5 py-0.5 rounded"
-							style={{ backgroundColor: theme.colors.accent + '20', color: theme.colors.accent }}
+							style={{
+								backgroundColor: theme.colors.accent + '30',
+								color: theme.colors.accentText,
+							}}
 						>
 							<Search className="w-3 h-3" />
 							{searchResultInfo.matchCount}

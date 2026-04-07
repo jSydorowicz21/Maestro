@@ -33,8 +33,12 @@ export interface OpenSpecCommandDefinition {
 	isCustom: boolean;
 }
 
-import type { OpenSpecMetadata } from '../../main/openspec-manager';
-export type { OpenSpecMetadata };
+export interface OpenSpecMetadata {
+	lastRefreshed: string;
+	commitSha: string;
+	sourceVersion: string;
+	sourceUrl: string;
+}
 
 /**
  * All bundled OpenSpec commands

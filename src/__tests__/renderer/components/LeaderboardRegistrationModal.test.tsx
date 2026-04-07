@@ -17,7 +17,6 @@ vi.mock('../../../renderer/contexts/LayerStackContext', () => ({
 	useLayerStack: () => ({
 		registerLayer: mockRegisterLayer,
 		unregisterLayer: mockUnregisterLayer,
-		updateLayerHandler: vi.fn(),
 	}),
 }));
 

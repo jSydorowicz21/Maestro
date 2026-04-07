@@ -19,7 +19,32 @@ import {
 	cssVar,
 	type ThemeCSSProperty,
 } from '../../../web/utils/cssCustomProperties';
-import { createMockTheme } from '../../helpers/mockTheme';
+
+// Helper function to create a mock theme
+function createMockTheme(overrides?: Partial<Theme>): Theme {
+	return {
+		id: 'dracula',
+		name: 'Dracula',
+		mode: 'dark',
+		colors: {
+			bgMain: '#282a36',
+			bgSidebar: '#21222c',
+			bgActivity: '#44475a',
+			border: '#6272a4',
+			textMain: '#f8f8f2',
+			textDim: '#6272a4',
+			accent: '#bd93f9',
+			accentDim: 'rgba(189, 147, 249, 0.3)',
+			accentText: '#bd93f9',
+			accentForeground: '#282a36',
+			success: '#50fa7b',
+			warning: '#ffb86c',
+			error: '#ff5555',
+		},
+		...overrides,
+	};
+}
+
 // Helper function to create a light theme
 function createLightTheme(): Theme {
 	return {
@@ -90,18 +115,18 @@ describe('cssCustomProperties', () => {
 			const theme = createMockTheme();
 			const properties = generateCSSProperties(theme);
 
-			expect(properties['--maestro-bg-main']).toBe(theme.colors.bgMain);
-			expect(properties['--maestro-bg-sidebar']).toBe(theme.colors.bgSidebar);
-			expect(properties['--maestro-bg-activity']).toBe(theme.colors.bgActivity);
-			expect(properties['--maestro-border']).toBe(theme.colors.border);
-			expect(properties['--maestro-text-main']).toBe(theme.colors.textMain);
-			expect(properties['--maestro-text-dim']).toBe(theme.colors.textDim);
-			expect(properties['--maestro-accent']).toBe(theme.colors.accent);
-			expect(properties['--maestro-accent-dim']).toBe(theme.colors.accentDim);
-			expect(properties['--maestro-accent-text']).toBe(theme.colors.accentText);
-			expect(properties['--maestro-success']).toBe(theme.colors.success);
-			expect(properties['--maestro-warning']).toBe(theme.colors.warning);
-			expect(properties['--maestro-error']).toBe(theme.colors.error);
+			expect(properties['--maestro-bg-main']).toBe('#282a36');
+			expect(properties['--maestro-bg-sidebar']).toBe('#21222c');
+			expect(properties['--maestro-bg-activity']).toBe('#44475a');
+			expect(properties['--maestro-border']).toBe('#6272a4');
+			expect(properties['--maestro-text-main']).toBe('#f8f8f2');
+			expect(properties['--maestro-text-dim']).toBe('#6272a4');
+			expect(properties['--maestro-accent']).toBe('#bd93f9');
+			expect(properties['--maestro-accent-dim']).toBe('rgba(189, 147, 249, 0.3)');
+			expect(properties['--maestro-accent-text']).toBe('#bd93f9');
+			expect(properties['--maestro-success']).toBe('#50fa7b');
+			expect(properties['--maestro-warning']).toBe('#ffb86c');
+			expect(properties['--maestro-error']).toBe('#ff5555');
 			expect(properties['--maestro-mode']).toBe('dark');
 		});
 
@@ -174,7 +199,7 @@ describe('cssCustomProperties', () => {
 
 			expect(cssString).toMatch(/^:root \{/);
 			expect(cssString).toMatch(/\}$/);
-			expect(cssString).toContain(`--maestro-bg-main: ${theme.colors.bgMain};`);
+			expect(cssString).toContain('--maestro-bg-main: #282a36;');
 			expect(cssString).toContain('--maestro-mode: dark;');
 		});
 
@@ -289,7 +314,7 @@ describe('cssCustomProperties', () => {
 
 			styleElement = document.getElementById('maestro-theme-css-properties') as HTMLStyleElement;
 			expect(styleElement.textContent).toContain('--maestro-bg-main');
-			expect(styleElement.textContent).toContain(theme.colors.bgMain);
+			expect(styleElement.textContent).toContain('#282a36');
 		});
 
 		it('should update existing style element instead of creating duplicate', () => {
@@ -309,7 +334,7 @@ describe('cssCustomProperties', () => {
 			// Content should be updated
 			styleElement = document.getElementById('maestro-theme-css-properties') as HTMLStyleElement;
 			expect(styleElement.textContent).toContain('#ffffff');
-			expect(styleElement.textContent).not.toContain(darkTheme.colors.bgMain);
+			expect(styleElement.textContent).not.toContain('#282a36');
 		});
 
 		it('should inject CSS properties from light theme', () => {
@@ -407,8 +432,8 @@ describe('cssCustomProperties', () => {
 			const theme = createMockTheme();
 			setElementCSSProperties(element, theme);
 
-			expect(element.style.getPropertyValue('--maestro-bg-main')).toBe(theme.colors.bgMain);
-			expect(element.style.getPropertyValue('--maestro-bg-sidebar')).toBe(theme.colors.bgSidebar);
+			expect(element.style.getPropertyValue('--maestro-bg-main')).toBe('#282a36');
+			expect(element.style.getPropertyValue('--maestro-bg-sidebar')).toBe('#21222c');
 			expect(element.style.getPropertyValue('--maestro-mode')).toBe('dark');
 		});
 
@@ -430,7 +455,7 @@ describe('cssCustomProperties', () => {
 			const lightTheme = createLightTheme();
 
 			setElementCSSProperties(element, darkTheme);
-			expect(element.style.getPropertyValue('--maestro-bg-main')).toBe(darkTheme.colors.bgMain);
+			expect(element.style.getPropertyValue('--maestro-bg-main')).toBe('#282a36');
 
 			setElementCSSProperties(element, lightTheme);
 			expect(element.style.getPropertyValue('--maestro-bg-main')).toBe('#ffffff');
@@ -445,7 +470,7 @@ describe('cssCustomProperties', () => {
 			const theme = createMockTheme();
 			setElementCSSProperties(childElement, theme);
 
-			expect(childElement.style.getPropertyValue('--maestro-accent')).toBe(theme.colors.accent);
+			expect(childElement.style.getPropertyValue('--maestro-accent')).toBe('#bd93f9');
 
 			parentElement.remove();
 		});
@@ -469,9 +494,7 @@ describe('cssCustomProperties', () => {
 
 		it('should remove all CSS custom properties from element', () => {
 			// Verify properties are set
-			expect(element.style.getPropertyValue('--maestro-bg-main')).toBe(
-				createMockTheme().colors.bgMain
-			);
+			expect(element.style.getPropertyValue('--maestro-bg-main')).toBe('#282a36');
 
 			removeElementCSSProperties(element);
 
@@ -675,7 +698,7 @@ describe('cssCustomProperties', () => {
 			// Verify injection
 			const styleElement = document.getElementById('maestro-theme-css-properties');
 			expect(styleElement).not.toBeNull();
-			expect(styleElement?.textContent).toContain(`--maestro-bg-main: ${theme.colors.bgMain};`);
+			expect(styleElement?.textContent).toContain('--maestro-bg-main: #282a36;');
 
 			// Clean up
 			removeCSSProperties();
@@ -808,7 +831,7 @@ describe('cssCustomProperties', () => {
 
 			// Verify all elements have properties
 			elements.forEach((el) => {
-				expect(el.style.getPropertyValue('--maestro-bg-main')).toBe(theme.colors.bgMain);
+				expect(el.style.getPropertyValue('--maestro-bg-main')).toBe('#282a36');
 			});
 
 			// Clean up

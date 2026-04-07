@@ -11,8 +11,7 @@
  */
 
 import { useEffect, useCallback } from 'react';
-import { useSessionStore } from '../../stores/sessionStore';
-import { useActiveSession } from '../session/useActiveSession';
+import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
 import { useBatchStore } from '../../stores/batchStore';
 
 // ============================================================================
@@ -34,7 +33,7 @@ export interface UseAutoRunDocumentLoaderReturn {
 
 export function useAutoRunDocumentLoader(): UseAutoRunDocumentLoaderReturn {
 	// --- Reactive subscriptions ---
-	const activeSession = useActiveSession();
+	const activeSession = useSessionStore(selectActiveSession);
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
 
 	// --- Store actions (stable via getState) ---

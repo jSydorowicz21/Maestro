@@ -6,8 +6,6 @@ import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { FIXED_SHORTCUTS } from '../constants/shortcuts';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import { Modal } from './ui/Modal';
-import { GhostIconButton } from './ui/GhostIconButton';
-import { EmptyState } from './ui';
 import { KEYBOARD_MASTERY_LEVELS, getLevelForPercentage } from '../constants/keyboardMastery';
 
 interface ShortcutsHelpModalProps {
@@ -73,9 +71,13 @@ export function ShortcutsHelpModal({
 						{searchQuery ? `${filteredCount} / ${totalShortcuts}` : totalShortcuts}
 					</span>
 				</div>
-				<GhostIconButton onClick={onClose} style={{ color: theme.colors.textDim }}>
+				<button
+					onClick={onClose}
+					className="p-1 rounded hover:bg-white/10 transition-colors"
+					style={{ color: theme.colors.textDim }}
+				>
 					<X className="w-4 h-4" />
-				</GhostIconButton>
+				</button>
 			</div>
 
 			{hasNoAgents && (
@@ -204,7 +206,9 @@ export function ShortcutsHelpModal({
 					);
 				})}
 				{filteredCount === 0 && (
-					<EmptyState theme={theme} message="No shortcuts found" className="opacity-50" />
+					<div className="text-center text-sm opacity-50" style={{ color: theme.colors.textDim }}>
+						No shortcuts found
+					</div>
 				)}
 			</div>
 		</Modal>

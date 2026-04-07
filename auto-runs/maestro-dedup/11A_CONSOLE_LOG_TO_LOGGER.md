@@ -77,14 +77,18 @@ Replace 130+ `console.log` calls in the group chat router (and 26 in group-chat-
 
 ### 6. Verify full build
 
-- [ ] Run lint: `rtk npm run lint`
-- [ ] Run tests: `CI=1 rtk vitest run`
-- [ ] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
+- [x] Run lint: `rtk npm run lint`
+  - Lint passes cleanly.
+- [x] Run tests: `CI=1 rtk vitest run`
+  - 23,659 pass, 55 fail. All 55 failures are pre-existing Windows platform issues (pathUtils Unix tests, cue-executor path separators, cue-yaml-loader) - none related to logging migration. All 113 tests for modified files pass with 0 failures.
+- [x] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
+  - Both configs compile cleanly.
 
 ### 7. Count remaining raw console.log in group chat
 
-- [ ] Run: `rtk grep "console\.log" src/main/group-chat/ --glob "*.ts"`
-- [ ] Target: 0 remaining
+- [x] Run: `rtk grep "console\.log" src/main/group-chat/ --glob "*.ts"`
+- [x] Target: 0 remaining
+  - Found 8 remaining `console.log` calls in `group-chat-moderator.ts` (spawnModerator function). Migrated all 8 to `logger.debug` with `LOG_CONTEXT = '[GroupChatModerator]'`. Added `import { logger }` and `LOG_CONTEXT` constant. All 18 moderator tests pass. Types compile cleanly. Zero `console.log` across entire `src/main/group-chat/` directory.
 
 ---
 

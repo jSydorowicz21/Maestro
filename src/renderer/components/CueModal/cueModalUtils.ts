@@ -5,7 +5,6 @@
  */
 
 import type { CuePipeline } from '../../../shared/cue-pipeline-types';
-import { formatElapsedTime } from '../../../shared/formatters';
 
 export function formatRelativeTime(dateStr?: string): string {
 	if (!dateStr) return '—';
@@ -23,7 +22,13 @@ export function formatRelativeTime(dateStr?: string): string {
 	return `${days}d ago`;
 }
 
-export const formatDuration = formatElapsedTime;
+export function formatDuration(ms: number): string {
+	const seconds = Math.floor(ms / 1000);
+	if (seconds < 60) return `${seconds}s`;
+	const minutes = Math.floor(seconds / 60);
+	const remainSeconds = seconds % 60;
+	return `${minutes}m ${remainSeconds}s`;
+}
 
 export function formatElapsed(startedAt: string): string {
 	const parsed = new Date(startedAt).getTime();

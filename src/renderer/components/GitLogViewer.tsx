@@ -1,14 +1,12 @@
 import { useState, useMemo, useEffect, useRef, useCallback, memo } from 'react';
-import { useEventListener } from '../hooks/utils/useEventListener';
 import { GitCommit, GitBranch, Tag } from 'lucide-react';
 import type { Theme } from '../types';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { Diff, Hunk } from 'react-diff-view';
 import { parseGitDiff } from '../utils/gitDiffParser';
 import { useListNavigation } from '../hooks';
 import { generateDiffViewStyles } from '../utils/markdownConfig';
-import { EmptyState } from './ui';
 import 'react-diff-view/style/index.css';
 
 interface GitLogEntry {
@@ -54,9 +52,11 @@ export const GitLogViewer = memo(function GitLogViewer({
 		pageSize: 10,
 	});
 
-	useModalLayer(MODAL_PRIORITIES.GIT_LOG, 'Git Log Viewer', onClose, {
-		focusTrap: 'lenient',
-	});
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
+	const layerIdRef = useRef<string>();
+
+	const onCloseRef = useRef(onClose);
+	onCloseRef.current = onClose;
 
 	// Load git log on mount
 	useEffect(() => {
@@ -111,6 +111,32 @@ export const GitLogViewer = memo(function GitLogViewer({
 		}
 	}, [selectedIndex, entries, loadCommitDiff]);
 
+	// Register with layer stack
+	useEffect(() => {
+		layerIdRef.current = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.GIT_LOG,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'lenient',
+			ariaLabel: 'Git Log Viewer',
+			onEscape: () => onCloseRef.current(),
+		});
+
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [registerLayer, unregisterLayer]);
+
+	// Update handler when dependencies change
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, () => onCloseRef.current());
+		}
+	}, [updateLayerHandler]);
+
 	// Scroll selected item into view
 	useEffect(() => {
 		const selectedItem = itemRefs.current[selectedIndex];
@@ -123,8 +149,19 @@ export const GitLogViewer = memo(function GitLogViewer({
 	}, [selectedIndex]);
 
 	// Handle keyboard navigation via global listener
-	// useEventListener stores the handler in a ref internally, so no stale closure issues
-	useEventListener('keydown', handleKeyDown);
+	// Store handleKeyDown in a ref to avoid stale closure issues
+	// The ref is updated synchronously on every render, before any events can fire
+	const handleKeyDownRef = useRef(handleKeyDown);
+	handleKeyDownRef.current = handleKeyDown;
+
+	useEffect(() => {
+		// Wrapper function that always calls the current handler from the ref
+		const handler = (e: KeyboardEvent) => {
+			handleKeyDownRef.current(e);
+		};
+		window.addEventListener('keydown', handler);
+		return () => window.removeEventListener('keydown', handler);
+	}, []); // Empty deps - handler wrapper never changes, but it reads current value from ref
 
 	// Format date for display - time for today, full date for older commits
 	const formatDate = (dateStr: string) => {
@@ -315,7 +352,11 @@ export const GitLogViewer = memo(function GitLogViewer({
 								<p className="text-sm text-red-500">{error}</p>
 							</div>
 						) : entries.length === 0 ? (
-							<EmptyState theme={theme} message="No commits found" className="h-full" />
+							<div className="flex items-center justify-center h-full">
+								<p className="text-sm" style={{ color: theme.colors.textDim }}>
+									No commits found
+								</p>
+							</div>
 						) : (
 							<div className="divide-y" style={{ borderColor: theme.colors.border }}>
 								{entries.map((entry, index) => (

@@ -3,11 +3,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QuickActionsModal } from '../../../renderer/components/QuickActionsModal';
 import { formatShortcutKeys } from '../../../renderer/utils/shortcutFormatter';
 import type { Session, Group, Theme, Shortcut } from '../../../renderer/types';
-import { createMockSession as _createMockSession } from '../../helpers/mockSession';
 import { useUIStore } from '../../../renderer/stores/uiStore';
 import { useFileExplorerStore } from '../../../renderer/stores/fileExplorerStore';
-import { useSessionStore } from '../../../renderer/stores/sessionStore';
-import { mockTheme } from '../../helpers/mockTheme';
 // Add missing window.maestro.devtools and debug mocks
 beforeAll(() => {
 	(window.maestro as any).devtools = {
@@ -75,6 +72,29 @@ vi.mock('../../../renderer/utils/shortcutFormatter', () => ({
 vi.mock('lucide-react', () => ({
 	Search: () => <svg data-testid="search-icon" />,
 }));
+
+// Create mock theme
+const mockTheme: Theme = {
+	id: 'dark',
+	name: 'Dark',
+	mode: 'dark',
+	colors: {
+		bgMain: '#1a1a2e',
+		bgSidebar: '#16213e',
+		bgActivity: '#0f3460',
+		bgTerminal: '#1a1a2e',
+		textMain: '#eaeaea',
+		textDim: '#888',
+		accent: '#e94560',
+		accentForeground: '#ffffff',
+		error: '#ff6b6b',
+		border: '#333',
+		success: '#4ecdc4',
+		warning: '#ffd93d',
+		terminalCursor: '#e94560',
+	},
+};
+
 // Create mock shortcuts
 const mockShortcuts: Record<string, Shortcut> = {
 	newInstance: { id: 'newInstance', keys: ['Cmd', 'N'], enabled: true },
@@ -93,18 +113,30 @@ const mockShortcuts: Record<string, Shortcut> = {
 	createDebugPackage: { id: 'createDebugPackage', keys: ['Alt', 'Cmd', 'D'], enabled: true },
 };
 
-// Wrapper: old factory had different cwd, non-zero pids, isGitRepo, and a pre-populated AI tab
-const createMockSession = (overrides: Partial<Session> = {}): Session =>
-	_createMockSession({
-		cwd: '/home/user/project',
-		projectRoot: '/home/user/project',
-		aiPid: 1234,
-		terminalPid: 5678,
-		isGitRepo: true,
-		aiTabs: [{ id: 'tab-1', name: 'Tab 1', logs: [] }],
-		activeTabId: 'tab-1',
-		...overrides,
-	} as Partial<Session>);
+// Create mock session
+const createMockSession = (overrides: Partial<Session> = {}): Session => ({
+	id: 'session-1',
+	name: 'Test Session',
+	toolType: 'claude-code',
+	state: 'idle',
+	inputMode: 'ai',
+	cwd: '/home/user/project',
+	projectRoot: '/home/user/project',
+	aiPid: 1234,
+	terminalPid: 5678,
+	aiLogs: [],
+	shellLogs: [],
+	isGitRepo: true,
+	fileTree: [],
+	fileExplorerExpanded: [],
+	messageQueue: [],
+	aiTabs: [{ id: 'tab-1', name: 'Tab 1', logs: [] }],
+	activeTabId: 'tab-1',
+	closedTabHistory: [],
+	terminalTabs: [],
+	activeTerminalTabId: null,
+	...overrides,
+});
 
 // Create mock group
 const createMockGroup = (overrides: Partial<Group> = {}): Group => ({
@@ -121,6 +153,7 @@ const createDefaultProps = (
 ) => ({
 	theme: mockTheme,
 	sessions: [createMockSession()],
+	setSessions: vi.fn(),
 	activeSessionId: 'session-1',
 	groups: [],
 	setGroups: vi.fn(),
@@ -154,14 +187,8 @@ const createDefaultProps = (
 });
 
 describe('QuickActionsModal', () => {
-	const storeSpy = {
-		setSessions: vi.fn(),
-	};
-
 	beforeEach(() => {
 		vi.clearAllMocks();
-		vi.spyOn(useSessionStore, 'setState');
-		vi.spyOn(useSessionStore.getState(), 'setSessions').mockImplementation(storeSpy.setSessions);
 		// Reset uiStore state used by search actions
 		useUIStore.setState({
 			sessionFilterOpen: false,
@@ -801,7 +828,7 @@ describe('QuickActionsModal', () => {
 			fireEvent.change(input, { target: { value: 'debug' } });
 			fireEvent.click(screen.getByText('Debug: Reset Busy State'));
 
-			expect(storeSpy.setSessions).toHaveBeenCalled();
+			expect(props.setSessions).toHaveBeenCalled();
 			expect(consoleSpy).toHaveBeenCalledWith('[Debug] Reset busy state for all sessions');
 			expect(props.setQuickActionOpen).toHaveBeenCalledWith(false);
 
@@ -817,7 +844,7 @@ describe('QuickActionsModal', () => {
 			fireEvent.change(input, { target: { value: 'debug' } });
 			fireEvent.click(screen.getByText('Debug: Reset Current Session'));
 
-			expect(useSessionStore.setState).toHaveBeenCalled();
+			expect(props.setSessions).toHaveBeenCalled();
 			expect(consoleSpy).toHaveBeenCalledWith('[Debug] Reset busy state for session:', 'session-1');
 
 			consoleSpy.mockRestore();
@@ -1017,7 +1044,7 @@ describe('QuickActionsModal', () => {
 			fireEvent.click(screen.getByText('Move to Group...'));
 			fireEvent.click(screen.getByText('📁 Test Group'));
 
-			expect(useSessionStore.setState).toHaveBeenCalled();
+			expect(props.setSessions).toHaveBeenCalled();
 			expect(props.setQuickActionOpen).toHaveBeenCalledWith(false);
 		});
 
@@ -1028,7 +1055,7 @@ describe('QuickActionsModal', () => {
 			fireEvent.click(screen.getByText('Move to Group...'));
 			fireEvent.click(screen.getByText('📁 No Group (Root)'));
 
-			expect(useSessionStore.setState).toHaveBeenCalled();
+			expect(props.setSessions).toHaveBeenCalled();
 			expect(props.setQuickActionOpen).toHaveBeenCalledWith(false);
 		});
 

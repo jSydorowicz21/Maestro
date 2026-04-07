@@ -9,12 +9,10 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Package, Check, FolderOpen, AlertCircle, Copy } from 'lucide-react';
-import { Spinner } from './ui';
+import { Package, Check, Loader2, FolderOpen, AlertCircle, Copy } from 'lucide-react';
 import type { Theme } from '../types';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { Modal, ModalFooter } from './ui/Modal';
-import { GhostIconButton } from './ui/GhostIconButton';
 import { notifyToast } from '../stores/notificationStore';
 
 interface DebugPackageModalProps {
@@ -241,11 +239,11 @@ export function DebugPackageModal({ theme, isOpen, onClose }: DebugPackageModalP
 
 			{loading ? (
 				<div className="flex items-center justify-center py-8">
-					<Spinner size="lg" style={{ color: theme.colors.accent }} />
+					<Loader2 className="w-6 h-6 animate-spin" style={{ color: theme.colors.accent }} />
 				</div>
 			) : generationState === 'generating' ? (
 				<div className="flex flex-col items-center justify-center py-8 gap-4">
-					<Spinner size="xl" style={{ color: theme.colors.accent }} />
+					<Loader2 className="w-8 h-8 animate-spin" style={{ color: theme.colors.accent }} />
 					<p className="text-sm" style={{ color: theme.colors.textDim }}>
 						Collecting diagnostic information...
 					</p>
@@ -266,14 +264,15 @@ export function DebugPackageModal({ theme, isOpen, onClose }: DebugPackageModalP
 							<p className="text-xs break-all" style={{ color: theme.colors.textDim }}>
 								{resultPath}
 							</p>
-							<GhostIconButton
+							<button
+								type="button"
 								onClick={handleCopyPath}
-								className="flex-shrink-0"
+								className="p-1 rounded hover:bg-white/10 transition-colors flex-shrink-0"
 								style={{ color: theme.colors.textDim }}
-								tooltip="Copy file path to clipboard"
+								title="Copy file path to clipboard"
 							>
 								<Copy className="w-3.5 h-3.5" />
-							</GhostIconButton>
+							</button>
 						</div>
 					</div>
 				</div>

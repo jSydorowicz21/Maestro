@@ -1,7 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
-import { GripVertical, Settings, Zap, Play } from 'lucide-react';
-import { Spinner } from '../../ui';
+import { GripVertical, Settings, Zap, Play, Loader2 } from 'lucide-react';
 import { CUE_COLOR, type CueEventType } from '../../../../shared/cue-pipeline-types';
 import { EVENT_COLORS, EVENT_ICONS } from '../cueEventConstants';
 import type { Theme } from '../../../types';
@@ -184,7 +183,7 @@ export const TriggerNode = memo(function TriggerNode({
 						}}
 						title={data.isRunning ? 'Running…' : 'Run now'}
 					>
-						{data.isRunning ? <Spinner size="xs" className="w-3.5 h-3.5" /> : <Play size={14} />}
+						{data.isRunning ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
 					</button>
 				)}
 

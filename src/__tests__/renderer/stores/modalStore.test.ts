@@ -9,6 +9,7 @@ import {
 	useModalActions,
 	selectModalOpen,
 	selectModalData,
+	selectModal,
 	getModalActions,
 	type ModalId,
 	type SettingsModalData,
@@ -297,6 +298,21 @@ describe('modalStore', () => {
 			});
 
 			expect(result.current).toEqual({ tab: 'theme' });
+		});
+
+		it('provides full entry via selectModal', () => {
+			const { result } = renderHook(() => useModalStore(selectModal('settings')));
+
+			expect(result.current).toBeUndefined();
+
+			act(() => {
+				useModalStore.getState().openModal('settings', { tab: 'notifications' });
+			});
+
+			expect(result.current).toEqual({
+				open: true,
+				data: { tab: 'notifications' },
+			});
 		});
 	});
 

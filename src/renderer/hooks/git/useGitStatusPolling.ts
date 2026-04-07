@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { Session } from '../../types';
 import { gitService } from '../../services/git';
 import { subscribeToActivity } from '../../utils/activityBus';
-import { useEventListener } from '../utils/useEventListener';
 
 /**
  * Extended git status data for a session.
@@ -388,17 +387,25 @@ export function useGitStatusPolling(
 	}, []);
 
 	// Handle visibility changes
-	useEventListener(
-		'visibilitychange',
-		() => {
+	useEffect(() => {
+		const handleVisibilityChange = () => {
 			if (document.hidden) {
 				stopPolling();
 			} else if (isActiveRef.current) {
 				startPolling();
 			}
-		},
-		pauseWhenHidden ? document : null
-	);
+		};
+
+		if (pauseWhenHidden) {
+			document.addEventListener('visibilitychange', handleVisibilityChange);
+		}
+
+		return () => {
+			if (pauseWhenHidden) {
+				document.removeEventListener('visibilitychange', handleVisibilityChange);
+			}
+		};
+	}, [pauseWhenHidden, startPolling, stopPolling]);
 
 	// Debounce timer ref for activity handler
 	const activityDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);

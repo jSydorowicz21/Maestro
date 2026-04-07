@@ -1,11 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
-import { X, GitBranch, AlertTriangle } from 'lucide-react';
+import { X, GitBranch, Loader2, AlertTriangle } from 'lucide-react';
 import type { Theme, Session, GhCliStatus } from '../types';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
-import { GhostIconButton } from './ui/GhostIconButton';
-import { Spinner } from './ui';
 
 interface CreateWorktreeModalProps {
 	isOpen: boolean;
@@ -28,10 +25,9 @@ export function CreateWorktreeModal({
 	session,
 	onCreateWorktree,
 }: CreateWorktreeModalProps) {
-	useModalLayer(MODAL_PRIORITIES.CREATE_WORKTREE, 'Create Worktree', onClose, {
-		isOpen,
-		focusTrap: 'lenient',
-	});
+	const { registerLayer, unregisterLayer } = useLayerStack();
+	const onCloseRef = useRef(onClose);
+	onCloseRef.current = onClose;
 
 	// Form state
 	const [branchName, setBranchName] = useState('');
@@ -44,8 +40,20 @@ export function CreateWorktreeModal({
 	// Input ref for auto-focus
 	const inputRef = useRef<HTMLInputElement>(null);
 
-	// Auto-focus the input when modal opens
-	useFocusAfterRender(inputRef, isOpen, 50);
+	// Register with layer stack for Escape handling
+	useEffect(() => {
+		if (isOpen) {
+			const id = registerLayer({
+				type: 'modal',
+				priority: MODAL_PRIORITIES.CREATE_WORKTREE,
+				onEscape: () => onCloseRef.current(),
+				blocksLowerLayers: true,
+				capturesFocus: true,
+				focusTrap: 'lenient',
+			});
+			return () => unregisterLayer(id);
+		}
+	}, [isOpen, registerLayer, unregisterLayer]);
 
 	// Check gh CLI status and reset state on open
 	useEffect(() => {
@@ -53,6 +61,8 @@ export function CreateWorktreeModal({
 			checkGhCli();
 			setBranchName('');
 			setError(null);
+			// Auto-focus the input
+			setTimeout(() => inputRef.current?.focus(), 50);
 		}
 	}, [isOpen]);
 
@@ -127,9 +137,9 @@ export function CreateWorktreeModal({
 							Create New Worktree
 						</h2>
 					</div>
-					<GhostIconButton onClick={onClose}>
+					<button onClick={onClose} className="p-1 rounded hover:bg-white/10 transition-colors">
 						<X className="w-4 h-4" style={{ color: theme.colors.textDim }} />
-					</GhostIconButton>
+					</button>
 				</div>
 
 				{/* Content */}
@@ -266,7 +276,7 @@ export function CreateWorktreeModal({
 					>
 						{isCreating ? (
 							<>
-								<Spinner />
+								<Loader2 className="w-4 h-4 animate-spin" />
 								Creating...
 							</>
 						) : (

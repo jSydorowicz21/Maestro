@@ -9,7 +9,29 @@ import React from 'react';
 import { TemplateAutocompleteDropdown } from '../../../renderer/components/TemplateAutocompleteDropdown';
 import type { Theme } from '../../../renderer/types';
 import type { AutocompleteState } from '../../../renderer/hooks';
-import { mockTheme, createMockTheme } from '../../helpers/mockTheme';
+
+// Create a mock theme for testing
+const createMockTheme = (): Theme => ({
+	id: 'test-theme',
+	name: 'Test Theme',
+	mode: 'dark',
+	colors: {
+		bgMain: '#1a1a1a',
+		bgPanel: '#252525',
+		bgSidebar: '#202020',
+		bgActivity: '#2d2d2d',
+		textMain: '#ffffff',
+		textDim: '#888888',
+		accent: '#0066ff',
+		accentForeground: '#ffffff',
+		border: '#333333',
+		highlight: '#0066ff33',
+		success: '#00aa00',
+		warning: '#ffaa00',
+		error: '#ff0000',
+	},
+});
+
 // Create mock autocomplete state
 const createMockState = (overrides?: Partial<AutocompleteState>): AutocompleteState => ({
 	isOpen: true,
@@ -25,6 +47,7 @@ const createMockState = (overrides?: Partial<AutocompleteState>): AutocompleteSt
 });
 
 describe('TemplateAutocompleteDropdown', () => {
+	const mockTheme = createMockTheme();
 	let mockOnSelect: ReturnType<typeof vi.fn>;
 
 	beforeEach(() => {
@@ -112,7 +135,7 @@ describe('TemplateAutocompleteDropdown', () => {
 
 			const items = container.querySelectorAll('[data-index]');
 			// Selected item (index 1) should have bgActivity color
-			expect(items[1]).toHaveStyle({ backgroundColor: mockTheme.colors.bgActivity });
+			expect(items[1]).toHaveStyle({ backgroundColor: 'rgb(45, 45, 45)' });
 			// Non-selected item should be transparent
 			const item0 = items[0] as HTMLElement;
 			expect(item0.style.backgroundColor).toBe('transparent');
@@ -130,8 +153,8 @@ describe('TemplateAutocompleteDropdown', () => {
 			const secondItem = items[1] as HTMLElement;
 
 			fireEvent.mouseEnter(secondItem);
-			// bgActivity color from theme
-			expect(secondItem).toHaveStyle({ backgroundColor: mockTheme.colors.bgActivity });
+			// bgActivity color in RGB format
+			expect(secondItem.style.backgroundColor).toBe('rgb(45, 45, 45)');
 		});
 
 		it('resets background on mouse leave for non-selected item', () => {

@@ -1,5 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { useEventListener } from '../hooks/utils/useEventListener';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Check } from 'lucide-react';
 import type { Theme } from '../types';
 import { useContextMenuPosition } from '../hooks/ui/useContextMenuPosition';
@@ -175,7 +174,13 @@ export const SessionActivityGraph: React.FC<SessionActivityGraphProps> = ({
 	};
 
 	// Close context menu when clicking elsewhere
-	useEventListener('click', () => setContextMenu(null), contextMenu ? document : null);
+	useEffect(() => {
+		const handleClick = () => setContextMenu(null);
+		if (contextMenu) {
+			document.addEventListener('click', handleClick);
+			return () => document.removeEventListener('click', handleClick);
+		}
+	}, [contextMenu]);
 
 	// Generate labels for the x-axis
 	const getAxisLabels = () => {

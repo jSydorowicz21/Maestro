@@ -7,16 +7,17 @@ Re-vetted 2026-03-28 against origin/rc. Minor line number shifts noted inline.
 
 ## Duplicate Interface Definitions
 
-### AgentCapabilities (6 definitions)
+### AgentCapabilities (6 definitions) - **RESOLVED 2026-04-02**
 
-```
-src/main/agents/capabilities.ts:15                  export interface AgentCapabilities
-src/main/preload/agents.ts:17                       export interface AgentCapabilities
-src/renderer/global.d.ts:61                         interface AgentCapabilities (first)
-src/renderer/global.d.ts:104                        interface AgentCapabilities (second!)
-src/renderer/hooks/agent/useAgentCapabilities.ts:14 export interface AgentCapabilities
-src/renderer/types/index.ts:747                     export interface AgentCapabilities
-```
+Consolidated to single canonical definition in `src/shared/types.ts:152`.
+All other files now import/re-export from shared. Double-definition bug in `global.d.ts` fixed.
+
+~~src/main/agents/capabilities.ts:15~~ **Now imports from shared**
+~~src/main/preload/agents.ts:17~~ **Now imports from shared**
+~~src/renderer/global.d.ts:61~~ **Replaced with import() type alias**
+~~src/renderer/global.d.ts:104~~ **REMOVED (was duplicate)**
+~~src/renderer/hooks/agent/useAgentCapabilities.ts:14~~ **Now imports from shared**
+~~src/renderer/types/index.ts:747~~ **Now re-exports from shared**
 
 ### UsageStats (6 definitions)
 
@@ -229,12 +230,12 @@ src/renderer/utils/existingDocsDetector.ts:13                    export const AU
 
 All three are identical (`= PLAYBOOKS_DIR`). The canonical constant is `PLAYBOOKS_DIR` in `src/shared/maestro-paths.ts:14`.
 
-### DEFAULT_CAPABILITIES (2 definitions)
+### DEFAULT_CAPABILITIES (2 definitions) - **RESOLVED 2026-04-02**
 
-```
-src/main/agents/capabilities.ts:98                      export const DEFAULT_CAPABILITIES: AgentCapabilities
-src/renderer/hooks/agent/useAgentCapabilities.ts:89      export const DEFAULT_CAPABILITIES: AgentCapabilities
-```
+Consolidated to single canonical definition in `src/shared/types.ts:235`.
+
+~~src/main/agents/capabilities.ts:98~~ **Now imports from shared**
+~~src/renderer/hooks/agent/useAgentCapabilities.ts:89~~ **Now imports from shared**
 
 ---
 

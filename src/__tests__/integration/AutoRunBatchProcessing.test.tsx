@@ -16,7 +16,6 @@ import React, { createRef } from 'react';
 import { AutoRun, AutoRunHandle } from '../../renderer/components/AutoRun';
 import { LayerStackProvider } from '../../renderer/contexts/LayerStackContext';
 import type { Theme, BatchRunState, SessionState } from '../../renderer/types';
-import { createMockTheme } from '../helpers/mockTheme';
 
 // Helper to render with LayerStackProvider (required by AutoRunSearchBar)
 const renderWithProvider = (ui: React.ReactElement) => {
@@ -119,22 +118,50 @@ vi.mock('../../renderer/hooks/useTemplateAutocomplete', () => ({
 vi.mock('../../renderer/components/TemplateAutocompleteDropdown', () => ({
 	TemplateAutocompleteDropdown: React.forwardRef(() => null),
 }));
-// Override specific window.maestro namespaces (setup.ts provides the base mock)
-const overrideMaestroMock = () => {
-	Object.assign(window.maestro.fs, {
-		readFile: vi.fn().mockResolvedValue('data:image/png;base64,abc123'),
-		readDir: vi.fn().mockResolvedValue([]),
-	});
-	Object.assign(window.maestro.autorun, {
-		listImages: vi.fn().mockResolvedValue({ success: true, images: [] }),
-		saveImage: vi.fn().mockResolvedValue({ success: true, relativePath: 'images/test-123.png' }),
-		deleteImage: vi.fn().mockResolvedValue({ success: true }),
-		writeDoc: vi.fn().mockResolvedValue(undefined),
-	});
-	Object.assign(window.maestro.settings, {
-		get: vi.fn().mockResolvedValue(null),
-		set: vi.fn().mockResolvedValue(undefined),
-	});
+
+// Create a mock theme for testing
+const createMockTheme = (): Theme => ({
+	id: 'test-theme',
+	name: 'Test Theme',
+	mode: 'dark',
+	colors: {
+		bgMain: '#1a1a1a',
+		bgPanel: '#252525',
+		bgActivity: '#2d2d2d',
+		bgSidebar: '#1e1e1e',
+		textMain: '#ffffff',
+		textDim: '#888888',
+		accent: '#0066ff',
+		accentForeground: '#ffffff',
+		border: '#333333',
+		highlight: '#0066ff33',
+		success: '#00aa00',
+		warning: '#ffaa00',
+		error: '#ff0000',
+	},
+});
+
+// Setup window.maestro mock
+const setupMaestroMock = () => {
+	const mockMaestro = {
+		fs: {
+			readFile: vi.fn().mockResolvedValue('data:image/png;base64,abc123'),
+			readDir: vi.fn().mockResolvedValue([]),
+		},
+		autorun: {
+			listImages: vi.fn().mockResolvedValue({ success: true, images: [] }),
+			saveImage: vi.fn().mockResolvedValue({ success: true, relativePath: 'images/test-123.png' }),
+			deleteImage: vi.fn().mockResolvedValue({ success: true }),
+			writeDoc: vi.fn().mockResolvedValue(undefined),
+		},
+		settings: {
+			get: vi.fn().mockResolvedValue(null),
+			set: vi.fn().mockResolvedValue(undefined),
+		},
+	};
+
+	(window as any).maestro = mockMaestro;
+	return mockMaestro;
 };
 
 // Create base batch run state
@@ -189,8 +216,10 @@ Some implementation notes here.`,
 });
 
 describe('AutoRun + Batch Processing Integration', () => {
+	let mockMaestro: ReturnType<typeof setupMaestroMock>;
+
 	beforeEach(() => {
-		overrideMaestroMock();
+		mockMaestro = setupMaestroMock();
 		vi.useFakeTimers({ shouldAdvanceTime: true });
 	});
 
@@ -752,7 +781,7 @@ describe('AutoRun + Batch Processing Integration', () => {
 
 			// writeDoc should have been called to save
 			await waitFor(() => {
-				expect(window.maestro.autorun.writeDoc).toHaveBeenCalled();
+				expect(mockMaestro.autorun.writeDoc).toHaveBeenCalled();
 			});
 
 			expect(onOpenBatchRunner).toHaveBeenCalledTimes(1);
@@ -767,7 +796,7 @@ describe('AutoRun + Batch Processing Integration', () => {
 			fireEvent.click(screen.getByRole('button', { name: /^run$/i }));
 
 			// writeDoc should not have been called
-			expect(window.maestro.autorun.writeDoc).not.toHaveBeenCalled();
+			expect(mockMaestro.autorun.writeDoc).not.toHaveBeenCalled();
 			expect(onOpenBatchRunner).toHaveBeenCalledTimes(1);
 		});
 
@@ -791,7 +820,7 @@ describe('AutoRun + Batch Processing Integration', () => {
 			fireEvent.keyDown(textarea, { key: 's', metaKey: true });
 
 			// writeDoc should not be called
-			expect(window.maestro.autorun.writeDoc).not.toHaveBeenCalled();
+			expect(mockMaestro.autorun.writeDoc).not.toHaveBeenCalled();
 		});
 
 		it('Cmd+E still toggles mode during batch run (via container)', () => {

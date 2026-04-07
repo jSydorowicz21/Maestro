@@ -14,7 +14,7 @@ import { fuzzyMatch } from '../../utils/search';
 import { gitService } from '../../services/git';
 import { logger } from '../../utils/logger';
 import { useFileExplorerStore } from '../../stores/fileExplorerStore';
-import { useSessionStore, updateSessionWith } from '../../stores/sessionStore';
+import { useSessionStore } from '../../stores/sessionStore';
 
 /**
  * Retry delay for file tree errors (20 seconds).
@@ -90,6 +90,8 @@ export interface UseFileTreeManagementDeps {
 	sessions: Session[];
 	/** Ref to sessions for accessing latest state without triggering effect re-runs */
 	sessionsRef: React.MutableRefObject<Session[]>;
+	/** Session state setter */
+	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	/** Currently active session ID */
 	activeSessionId: string | null;
 	/** Currently active session (derived from sessions) */
@@ -136,6 +138,7 @@ export function useFileTreeManagement(
 	const {
 		sessions,
 		sessionsRef,
+		setSessions,
 		activeSessionId,
 		activeSession,
 		rightPanelRef,
@@ -250,14 +253,20 @@ export function useFileTreeManagement(
 					)
 					.then((stats) => {
 						if (isStale(sessionId, seq)) return;
-						updateSessionWith(sessionId, (s) => ({
-							...s,
-							fileTreeStats: {
-								fileCount: stats.fileCount,
-								folderCount: stats.folderCount,
-								totalSize: stats.totalSize,
-							},
-						}));
+						setSessions((prev) =>
+							prev.map((s) =>
+								s.id === sessionId
+									? {
+											...s,
+											fileTreeStats: {
+												fileCount: stats.fileCount,
+												folderCount: stats.folderCount,
+												totalSize: stats.totalSize,
+											},
+										}
+									: s
+							)
+						);
 					})
 					.catch((err) => {
 						logger.warn('directorySize failed during refresh (non-fatal)', 'FileTreeManagement', {
@@ -273,11 +282,17 @@ export function useFileTreeManagement(
 				const oldTree = session.fileTree || [];
 				const changes = compareFileTrees(oldTree, newTree);
 
-				updateSessionWith(sessionId, (s) => ({
-					...s,
-					fileTree: newTree,
-					fileTreeError: undefined,
-				}));
+				setSessions((prev) =>
+					prev.map((s) =>
+						s.id === sessionId
+							? {
+									...s,
+									fileTree: newTree,
+									fileTreeError: undefined,
+								}
+							: s
+					)
+				);
 
 				return changes;
 			} catch (error) {
@@ -289,7 +304,7 @@ export function useFileTreeManagement(
 				return undefined;
 			}
 		},
-		[sessionsRef, sshContextOptions, localOptions, nextSeq, isStale]
+		[sessionsRef, setSessions, sshContextOptions, localOptions, nextSeq, isStale]
 	);
 
 	/**
@@ -323,14 +338,20 @@ export function useFileTreeManagement(
 					)
 					.then((stats) => {
 						if (isStale(sessionId, seq)) return;
-						updateSessionWith(sessionId, (s) => ({
-							...s,
-							fileTreeStats: {
-								fileCount: stats.fileCount,
-								folderCount: stats.folderCount,
-								totalSize: stats.totalSize,
-							},
-						}));
+						setSessions((prev) =>
+							prev.map((s) =>
+								s.id === sessionId
+									? {
+											...s,
+											fileTreeStats: {
+												fileCount: stats.fileCount,
+												folderCount: stats.folderCount,
+												totalSize: stats.totalSize,
+											},
+										}
+									: s
+							)
+						);
 					})
 					.catch((err) => {
 						logger.warn(
@@ -366,15 +387,21 @@ export function useFileTreeManagement(
 				// Re-check after additional awaits (branches/tags fetch)
 				if (isStale(sessionId, seq)) return;
 
-				updateSessionWith(sessionId, (s) => ({
-					...s,
-					fileTree: tree,
-					fileTreeError: undefined,
-					isGitRepo,
-					gitBranches,
-					gitTags,
-					gitRefsCacheTime,
-				}));
+				setSessions((prev) =>
+					prev.map((s) =>
+						s.id === sessionId
+							? {
+									...s,
+									fileTree: tree,
+									fileTreeError: undefined,
+									isGitRepo,
+									gitBranches,
+									gitTags,
+									gitRefsCacheTime,
+								}
+							: s
+					)
+				);
 
 				// Also refresh history panel (reload from disk first to bypass electron-store cache)
 				await window.maestro.history.reload();
@@ -387,7 +414,7 @@ export function useFileTreeManagement(
 				});
 			}
 		},
-		[sessions, rightPanelRef, sshContextOptions, localOptions, nextSeq, isStale]
+		[sessions, setSessions, rightPanelRef, sshContextOptions, localOptions, nextSeq, isStale]
 	);
 
 	// Ref to track pending retry timers per session
@@ -400,8 +427,8 @@ export function useFileTreeManagement(
 	 * Shows streaming progress updates during loading (useful for slow SSH connections).
 	 */
 	useEffect(() => {
-		if (!activeSession) return;
-		const session = activeSession;
+		const session = sessions.find((s) => s.id === activeSessionId);
+		if (!session) return;
 
 		// Only load if file tree is empty, not already loading, and hasn't been loaded yet
 		// fileTreeStats is set after successful load, so we use it to detect "loaded but empty"
@@ -420,7 +447,9 @@ export function useFileTreeManagement(
 					const timerId = setTimeout(() => {
 						retryTimersRef.current.delete(session.id);
 						// Clear the retry time to allow the effect to trigger reload
-						updateSessionWith(session.id, (s) => ({ ...s, fileTreeRetryAt: undefined }));
+						setSessions((prev) =>
+							prev.map((s) => (s.id === session.id ? { ...s, fileTreeRetryAt: undefined } : s))
+						);
 					}, delay);
 					retryTimersRef.current.set(session.id, timerId);
 				}
@@ -439,22 +468,34 @@ export function useFileTreeManagement(
 			const sessionId = session.id;
 
 			// Mark as loading before starting
-			updateSessionWith(sessionId, (s) => ({
-				...s,
-				fileTreeLoading: true,
-				fileTreeLoadingProgress: undefined,
-			}));
+			setSessions((prev) =>
+				prev.map((s) =>
+					s.id === sessionId
+						? {
+								...s,
+								fileTreeLoading: true,
+								fileTreeLoadingProgress: undefined,
+							}
+						: s
+				)
+			);
 
 			// Progress callback for streaming updates during SSH load
 			const onProgress = (progress: FileTreeProgress) => {
-				updateSessionWith(sessionId, (s) => ({
-					...s,
-					fileTreeLoadingProgress: {
-						directoriesScanned: progress.directoriesScanned,
-						filesFound: progress.filesFound,
-						currentDirectory: progress.currentDirectory,
-					},
-				}));
+				setSessions((prev) =>
+					prev.map((s) =>
+						s.id === sessionId
+							? {
+									...s,
+									fileTreeLoadingProgress: {
+										directoriesScanned: progress.directoriesScanned,
+										filesFound: progress.filesFound,
+										currentDirectory: progress.currentDirectory,
+									},
+								}
+							: s
+					)
+				);
 			};
 
 			// Increment per-session load sequence so concurrent loads can detect staleness
@@ -468,15 +509,18 @@ export function useFileTreeManagement(
 				loadFileTree(treeRoot, 1, 0, sshContext, undefined, localOptions)
 					.then((shallowTree) => {
 						if (isStale(sessionId, seq)) return;
-						updateSessionWith(sessionId, (s) => {
-							if (!s.fileTreeLoading) return s;
-							return {
-								...s,
-								fileTree: shallowTree,
-								fileTreeError: undefined,
-								fileTreeRetryAt: undefined,
-							};
-						});
+						setSessions((prev) =>
+							prev.map((s) =>
+								s.id === sessionId && s.fileTreeLoading
+									? {
+											...s,
+											fileTree: shallowTree,
+											fileTreeError: undefined,
+											fileTreeRetryAt: undefined,
+										}
+									: s
+							)
+						);
 						signalInitialFileTreeReady();
 					})
 					.catch(() => {
@@ -501,14 +545,20 @@ export function useFileTreeManagement(
 				)
 				.then((stats) => {
 					if (isStale(sessionId, seq)) return;
-					updateSessionWith(sessionId, (s) => ({
-						...s,
-						fileTreeStats: {
-							fileCount: stats.fileCount,
-							folderCount: stats.folderCount,
-							totalSize: stats.totalSize,
-						},
-					}));
+					setSessions((prev) =>
+						prev.map((s) =>
+							s.id === sessionId
+								? {
+										...s,
+										fileTreeStats: {
+											fileCount: stats.fileCount,
+											folderCount: stats.folderCount,
+											totalSize: stats.totalSize,
+										},
+									}
+								: s
+						)
+					);
 				})
 				.catch((err) => {
 					logger.warn('directorySize failed (non-fatal)', 'FileTreeManagement', {
@@ -521,33 +571,43 @@ export function useFileTreeManagement(
 					// Discard if a newer load started for this session while we were awaiting
 					if (isStale(sessionId, seq)) {
 						// Reset loading state so this session can retry later
-						updateSessionWith(sessionId, (s) => ({
-							...s,
-							fileTreeLoading: false,
-							fileTreeLoadingProgress: undefined,
-						}));
+						setSessions((prev) =>
+							prev.map((s) =>
+								s.id === sessionId
+									? { ...s, fileTreeLoading: false, fileTreeLoadingProgress: undefined }
+									: s
+							)
+						);
 						return;
 					}
 
-					updateSessionWith(sessionId, (s) => ({
-						...s,
-						fileTree: tree,
-						fileTreeError: undefined,
-						fileTreeRetryAt: undefined,
-						fileTreeLoading: false,
-						fileTreeLoadingProgress: undefined,
-					}));
+					setSessions((prev) =>
+						prev.map((s) =>
+							s.id === sessionId
+								? {
+										...s,
+										fileTree: tree,
+										fileTreeError: undefined,
+										fileTreeRetryAt: undefined,
+										fileTreeLoading: false,
+										fileTreeLoadingProgress: undefined,
+									}
+								: s
+						)
+					);
 
 					signalInitialFileTreeReady();
 				})
 				.catch((error) => {
 					// Ignore errors from stale loads — a newer load is in progress
 					if (isStale(sessionId, seq)) {
-						updateSessionWith(sessionId, (s) => ({
-							...s,
-							fileTreeLoading: false,
-							fileTreeLoadingProgress: undefined,
-						}));
+						setSessions((prev) =>
+							prev.map((s) =>
+								s.id === sessionId
+									? { ...s, fileTreeLoading: false, fileTreeLoadingProgress: undefined }
+									: s
+							)
+						);
 						return;
 					}
 
@@ -555,20 +615,26 @@ export function useFileTreeManagement(
 						error: error?.message || 'Unknown error',
 					});
 					const errorMsg = error?.message || 'Unknown error';
-					updateSessionWith(sessionId, (s) => ({
-						...s,
-						fileTree: [],
-						fileTreeError: `Cannot access directory: ${treeRoot}\n${errorMsg}`,
-						fileTreeRetryAt: Date.now() + FILE_TREE_RETRY_DELAY_MS,
-						fileTreeLoading: false,
-						fileTreeLoadingProgress: undefined,
-						fileTreeStats: undefined,
-					}));
+					setSessions((prev) =>
+						prev.map((s) =>
+							s.id === sessionId
+								? {
+										...s,
+										fileTree: [],
+										fileTreeError: `Cannot access directory: ${treeRoot}\n${errorMsg}`,
+										fileTreeRetryAt: Date.now() + FILE_TREE_RETRY_DELAY_MS,
+										fileTreeLoading: false,
+										fileTreeLoadingProgress: undefined,
+										fileTreeStats: undefined,
+									}
+								: s
+						)
+					);
 
 					signalInitialFileTreeReady();
 				});
 		}
-	}, [activeSession, sshContextOptions, localOptions, nextSeq, isStale]);
+	}, [activeSessionId, sessions, setSessions, sshContextOptions, localOptions, nextSeq, isStale]);
 
 	// Cleanup retry timers on unmount
 	useEffect(() => {
@@ -586,11 +652,12 @@ export function useFileTreeManagement(
 		if (prevLocalOptionsRef.current === localOptions) return;
 		prevLocalOptionsRef.current = localOptions;
 
-		if (!activeSession) return;
-		if (!activeSession.fileTreeStats) return; // only re-scan already-loaded sessions
+		if (!activeSessionId) return;
+		const session = sessions.find((s) => s.id === activeSessionId);
+		if (!session || !session.fileTreeStats) return; // only re-scan already-loaded sessions
 
-		refreshFileTree(activeSession.id);
-	}, [activeSession, localOptions, refreshFileTree]);
+		refreshFileTree(activeSessionId);
+	}, [activeSessionId, sessions, localOptions, refreshFileTree]);
 
 	/**
 	 * Migration: Fetch stats for sessions that have a file tree but no stats.
@@ -598,8 +665,8 @@ export function useFileTreeManagement(
 	 * Only fetches stats - doesn't re-fetch the file tree since it's already loaded.
 	 */
 	useEffect(() => {
-		if (!activeSession) return;
-		const session = activeSession;
+		const session = sessions.find((s) => s.id === activeSessionId);
+		if (!session) return;
 
 		// Only migrate if: has file tree, no stats, no error, not loading
 		const needsStatsMigration =
@@ -626,14 +693,20 @@ export function useFileTreeManagement(
 				localOptions?.honorGitignore
 			)
 			.then((stats) => {
-				updateSessionWith(sessionId, (s) => ({
-					...s,
-					fileTreeStats: {
-						fileCount: stats.fileCount,
-						folderCount: stats.folderCount,
-						totalSize: stats.totalSize,
-					},
-				}));
+				setSessions((prev) =>
+					prev.map((s) =>
+						s.id === sessionId
+							? {
+									...s,
+									fileTreeStats: {
+										fileCount: stats.fileCount,
+										folderCount: stats.folderCount,
+										totalSize: stats.totalSize,
+									},
+								}
+							: s
+					)
+				);
 			})
 			.catch((error) => {
 				// Stats fetch failed - log but don't set error state (tree is still valid)
@@ -642,7 +715,7 @@ export function useFileTreeManagement(
 					sessionId,
 				});
 			});
-	}, [activeSession]);
+	}, [activeSessionId, sessions, setSessions]);
 
 	/**
 	 * Filter file tree based on search query.

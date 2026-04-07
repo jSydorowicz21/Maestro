@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useEventListener } from '../hooks/utils/useEventListener';
-import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { FALLBACK_CONTEXT_WINDOW } from '../../shared/agentConstants';
 import {
 	Search,
@@ -9,6 +7,7 @@ import {
 	HardDrive,
 	Play,
 	ChevronLeft,
+	Loader2,
 	Plus,
 	X,
 	List,
@@ -26,9 +25,8 @@ import {
 	ArrowUpFromLine,
 	Edit3,
 } from 'lucide-react';
-import { Spinner, EmptyState } from './ui';
 import type { Theme, Session, LogEntry, UsageStats } from '../types';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { SessionActivityGraph, type ActivityEntry } from './SessionActivityGraph';
 import { SessionListItem } from './SessionListItem';
@@ -42,7 +40,6 @@ import {
 	type ClaudeSession,
 } from '../hooks';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
-import { GhostIconButton } from './ui/GhostIconButton';
 
 type SearchMode = 'title' | 'user' | 'assistant' | 'all';
 
@@ -179,11 +176,14 @@ export function AgentSessionsBrowser({
 	const selectedItemRef = useRef<HTMLButtonElement>(null);
 	const searchModeDropdownRef = useRef<HTMLDivElement>(null);
 	const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const layerIdRef = useRef<string>();
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
 	const viewingSessionRef = useRef(viewingSession);
 	viewingSessionRef.current = viewingSession;
 	const autoJumpedRef = useRef<string | null>(null); // Track which session we've auto-jumped to
+
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
 
 	const handleSearchChange = useCallback((value: string) => {
 		setSearch(value);
@@ -195,18 +195,44 @@ export function AgentSessionsBrowser({
 		clearViewingSession();
 	}, [clearViewingSession]);
 
-	// Escape handler for layer stack
-	const handleEscape = useCallback(() => {
-		if (viewingSessionRef.current) {
-			clearViewingSession();
-		} else {
-			onCloseRef.current();
-		}
-	}, [viewingSession, clearViewingSession]);
+	// Register layer on mount for Escape key handling
+	useEffect(() => {
+		layerIdRef.current = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.AGENT_SESSIONS,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'lenient',
+			ariaLabel: 'Agent Sessions Browser',
+			onEscape: () => {
+				// If viewing a session detail, go back to list; otherwise close the panel
+				if (viewingSessionRef.current) {
+					clearViewingSession();
+				} else {
+					onCloseRef.current();
+				}
+			},
+		});
 
-	useModalLayer(MODAL_PRIORITIES.AGENT_SESSIONS, 'Agent Sessions Browser', handleEscape, {
-		focusTrap: 'lenient',
-	});
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [registerLayer, unregisterLayer, clearViewingSession]);
+
+	// Update handler when viewingSession changes
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, () => {
+				if (viewingSessionRef.current) {
+					clearViewingSession();
+				} else {
+					onCloseRef.current();
+				}
+			});
+		}
+	}, [viewingSession, updateLayerHandler, clearViewingSession]);
 
 	// Restore focus and scroll position when returning from detail view to list view
 	const prevViewingSessionRef = useRef<ClaudeSession | null>(null);
@@ -428,7 +454,10 @@ export function AgentSessionsBrowser({
 	}, [loading, sessions, activeAgentSessionId, viewingSession, handleViewSession]);
 
 	// Focus input on mount
-	useFocusAfterRender(inputRef, true, 50);
+	useEffect(() => {
+		const timer = setTimeout(() => inputRef.current?.focus(), 50);
+		return () => clearTimeout(timer);
+	}, []);
 
 	// Scroll selected item into view
 	useEffect(() => {
@@ -677,7 +706,10 @@ export function AgentSessionsBrowser({
 	);
 
 	// Add global keyboard listener for Cmd+F
-	useEventListener('keydown', handleGlobalKeyDown, document);
+	useEffect(() => {
+		document.addEventListener('keydown', handleGlobalKeyDown);
+		return () => document.removeEventListener('keydown', handleGlobalKeyDown);
+	}, [handleGlobalKeyDown]);
 
 	return (
 		<div className="flex-1 flex flex-col h-full" style={{ backgroundColor: theme.colors.bgMain }}>
@@ -689,18 +721,18 @@ export function AgentSessionsBrowser({
 				<div className="flex items-center gap-4">
 					{viewingSession ? (
 						<>
-							<GhostIconButton
-								size="md"
+							<button
 								onClick={clearViewingSession}
+								className="p-1.5 rounded hover:bg-white/10 transition-colors"
 								style={{ color: theme.colors.textDim }}
 							>
 								<ChevronLeft className="w-5 h-5" />
-							</GhostIconButton>
+							</button>
 							{/* Star button for detail view */}
-							<GhostIconButton
-								size="md"
+							<button
 								onClick={(e) => toggleStar(viewingSession.sessionId, e)}
-								tooltip={
+								className="p-1.5 rounded hover:bg-white/10 transition-colors"
+								title={
 									starredSessions.has(viewingSession.sessionId)
 										? 'Remove from favorites'
 										: 'Add to favorites'
@@ -717,7 +749,7 @@ export function AgentSessionsBrowser({
 											: 'transparent',
 									}}
 								/>
-							</GhostIconButton>
+							</button>
 							<div className="flex flex-col min-w-0">
 								{/* Session name with edit button */}
 								{renamingSessionId === viewingSession.sessionId ? (
@@ -1074,7 +1106,10 @@ export function AgentSessionsBrowser({
 						{hasMoreMessages && (
 							<div className="text-center py-2">
 								{messagesLoading ? (
-									<Spinner size="md" className="mx-auto" style={{ color: theme.colors.textDim }} />
+									<Loader2
+										className="w-5 h-5 animate-spin mx-auto"
+										style={{ color: theme.colors.textDim }}
+									/>
 								) : (
 									<button
 										onClick={handleLoadMore}
@@ -1094,11 +1129,11 @@ export function AgentSessionsBrowser({
 								className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
 							>
 								{/* Tool call messages - render with ToolCallCard */}
-								{Array.isArray(msg.toolUse) && msg.toolUse.length > 0 ? (
+								{msg.toolUse && msg.toolUse.length > 0 ? (
 									<div className="max-w-[85%]">
 										<ToolCallCard
 											theme={theme}
-											toolUse={msg.toolUse as any}
+											toolUse={msg.toolUse}
 											timestamp={formatRelativeTime(msg.timestamp)}
 											defaultExpanded={false}
 										/>
@@ -1141,7 +1176,7 @@ export function AgentSessionsBrowser({
 
 						{messagesLoading && messages.length === 0 && (
 							<div className="flex items-center justify-center py-8">
-								<Spinner size="lg" style={{ color: theme.colors.textDim }} />
+								<Loader2 className="w-6 h-6 animate-spin" style={{ color: theme.colors.textDim }} />
 							</div>
 						)}
 					</div>
@@ -1220,7 +1255,10 @@ export function AgentSessionsBrowser({
 								</div>
 							)}
 							{!stats.isComplete && (
-								<Spinner size="xs" className="ml-auto" style={{ color: theme.colors.textDim }} />
+								<Loader2
+									className="w-3 h-3 animate-spin ml-auto"
+									style={{ color: theme.colors.textDim }}
+								/>
 							)}
 						</div>
 					)}
@@ -1232,8 +1270,7 @@ export function AgentSessionsBrowser({
 							style={{ backgroundColor: theme.colors.bgActivity }}
 						>
 							{/* Toggle button: Search icon when showing graph, BarChart icon when showing search */}
-							<GhostIconButton
-								size="md"
+							<button
 								onClick={() => {
 									setShowSearchPanel(!showSearchPanel);
 									if (!showSearchPanel) {
@@ -1244,9 +1281,9 @@ export function AgentSessionsBrowser({
 										handleSearchChange('');
 									}
 								}}
-								className="shrink-0"
+								className="p-1.5 rounded hover:bg-white/10 transition-colors shrink-0"
 								style={{ color: theme.colors.textDim }}
-								tooltip={
+								title={
 									showSearchPanel
 										? 'Show activity graph'
 										: `Search sessions (${formatShortcutKeys(['Meta', 'f'])})`
@@ -1257,7 +1294,7 @@ export function AgentSessionsBrowser({
 								) : (
 									<Search className="w-4 h-4" />
 								)}
-							</GhostIconButton>
+							</button>
 
 							{/* Conditional: Search input OR Activity Graph - fixed height container to prevent layout shift */}
 							<div className="flex-1 min-w-0 flex items-center" style={{ height: '38px' }}>
@@ -1282,7 +1319,12 @@ export function AgentSessionsBrowser({
 												}
 											}}
 										/>
-										{isSearching && <Spinner size="sm" style={{ color: theme.colors.textDim }} />}
+										{isSearching && (
+											<Loader2
+												className="w-4 h-4 animate-spin"
+												style={{ color: theme.colors.textDim }}
+											/>
+										)}
 										{search && !isSearching && (
 											<button
 												onClick={() => handleSearchChange('')}
@@ -1426,19 +1468,20 @@ export function AgentSessionsBrowser({
 					>
 						{loading ? (
 							<div className="flex items-center justify-center py-12">
-								<Spinner size="lg" style={{ color: theme.colors.textDim }} />
+								<Loader2 className="w-6 h-6 animate-spin" style={{ color: theme.colors.textDim }} />
 							</div>
 						) : filteredSessions.length === 0 ? (
-							<EmptyState
-								theme={theme}
-								icon={<List className="w-12 h-12" />}
-								message={
-									sessions.length === 0
+							<div className="flex flex-col items-center justify-center py-12 px-4">
+								<List
+									className="w-12 h-12 mb-4 opacity-30"
+									style={{ color: theme.colors.textDim }}
+								/>
+								<p className="text-sm text-center" style={{ color: theme.colors.textDim }}>
+									{sessions.length === 0
 										? `No ${agentId === 'claude-code' ? 'Claude' : 'agent'} sessions found for this project`
-										: 'No sessions match your search'
-								}
-								className="py-12 px-4"
-							/>
+										: 'No sessions match your search'}
+								</p>
+							</div>
 						) : (
 							<div className="py-2">
 								{filteredSessions.map((session, i) => (
@@ -1470,7 +1513,10 @@ export function AgentSessionsBrowser({
 									<div className="py-4 flex justify-center items-center">
 										{isLoadingMoreSessions ? (
 											<div className="flex items-center gap-2">
-												<Spinner size="sm" style={{ color: theme.colors.accent }} />
+												<Loader2
+													className="w-4 h-4 animate-spin"
+													style={{ color: theme.colors.accent }}
+												/>
 												<span className="text-xs" style={{ color: theme.colors.textDim }}>
 													Loading more sessions...
 												</span>

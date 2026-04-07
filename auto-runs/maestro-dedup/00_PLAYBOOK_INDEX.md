@@ -10,12 +10,23 @@ Master index of all deduplication playbooks. Execute phases in order - each phas
 
 ## Tasks
 
-- [ ] Read this full index and confirm scope: 13 phases, 40 tracker findings, ~8,314 lines of removable/consolidatable code
-- [ ] Read the scan evidence files referenced in each phase before starting that phase
+- [x] Read this full index and confirm scope: 13 phases, 40 tracker findings, ~8,314 lines of removable/consolidatable code
+  - Confirmed: 13 phases, 30 playbook documents, 39 unique tracker items referenced (#1-#40, #30 not listed in index), ~8,214 explicit line savings + observability/maintainability gains in Phases 11 and 13
+- [x] Read the scan evidence files referenced in each phase before starting that phase
+  - Read all 22 scan files in `docs/agent-guides/scans/`: SCAN-DEADCODE, SCAN-TYPES, SCAN-MOCKS, SCAN-FORMATTERS, SCAN-PATTERNS, SCAN-STATE, SCAN-BLOCKS, SCAN-HOOKS, SCAN-COMPONENTS, SCAN-MAIN, SCAN-OVERSIZED, SCAN-SERVICES-CONSTANTS, SCAN-PROCESS-WEBSERVER, SCAN-SUPPLEMENTARY, SCAN-CUE-DEBUG, SCAN-REGEX-DEFAULTS, SCAN-WEB-RENDERER, SCAN-EVENTS-PERSISTENCE, SCAN-PROMPTS-CLI, SCAN-REMAINING, SCAN-TEST-PATTERNS, SCAN-TYPESAFETY
+  - Read DEDUP-TRACKER.md with all 40 findings (P0-P3) and their evidence cross-references
+  - All validated against origin/rc on 2026-04-01. Key regressions noted: App.tsx grew to 4034 lines, mock proliferation accelerating (mockTheme 66->119, window.maestro 64->117)
 - [ ] Execute each phase document (01A through 13C) sequentially - each is a self-contained Auto Run step
-- [ ] After each phase document, run verification: `rtk npm run lint && rtk vitest run`
+  - Phase 01 (01A-01D) completed 2026-04-02. Dead code removal: 7 component files deleted, ~170 dead exports removed/de-exported across stores, shared utils, and main process files. All test files updated. Lint passes clean. Pre-existing failures: 16 main tests (Windows paths), 2 shared tests (pathUtils Unix tests).
+  - Phase 02 completed 2026-04-02. AgentCapabilities consolidated from 7 definitions to 1 canonical in shared/types.ts. Type checks pass. 4 test failures are pre-existing (agents discovery Windows paths).
+  - Phase 03A completed 2026-04-02. 62 createMockSession factories consolidated to shared helper. 17 thin local wrappers retained. 3 correctly excluded (different types).
+  - Phase 03B completed 2026-04-02. 113 mockTheme/createMockTheme definitions consolidated to shared helper.
+  - Phase 03C completed 2026-04-02. 70 window.maestro mock setups migrated to centralized mock.
+  - Phase 03D completed 2026-04-02. 20 createMockTab/createMockAITab factories consolidated to shared helpers. 3 thin wrappers retained, 1 excluded (AITabData type).
+- [ ] After each phase document, run verification: `rtk npm run lint && CI=1 rtk vitest run`
 - [ ] Do not start phase N+1 until phase N passes verification
 - [ ] Track pre-existing test failures separately from failures introduced by your changes
+  - Pre-existing failures baseline: cue-yaml-loader (6), agents discovery (4), filesystem (2), pathResolver (3), messageHandlers (1), pathUtils (2) - all Windows path handling issues
 
 ---
 
@@ -177,7 +188,7 @@ Use RTK (Rust Token Killer) to save tokens on verification output:
 ```
 rtk npm run lint           # TypeScript type checking (83% token savings)
 rtk npm run lint:eslint    # ESLint code quality (84% token savings)
-rtk vitest run             # Vitest test suite (99.5% token savings)
+CI=1 rtk vitest run             # Vitest test suite (99.5% token savings)
 ```
 
 If RTK is not available, fall back to raw npm:
@@ -191,7 +202,7 @@ npm run test
 **Important:** Always prefix verification commands with `rtk` when available. Even in command chains, use `rtk` on each command:
 
 ```
-rtk npm run lint && rtk vitest run
+rtk npm run lint && CI=1 rtk vitest run
 ```
 
 ## Verification
@@ -199,7 +210,7 @@ rtk npm run lint && rtk vitest run
 After completing changes, run targeted tests for the files you modified:
 
 ```bash
-rtk vitest run <path-to-relevant-test-files>
+CI=1 rtk vitest run <path-to-relevant-test-files>
 ```
 
 **Rule: Zero new test failures from your changes.** Pre-existing failures on the baseline are acceptable. If a test you didn't touch starts failing, investigate whether your refactoring broke it. If your change removed code that a test depended on, update that test.

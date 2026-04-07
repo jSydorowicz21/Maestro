@@ -153,18 +153,18 @@ const mockGetInitializationResult = vi.fn();
 const mockClearInitializationResult = vi.fn();
 
 beforeAll(() => {
-	Object.assign(window.maestro.git, { checkGhCli: mockCheckGhCli });
-	Object.assign(window.maestro, {
+	(window as any).maestro = {
+		git: { checkGhCli: mockCheckGhCli },
 		power: { getStatus: mockGetStatus },
+		settings: { get: mockSettingsGet, set: mockSettingsSet },
 		updates: { setAllowPrerelease: mockSetAllowPrerelease, check: mockUpdatesCheck },
-	});
-	Object.assign(window.maestro.settings, { get: mockSettingsGet, set: mockSettingsSet });
-	Object.assign(window.maestro.leaderboard, { sync: mockLeaderboardSync });
-	Object.assign(window.maestro.sshRemote, { getConfigs: mockGetSshConfigs });
-	Object.assign(window.maestro.stats, {
-		getInitializationResult: mockGetInitializationResult,
-		clearInitializationResult: mockClearInitializationResult,
-	});
+		leaderboard: { sync: mockLeaderboardSync },
+		sshRemote: { getConfigs: mockGetSshConfigs },
+		stats: {
+			getInitializationResult: mockGetInitializationResult,
+			clearInitializationResult: mockClearInitializationResult,
+		},
+	};
 	(window as any).__hideSplash = vi.fn();
 	(window as any).__updateSplash = vi.fn();
 });

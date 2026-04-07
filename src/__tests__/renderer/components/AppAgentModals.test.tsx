@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { AppAgentModals } from '../../../renderer/components/AppModals';
 import type { Theme, Session, AgentError } from '../../../renderer/types';
-import { createMockSession } from '../../helpers/mockSession';
 import type {
 	AppAgentModalsProps,
 	GroupChatErrorInfo,
@@ -47,6 +46,19 @@ const testTheme: Theme = {
 		success: '#89d185',
 	},
 };
+
+function createMockSession(overrides: Partial<Session>): Session {
+	return {
+		id: 'session-1',
+		name: 'Agent 1',
+		state: 'idle',
+		toolType: 'claude-code',
+		cwd: '/tmp',
+		terminalTabs: [],
+		activeTerminalTabId: null,
+		...overrides,
+	} as Session;
+}
 
 const defaultProps: AppAgentModalsProps = {
 	theme: testTheme,

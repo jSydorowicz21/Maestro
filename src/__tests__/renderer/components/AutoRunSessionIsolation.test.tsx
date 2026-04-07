@@ -15,7 +15,6 @@ import React from 'react';
 import { AutoRun, AutoRunHandle } from '../../../renderer/components/AutoRun';
 import { LayerStackProvider } from '../../../renderer/contexts/LayerStackContext';
 import type { Theme, BatchRunState } from '../../../renderer/types';
-import { createMockTheme } from '../../helpers/mockTheme';
 
 // Helper to wrap component in LayerStackProvider with custom rerender
 const renderWithProviders = (ui: React.ReactElement) => {
@@ -126,9 +125,31 @@ vi.mock('../../../renderer/hooks/input/useTemplateAutocomplete', () => ({
 vi.mock('../../../renderer/components/TemplateAutocompleteDropdown', () => ({
 	TemplateAutocompleteDropdown: React.forwardRef(() => null),
 }));
-// Setup window.maestro mock overrides on the centralized mock from setup.ts
+
+// Create a mock theme for testing
+const createMockTheme = (): Theme => ({
+	id: 'test-theme',
+	name: 'Test Theme',
+	mode: 'dark',
+	colors: {
+		bgMain: '#1a1a1a',
+		bgPanel: '#252525',
+		bgActivity: '#2d2d2d',
+		textMain: '#ffffff',
+		textDim: '#888888',
+		accent: '#0066ff',
+		accentForeground: '#ffffff',
+		border: '#333333',
+		highlight: '#0066ff33',
+		success: '#00aa00',
+		warning: '#ffaa00',
+		error: '#ff0000',
+	},
+});
+
+// Setup window.maestro mock
 const setupMaestroMock = () => {
-	const mockOverrides = {
+	const mockMaestro = {
 		fs: {
 			readFile: vi.fn().mockResolvedValue('data:image/png;base64,abc123'),
 			readDir: vi.fn().mockResolvedValue([]),
@@ -145,10 +166,8 @@ const setupMaestroMock = () => {
 		},
 	};
 
-	Object.assign(window.maestro.fs, mockOverrides.fs);
-	Object.assign(window.maestro.autorun, mockOverrides.autorun);
-	Object.assign(window.maestro.settings, mockOverrides.settings);
-	return mockOverrides;
+	(window as any).maestro = mockMaestro;
+	return mockMaestro;
 };
 
 // Default props for AutoRun component

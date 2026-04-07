@@ -1,7 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
-import { useEventListener } from '../../hooks/utils/useEventListener';
 import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
-import { GhostIconButton } from '../ui/GhostIconButton';
 
 interface ImageViewerProps {
 	src: string;
@@ -91,7 +89,12 @@ export const ImageViewer = memo(function ImageViewer({ src, alt, theme }: ImageV
 	}, []);
 
 	// Release drag if mouse leaves the container
-	useEventListener('mouseup', () => setDragging(false), dragging ? window : null);
+	useEffect(() => {
+		if (!dragging) return;
+		const up = () => setDragging(false);
+		window.addEventListener('mouseup', up);
+		return () => window.removeEventListener('mouseup', up);
+	}, [dragging]);
 
 	const fitToView = useCallback(() => {
 		setZoom(1);
@@ -115,29 +118,36 @@ export const ImageViewer = memo(function ImageViewer({ src, alt, theme }: ImageV
 				className="flex items-center justify-center gap-2 py-1.5 shrink-0 border-b"
 				style={{ borderColor: theme.colors.border }}
 			>
-				<GhostIconButton
+				<button
 					onClick={zoomOut}
+					className="p-1 rounded hover:bg-white/10 transition-colors"
 					style={{ color: theme.colors.textDim }}
-					tooltip="Zoom out"
+					title="Zoom out"
 				>
 					<ZoomOut className="w-4 h-4" />
-				</GhostIconButton>
+				</button>
 				<span
 					className="text-xs font-mono w-12 text-center select-none"
 					style={{ color: theme.colors.textMain }}
 				>
 					{zoomPercent}%
 				</span>
-				<GhostIconButton onClick={zoomIn} style={{ color: theme.colors.textDim }} tooltip="Zoom in">
-					<ZoomIn className="w-4 h-4" />
-				</GhostIconButton>
-				<GhostIconButton
-					onClick={fitToView}
+				<button
+					onClick={zoomIn}
+					className="p-1 rounded hover:bg-white/10 transition-colors"
 					style={{ color: theme.colors.textDim }}
-					tooltip="Fit to view"
+					title="Zoom in"
+				>
+					<ZoomIn className="w-4 h-4" />
+				</button>
+				<button
+					onClick={fitToView}
+					className="p-1 rounded hover:bg-white/10 transition-colors"
+					style={{ color: theme.colors.textDim }}
+					title="Fit to view"
 				>
 					<Maximize2 className="w-4 h-4" />
-				</GhostIconButton>
+				</button>
 				{naturalSize && (
 					<span className="text-[10px] ml-2" style={{ color: theme.colors.textDim }}>
 						{naturalSize.w} × {naturalSize.h}

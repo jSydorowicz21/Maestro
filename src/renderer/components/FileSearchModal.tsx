@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
 import { Search, File, FileImage, FileText } from 'lucide-react';
 import type { Theme, Shortcut } from '../types';
 import type { FileNode } from '../types/fileTree';
 import { fuzzyMatchWithScore } from '../utils/search';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 
@@ -216,6 +215,8 @@ export function FileSearchModal({
 	const inputRef = useRef<HTMLInputElement>(null);
 	const selectedItemRef = useRef<HTMLButtonElement>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
+	const layerIdRef = useRef<string>();
+	const onCloseRef = useRef(onClose);
 
 	const handleSearchChange = useCallback((value: string) => {
 		setSearch(value);
@@ -229,10 +230,46 @@ export function FileSearchModal({
 		setFirstVisibleIndex(0);
 	}, []);
 
-	useModalLayer(MODAL_PRIORITIES.FUZZY_FILE_SEARCH, 'Fuzzy File Search', onClose);
+	// Keep onClose ref up to date
+	useEffect(() => {
+		onCloseRef.current = onClose;
+	});
+
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
+
+	// Register layer on mount
+	useEffect(() => {
+		layerIdRef.current = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.FUZZY_FILE_SEARCH,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'strict',
+			ariaLabel: 'Fuzzy File Search',
+			onEscape: () => onCloseRef.current(),
+		});
+
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [registerLayer, unregisterLayer]);
+
+	// Update handler when onClose changes
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, () => {
+				onCloseRef.current();
+			});
+		}
+	}, [updateLayerHandler]);
 
 	// Focus input on mount
-	useFocusAfterRender(inputRef, true, 50);
+	useEffect(() => {
+		const timer = setTimeout(() => inputRef.current?.focus(), 50);
+		return () => clearTimeout(timer);
+	}, []);
 
 	// Flatten the file tree to only previewable files
 	const allFiles = useMemo(() => {

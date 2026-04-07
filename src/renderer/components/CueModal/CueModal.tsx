@@ -17,14 +17,14 @@ import {
 	AlertTriangle,
 } from 'lucide-react';
 import type { Theme } from '../../types';
-import { useModalLayer } from '../../hooks/ui/useModalLayer';
+import { useLayerStack } from '../../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
 import { useCue } from '../../hooks/useCue';
 import type { CueSessionStatus } from '../../hooks/useCue';
 import { CueHelpContent } from '../CueHelpModal';
 import { CuePipelineEditor } from '../CuePipelineEditor';
 import { useSessionStore } from '../../stores/sessionStore';
-import { getModalActions } from '../../stores/modalStore';
+import { getModalActions, useModalStore, selectModalData } from '../../stores/modalStore';
 import { CUE_COLOR, type CueGraphSession } from '../../../shared/cue-pipeline-types';
 import { graphSessionsToPipelines } from '../CuePipelineEditor/utils/yamlToPipeline';
 import { SessionsTable } from './SessionsTable';
@@ -43,6 +43,8 @@ export interface CueModalProps {
 }
 
 export function CueModal({ theme, onClose, cueShortcutKeys }: CueModalProps) {
+	const { registerLayer, unregisterLayer } = useLayerStack();
+	const layerIdRef = useRef<string>();
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
 
@@ -115,28 +117,41 @@ export function CueModal({ theme, onClose, cueShortcutKeys }: CueModalProps) {
 		}
 	}, [isEnabled, enable, disable, toggling]);
 
-	// Layer registration via useModalLayer
-	const handleEscape = useCallback(() => {
-		if (showHelpRef.current) {
-			setShowHelp(false);
-			return;
-		}
-		if (pipelineDirtyRef.current) {
-			getModalActions().showConfirmation(
-				'You have unsaved changes in the pipeline editor. Discard and close?',
-				() => onCloseRef.current()
-			);
-			return;
-		}
-		onCloseRef.current();
-	}, []);
+	// Register layer on mount
+	useEffect(() => {
+		const id = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.CUE_MODAL,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'strict',
+			onEscape: () => {
+				if (showHelpRef.current) {
+					setShowHelp(false);
+					return;
+				}
+				if (pipelineDirtyRef.current) {
+					getModalActions().showConfirmation(
+						'You have unsaved changes in the pipeline editor. Discard and close?',
+						() => onCloseRef.current()
+					);
+					return;
+				}
+				onCloseRef.current();
+			},
+		});
+		layerIdRef.current = id;
 
-	useModalLayer(MODAL_PRIORITIES.CUE_MODAL, 'Cue Dashboard', handleEscape, {
-		focusTrap: 'strict',
-	});
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [registerLayer, unregisterLayer]);
 
-	// Tab state
-	const [activeTab, setActiveTab] = useState<CueModalTab>('pipeline');
+	// Read initial tab from modal data (e.g., when navigating from YAML editor)
+	const cueModalData = useModalStore(selectModalData('cueModal'));
+	const [activeTab, setActiveTab] = useState<CueModalTab>(cueModalData?.initialTab ?? 'pipeline');
 
 	// Graph data fetch error state
 	const [graphError, setGraphError] = useState<string | null>(null);

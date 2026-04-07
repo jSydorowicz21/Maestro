@@ -1,6 +1,5 @@
-import { useRef } from 'react';
+import React, { useRef } from 'react';
 import type { Theme, Session } from '../types';
-import { updateSessionWith } from '../stores/sessionStore';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { Modal, ModalFooter } from './ui/Modal';
 import { FormInput } from './ui/FormInput';
@@ -11,6 +10,7 @@ interface RenameSessionModalProps {
 	setValue: (value: string) => void;
 	onClose: () => void;
 	sessions: Session[];
+	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	activeSessionId: string;
 	/** Optional: specific session ID to rename (overrides activeSessionId) */
 	targetSessionId?: string;
@@ -25,6 +25,7 @@ export function RenameSessionModal(props: RenameSessionModalProps) {
 		setValue,
 		onClose,
 		sessions,
+		setSessions,
 		activeSessionId,
 		targetSessionId,
 		onAfterRename,
@@ -41,7 +42,9 @@ export function RenameSessionModal(props: RenameSessionModalProps) {
 			const targetSession = sessions.find((s) => s.id === sessionIdToRename);
 
 			// Update local state
-			updateSessionWith(sessionIdToRename, (s) => ({ ...s, name: trimmedName }));
+			setSessions((prev) =>
+				prev.map((s) => (s.id === sessionIdToRename ? { ...s, name: trimmedName } : s))
+			);
 
 			// Also update the agent session name if this session has an associated agent session
 			// Use projectRoot (not cwd) for consistent session storage access

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useEventListener } from '../hooks/utils/useEventListener';
 import { X, MessageSquare, Command, Trash2, Clock, Folder, FolderOpen } from 'lucide-react';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import type { Session, Theme, QueuedItem } from '../types';
 
@@ -12,7 +11,7 @@ interface ExecutionQueueBrowserProps {
 	activeSessionId: string | null;
 	theme: Theme;
 	onRemoveItem: (sessionId: string, itemId: string) => void;
-	onSwitchSession: (sessionId: string) => void;
+	onSwitchSession: (sessionId: string, tabId?: string) => void;
 	onReorderItems?: (sessionId: string, fromIndex: number, toIndex: number) => void;
 }
 
@@ -44,12 +43,9 @@ export function ExecutionQueueBrowser({
 	const [viewMode, setViewMode] = useState<'current' | 'global'>('current');
 	const [dragState, setDragState] = useState<DragState | null>(null);
 	const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
-	useModalLayer(
-		MODAL_PRIORITIES.EXECUTION_QUEUE_BROWSER || 50,
-		'Execution Queue Browser',
-		onClose,
-		{ isOpen }
-	);
+	const { registerLayer, unregisterLayer } = useLayerStack();
+	const onCloseRef = useRef(onClose);
+	onCloseRef.current = onClose;
 
 	// Drag handlers
 	const handleDragStart = (sessionId: string, itemId: string, index: number) => {
@@ -83,6 +79,21 @@ export function ExecutionQueueBrowser({
 		setDragState(null);
 		setDropIndicator(null);
 	};
+
+	// Register with layer stack for proper escape handling
+	useEffect(() => {
+		if (isOpen) {
+			const id = registerLayer({
+				type: 'modal',
+				priority: MODAL_PRIORITIES.EXECUTION_QUEUE_BROWSER || 50,
+				blocksLowerLayers: true,
+				capturesFocus: true,
+				focusTrap: 'strict',
+				onEscape: () => onCloseRef.current(),
+			});
+			return () => unregisterLayer(id);
+		}
+	}, [isOpen, registerLayer, unregisterLayer]);
 
 	if (!isOpen) return null;
 
@@ -234,7 +245,7 @@ export function ExecutionQueueBrowser({
 												theme={theme}
 												onRemove={() => onRemoveItem(session.id, item.id)}
 												onSwitchToSession={() => {
-													onSwitchSession(session.id);
+													onSwitchSession(session.id, item.tabId);
 													onClose();
 												}}
 												isDragging={dragState?.itemId === item.id}
@@ -407,20 +418,24 @@ function QueueItemRow({
 	}, []);
 
 	// Handle escape key to cancel drag
-	useEventListener(
-		'keydown',
-		(e: KeyboardEvent) => {
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.key === 'Escape' && isDragging) {
 				onDragCancel?.();
 				isDraggingRef.current = false;
 				setIsPressed(false);
 			}
-		},
-		isDragging ? window : null
-	);
+		};
 
-	// Handle mouseup to end drag
-	useEventListener('mouseup', handleMouseUp, isDragging ? window : null);
+		if (isDragging) {
+			window.addEventListener('keydown', handleKeyDown);
+			window.addEventListener('mouseup', handleMouseUp);
+			return () => {
+				window.removeEventListener('keydown', handleKeyDown);
+				window.removeEventListener('mouseup', handleMouseUp);
+			};
+		}
+	}, [isDragging, onDragCancel]);
 
 	// Visual states
 	const showDragReady = canDrag && isHovered && !isDragging && !isAnyDragging;

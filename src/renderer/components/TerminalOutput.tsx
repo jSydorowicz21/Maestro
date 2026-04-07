@@ -11,12 +11,13 @@ import {
 	AlertCircle,
 	Save,
 	Share2,
+	Zap,
 } from 'lucide-react';
 import type { Session, Theme, LogEntry, FocusArea, AgentError } from '../types';
 import type { FileNode } from '../types/fileTree';
 import Convert from 'ansi-to-html';
 import DOMPurify from 'dompurify';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { getActiveTab } from '../utils/tabHelpers';
 import { useDebouncedValue, useThrottledCallback } from '../hooks';
@@ -28,7 +29,6 @@ import {
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { QueuedItemsList } from './QueuedItemsList';
-import { EmptyState } from './ui';
 import { LogFilterControls } from './LogFilterControls';
 import { SaveMarkdownModal } from './SaveMarkdownModal';
 import { generateTerminalProseStyles } from '../utils/markdownConfig';
@@ -656,7 +656,12 @@ const LogItemComponent = memo(
 						log.source !== 'thinking' &&
 						log.source !== 'tool' &&
 						(hasNoMatches ? (
-							<EmptyState theme={theme} message="No matches found for filter" className="py-8" />
+							<div
+								className="flex items-center justify-center py-8 text-sm"
+								style={{ color: theme.colors.textDim }}
+							>
+								<span>No matches found for filter</span>
+							</div>
 						) : shouldCollapse && !isExpanded ? (
 							<div>
 								<div
@@ -970,6 +975,18 @@ const LogItemComponent = memo(
 									<Trash2 className="w-3.5 h-3.5" />
 								</button>
 							))}
+						{/* Force parallel indicator for messages sent via Cmd+Shift+Enter */}
+						{isUserMessage && isAIMode && log.forceParallel && (
+							<span
+								title="Sent via forced parallel execution (bypassed queue)"
+								className="flex items-center"
+							>
+								<Zap
+									className="w-3.5 h-3.5"
+									style={{ color: theme.colors.warning, opacity: 0.7 }}
+								/>
+							</span>
+						)}
 						{/* Delivery checkmark for user messages in AI mode - positioned at the end */}
 						{isUserMessage && isAIMode && log.delivered && (
 							<span title="Message delivered" className="flex items-center">
@@ -992,6 +1009,7 @@ const LogItemComponent = memo(
 			prevProps.log.text === nextProps.log.text &&
 			prevProps.log.delivered === nextProps.log.delivered &&
 			prevProps.log.readOnly === nextProps.log.readOnly &&
+			prevProps.log.forceParallel === nextProps.log.forceParallel &&
 			prevProps.isExpanded === nextProps.isExpanded &&
 			prevProps.localFilterQuery === nextProps.localFilterQuery &&
 			prevProps.filterMode.mode === nextProps.filterMode.mode &&
@@ -1183,17 +1201,45 @@ export const TerminalOutput = memo(
 		}, []);
 
 		// Layer stack integration for search overlay
-		const handleSearchEscape = useCallback(() => {
-			setOutputSearchOpen(false);
-			setOutputSearchQuery('');
-			terminalOutputRef.current?.focus();
-		}, [setOutputSearchOpen, setOutputSearchQuery, terminalOutputRef]);
+		const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
+		const layerIdRef = useRef<string>();
 
-		useModalLayer(MODAL_PRIORITIES.SLASH_AUTOCOMPLETE, 'Output Search', handleSearchEscape, {
-			isOpen: outputSearchOpen,
-			type: 'overlay',
-			capturesFocus: true,
-		});
+		// Register layer when search is open
+		useEffect(() => {
+			if (outputSearchOpen) {
+				layerIdRef.current = registerLayer({
+					type: 'overlay',
+					priority: MODAL_PRIORITIES.SLASH_AUTOCOMPLETE, // Use same priority as slash autocomplete (low priority)
+					blocksLowerLayers: false,
+					capturesFocus: true,
+					focusTrap: 'none',
+					onEscape: () => {
+						setOutputSearchOpen(false);
+						setOutputSearchQuery('');
+						terminalOutputRef.current?.focus();
+					},
+					allowClickOutside: true,
+					ariaLabel: 'Output Search',
+				});
+
+				return () => {
+					if (layerIdRef.current) {
+						unregisterLayer(layerIdRef.current);
+					}
+				};
+			}
+		}, [outputSearchOpen, registerLayer, unregisterLayer]);
+
+		// Update the handler when dependencies change
+		useEffect(() => {
+			if (outputSearchOpen && layerIdRef.current) {
+				updateLayerHandler(layerIdRef.current, () => {
+					setOutputSearchOpen(false);
+					setOutputSearchQuery('');
+					terminalOutputRef.current?.focus();
+				});
+			}
+		}, [outputSearchOpen, updateLayerHandler]);
 
 		const toggleExpanded = useCallback((logId: string) => {
 			setExpandedLogs((prev) => {

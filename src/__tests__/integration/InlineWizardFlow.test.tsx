@@ -26,43 +26,57 @@ import {
 import { WizardConversationView } from '../../renderer/components/InlineWizard/WizardConversationView';
 import { parseWizardIntent } from '../../renderer/services/wizardIntentParser';
 import type { Theme } from '../../renderer/types';
-import { createMockTheme } from '../helpers/mockTheme';
 
-// Override specific window.maestro namespaces (setup.ts provides the base mock)
-// Keep references for assertions in tests
-const mockAutorun = {
-	listDocs: vi.fn(),
-	readDoc: vi.fn(),
-	writeDoc: vi.fn(),
-};
-const mockAgents = {
-	get: vi.fn(),
-};
-const mockProcess = {
-	spawn: vi.fn(),
-	kill: vi.fn(),
-	onData: vi.fn(),
-	onExit: vi.fn(),
-};
-
-// Alias for backward compatibility with test assertions
+// Mock the maestro API
 const mockMaestro = {
-	autorun: mockAutorun,
-	agents: mockAgents,
-	process: mockProcess,
+	autorun: {
+		listDocs: vi.fn(),
+		readDoc: vi.fn(),
+		writeDoc: vi.fn(),
+	},
+	agents: {
+		get: vi.fn(),
+	},
+	process: {
+		spawn: vi.fn(),
+		kill: vi.fn(),
+		onData: vi.fn(),
+		onExit: vi.fn(),
+	},
 };
 
 // Setup window.maestro mock before each test
 beforeEach(() => {
+	(window as any).maestro = mockMaestro;
 	vi.clearAllMocks();
-	Object.assign(window.maestro.autorun, mockAutorun);
-	Object.assign(window.maestro.agents, mockAgents);
-	Object.assign(window.maestro.process, mockProcess);
 });
 
 afterEach(() => {
 	vi.useRealTimers();
 });
+
+// Create a mock theme
+const createMockTheme = (): Theme => ({
+	id: 'test-theme',
+	name: 'Test Theme',
+	mode: 'dark',
+	colors: {
+		bgMain: '#1a1a1a',
+		bgPanel: '#252525',
+		bgActivity: '#2d2d2d',
+		bgSidebar: '#1e1e1e',
+		textMain: '#ffffff',
+		textDim: '#888888',
+		accent: '#0066ff',
+		accentForeground: '#ffffff',
+		border: '#333333',
+		highlight: '#0066ff33',
+		success: '#00aa00',
+		warning: '#ffaa00',
+		error: '#ff0000',
+	},
+});
+
 /**
  * Helper to create a wrapper component with InlineWizardProvider
  */

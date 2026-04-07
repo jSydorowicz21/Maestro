@@ -27,11 +27,25 @@ export interface UseRightPanelPropsDeps {
 	handleSetActiveRightTab: (tab: RightPanelTab) => void;
 
 	// File explorer handlers
-	toggleFolder: (path: string, activeSessionId: string) => void;
+	toggleFolder: (
+		path: string,
+		activeSessionId: string,
+		setSessions: React.Dispatch<React.SetStateAction<Session[]>>
+	) => void;
 	handleFileClick: (node: any, path: string, activeSession: Session) => Promise<void>;
-	expandAllFolders: (activeSessionId: string, activeSession: Session) => void;
-	collapseAllFolders: (activeSessionId: string) => void;
-	updateSessionWorkingDirectory: () => Promise<void>;
+	expandAllFolders: (
+		activeSessionId: string,
+		activeSession: Session,
+		setSessions: React.Dispatch<React.SetStateAction<Session[]>>
+	) => void;
+	collapseAllFolders: (
+		activeSessionId: string,
+		setSessions: React.Dispatch<React.SetStateAction<Session[]>>
+	) => void;
+	updateSessionWorkingDirectory: (
+		activeSessionId: string,
+		setSessions: React.Dispatch<React.SetStateAction<Session[]>>
+	) => Promise<void>;
 	refreshFileTree: (sessionId: string) => Promise<FileTreeChanges | undefined>;
 	handleAutoRefreshChange: (interval: number) => void;
 	showSuccessFlash: (message: string) => void;

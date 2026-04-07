@@ -13,7 +13,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
-import { createMockSession as _createMockSession } from '../../helpers/mockSession';
 
 const mockPushNavigation = vi.fn();
 
@@ -47,18 +46,43 @@ function createMockAITab(overrides: Partial<AITab> = {}): AITab {
 	} as AITab;
 }
 
-// Wrapper: old factory included specific defaults these tests depend on
 function createMockSession(overrides: Partial<Session> = {}): Session {
-	return _createMockSession({
+	return {
+		id: 'session-1',
+		name: 'Test Agent',
 		cwd: '/projects/myapp',
 		fullPath: '/projects/myapp',
 		projectRoot: '/projects/myapp',
+		toolType: 'claude-code' as any,
 		groupId: 'group-1',
-		port: 3000,
+		inputMode: 'ai' as any,
+		state: 'idle' as any,
 		aiTabs: [createMockAITab()],
 		activeTabId: 'tab-1',
+		aiLogs: [],
+		shellLogs: [],
+		workLog: [],
+		contextUsage: 0,
+		aiPid: 0,
+		terminalPid: 0,
+		port: 3000,
+		isLive: false,
+		changedFiles: [],
+		isGitRepo: false,
+		fileTree: [],
+		fileExplorerExpanded: [],
+		fileExplorerScrollPos: 0,
+		executionQueue: [],
+		activeTimeMs: 0,
+		closedTabHistory: [],
+		filePreviewTabs: [],
+		activeFileTabId: null,
+		unifiedTabOrder: [],
+		unifiedClosedTabHistory: [],
+		terminalTabs: [],
+		activeTerminalTabId: null,
 		...overrides,
-	});
+	} as Session;
 }
 
 // ============================================================================
@@ -102,15 +126,29 @@ beforeEach(() => {
 	});
 
 	// Mock window.maestro APIs
-	Object.assign(window.maestro.process, {
-		kill: vi.fn().mockResolvedValue(undefined),
-	});
-	Object.assign(window.maestro.stats, {
-		recordSessionClosed: vi.fn(),
-	});
-	Object.assign(window.maestro, {
+	(window as any).maestro = {
+		process: {
+			kill: vi.fn().mockResolvedValue(undefined),
+		},
+		stats: {
+			recordSessionClosed: vi.fn(),
+		},
 		playbooks: {
 			deleteAll: vi.fn().mockResolvedValue(undefined),
+		},
+		shell: {
+			trashItem: vi.fn().mockResolvedValue(undefined),
+		},
+		logger: {
+			log: vi.fn(),
+		},
+		claude: {
+			updateSessionName: vi.fn().mockResolvedValue(undefined),
+			updateSessionStarred: vi.fn().mockResolvedValue(undefined),
+		},
+		agentSessions: {
+			setSessionName: vi.fn().mockResolvedValue(undefined),
+			setSessionStarred: vi.fn().mockResolvedValue(undefined),
 		},
 		history: {
 			updateSessionName: vi.fn().mockResolvedValue(undefined),
@@ -118,21 +156,7 @@ beforeEach(() => {
 		groups: {
 			setAll: vi.fn(),
 		},
-	});
-	Object.assign(window.maestro.shell, {
-		trashItem: vi.fn().mockResolvedValue(undefined),
-	});
-	Object.assign(window.maestro.logger, {
-		log: vi.fn(),
-	});
-	Object.assign(window.maestro.claude, {
-		updateSessionName: vi.fn().mockResolvedValue(undefined),
-		updateSessionStarred: vi.fn().mockResolvedValue(undefined),
-	});
-	Object.assign(window.maestro.agentSessions, {
-		setSessionName: vi.fn().mockResolvedValue(undefined),
-		setSessionStarred: vi.fn().mockResolvedValue(undefined),
-	});
+	};
 });
 
 afterEach(() => {

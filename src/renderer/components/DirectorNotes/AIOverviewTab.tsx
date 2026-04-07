@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { RefreshCw, Save, Clock, Copy, Check, Bot, History, Timer } from 'lucide-react';
-import { Spinner } from '../ui';
+import { RefreshCw, Save, Loader2, Clock, Copy, Check, Bot, History, Timer } from 'lucide-react';
 import type { Theme } from '../../types';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { SaveMarkdownModal } from '../SaveMarkdownModal';
 import { useSettings } from '../../hooks';
 import { generateTerminalProseStyles } from '../../utils/markdownConfig';
 import { safeClipboardWrite } from '../../utils/clipboard';
-import { formatElapsedTime } from '../../../shared/formatters';
+import { notifyToast } from '../../stores/notificationStore';
+import { useModalStore } from '../../stores/modalStore';
 
 type SynopsisStats = NonNullable<
 	Awaited<ReturnType<typeof window.maestro.directorNotes.generateSynopsis>>['stats']
@@ -30,11 +30,31 @@ let cachedSynopsis: {
 // Exported for testing only – allows resetting the module-level cache between test runs
 export function _resetCacheForTesting() {
 	cachedSynopsis = null;
+	activeGenerationPromise = null;
 }
 
 // Check whether a cached synopsis exists (any lookback window)
 export function hasCachedSynopsis(): boolean {
 	return cachedSynopsis !== null;
+}
+
+// Module-level: tracks the in-flight synopsis IPC promise.
+// Prevents duplicate generation when the modal is closed and reopened
+// while a generation is still running in the main process.
+type SynopsisResult = Awaited<ReturnType<typeof window.maestro.directorNotes.generateSynopsis>>;
+let activeGenerationPromise: Promise<SynopsisResult> | null = null;
+
+/** Fire a toast when synopsis completes while the modal is closed */
+function fireSynopsisReadyToast() {
+	notifyToast({
+		type: 'success',
+		title: "Director's Notes",
+		message: 'AI Synopsis is ready. Click to view.',
+		skipCustomNotification: true,
+		onClick: () => {
+			useModalStore.getState().openModal('directorNotes', { initialTab: 'ai-overview' });
+		},
+	});
 }
 
 // Heuristic: expected chunk count for a typical synopsis generation.
@@ -61,7 +81,13 @@ export function AIOverviewTab({ theme, onSynopsisReady, onProgressChange }: AIOv
 	const proseStyles = generateTerminalProseStyles(theme, '.director-notes-content');
 
 	// Format generation duration for display
-	const formatDurationMs = formatElapsedTime;
+	const formatDurationMs = (ms: number): string => {
+		const totalSeconds = Math.floor(ms / 1000);
+		const minutes = Math.floor(totalSeconds / 60);
+		const seconds = totalSeconds % 60;
+		if (minutes > 0) return `${minutes}m ${seconds}s`;
+		return `${seconds}s`;
+	};
 
 	// Format the generation timestamp
 	const formatGeneratedAt = (timestamp: number): string => {
@@ -117,14 +143,17 @@ export function AIOverviewTab({ theme, onSynopsisReady, onProgressChange }: AIOv
 		setError(null);
 		setProgress({ phase: 'generating', message: 'Starting...', percent: 2 });
 
+		const ipcPromise = window.maestro.directorNotes.generateSynopsis({
+			lookbackDays,
+			provider: directorNotesSettings.provider,
+			customPath: directorNotesSettings.customPath,
+			customArgs: directorNotesSettings.customArgs,
+			customEnvVars: directorNotesSettings.customEnvVars,
+		});
+		activeGenerationPromise = ipcPromise;
+
 		try {
-			const result = await window.maestro.directorNotes.generateSynopsis({
-				lookbackDays,
-				provider: directorNotesSettings.provider,
-				customPath: directorNotesSettings.customPath,
-				customArgs: directorNotesSettings.customArgs,
-				customEnvVars: directorNotesSettings.customEnvVars,
-			});
+			const result = await ipcPromise;
 
 			// Always cache regardless of mount state so result is available next open
 			if (result.success) {
@@ -137,8 +166,13 @@ export function AIOverviewTab({ theme, onSynopsisReady, onProgressChange }: AIOv
 				};
 			}
 
-			// Only update component state if still mounted
-			if (!mountedRef.current) return;
+			// If component unmounted while generating, fire a toast notification
+			if (!mountedRef.current) {
+				if (result.success) {
+					fireSynopsisReadyToast();
+				}
+				return;
+			}
 
 			if (result.success) {
 				const ts = result.generatedAt ?? Date.now();
@@ -154,6 +188,10 @@ export function AIOverviewTab({ theme, onSynopsisReady, onProgressChange }: AIOv
 			if (!mountedRef.current) return;
 			setError(err instanceof Error ? err.message : 'Failed to generate synopsis');
 		} finally {
+			// Only clear if this is still the active generation (not overwritten by Regenerate)
+			if (activeGenerationPromise === ipcPromise) {
+				activeGenerationPromise = null;
+			}
 			isGeneratingRef.current = false;
 			if (mountedRef.current) {
 				setIsGenerating(false);
@@ -161,7 +199,7 @@ export function AIOverviewTab({ theme, onSynopsisReady, onProgressChange }: AIOv
 		}
 	}, [lookbackDays, directorNotesSettings, onSynopsisReady]);
 
-	// On mount: use cache if available (regardless of lookback), otherwise generate fresh
+	// On mount: use cache if available, attach to in-flight generation, or start fresh
 	useEffect(() => {
 		mountedRef.current = true;
 		if (cachedSynopsis) {
@@ -170,6 +208,39 @@ export function AIOverviewTab({ theme, onSynopsisReady, onProgressChange }: AIOv
 			setStats(cachedSynopsis.stats ?? null);
 			setLookbackDays(cachedSynopsis.lookbackDays);
 			onSynopsisReady?.();
+		} else if (activeGenerationPromise) {
+			// A generation is already in flight (started before modal was closed).
+			// Attach to it instead of starting a duplicate.
+			setIsGenerating(true);
+			isGeneratingRef.current = true;
+			setProgress({ phase: 'generating', message: 'Resuming...', percent: 2 });
+
+			const existingPromise = activeGenerationPromise;
+			existingPromise
+				.then((result) => {
+					if (!mountedRef.current) return;
+					if (result.success) {
+						const ts = result.generatedAt ?? Date.now();
+						setSynopsis(result.synopsis);
+						setGeneratedAt(ts);
+						setStats(result.stats ?? null);
+						if (cachedSynopsis) setLookbackDays(cachedSynopsis.lookbackDays);
+						setProgress({ phase: 'complete', message: 'Synopsis complete', percent: 100 });
+						onSynopsisReady?.();
+					} else {
+						setError(result.error || 'Failed to generate synopsis');
+					}
+				})
+				.catch((err) => {
+					if (!mountedRef.current) return;
+					setError(err instanceof Error ? err.message : 'Failed to generate synopsis');
+				})
+				.finally(() => {
+					isGeneratingRef.current = false;
+					if (mountedRef.current) {
+						setIsGenerating(false);
+					}
+				});
 		} else {
 			generateSynopsis();
 		}
@@ -223,7 +294,7 @@ export function AIOverviewTab({ theme, onSynopsisReady, onProgressChange }: AIOv
 					}}
 				>
 					{isGenerating ? (
-						<Spinner size="xs" className="w-3.5 h-3.5" />
+						<Loader2 className="w-3.5 h-3.5 animate-spin" />
 					) : (
 						<RefreshCw className="w-3.5 h-3.5" />
 					)}
@@ -352,7 +423,10 @@ export function AIOverviewTab({ theme, onSynopsisReady, onProgressChange }: AIOv
 				) : isGenerating ? (
 					<div className="flex items-center justify-center h-full">
 						<div className="text-center w-64">
-							<Spinner size="xl" className="mx-auto mb-3" style={{ color: theme.colors.accent }} />
+							<Loader2
+								className="w-8 h-8 animate-spin mx-auto mb-3"
+								style={{ color: theme.colors.accent }}
+							/>
 							<div
 								className="h-2 rounded-full overflow-hidden mb-2"
 								style={{ backgroundColor: theme.colors.border }}

@@ -11,6 +11,7 @@ type HistoryMock = {
 };
 
 describe('useWebBroadcasting', () => {
+	let originalMaestro: typeof window.maestro;
 	let historyMock: HistoryMock;
 	let externalChangeHandler: (() => Promise<void>) | null = null;
 	let unsubscribeFn: Mock;
@@ -35,15 +36,18 @@ describe('useWebBroadcasting', () => {
 			reload: vi.fn().mockResolvedValue(true),
 		};
 
-		Object.assign(window.maestro, {
+		originalMaestro = window.maestro;
+		window.maestro = {
+			...originalMaestro,
 			history: {
-				...((window.maestro as any).history || {}),
+				...originalMaestro?.history,
 				...historyMock,
 			},
-		});
+		} as unknown as typeof window.maestro;
 	});
 
 	afterEach(() => {
+		window.maestro = originalMaestro;
 		vi.clearAllMocks();
 	});
 

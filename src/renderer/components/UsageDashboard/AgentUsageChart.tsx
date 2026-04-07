@@ -15,12 +15,10 @@
  */
 
 import React, { memo, useState, useMemo, useCallback } from 'react';
-import { EmptyState } from '../ui';
 import { format, parseISO } from 'date-fns';
 import type { Theme, Session } from '../../types';
 import type { StatsTimeRange, StatsAggregation } from '../../hooks/stats/useStats';
 import { COLORBLIND_AGENT_PALETTE } from '../../constants/colorblindPalettes';
-import { formatElapsedTime as formatDuration } from '../../../shared/formatters';
 
 // 10 distinct colors for agents
 const AGENT_COLORS = [
@@ -62,6 +60,26 @@ interface AgentUsageChartProps {
 	colorBlindMode?: boolean;
 	/** Current sessions for mapping IDs to names */
 	sessions?: Session[];
+}
+
+/**
+ * Format duration in milliseconds to human-readable string
+ */
+function formatDuration(ms: number): string {
+	if (ms === 0) return '0s';
+
+	const totalSeconds = Math.floor(ms / 1000);
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+
+	if (hours > 0) {
+		return `${hours}h ${minutes}m`;
+	}
+	if (minutes > 0) {
+		return `${minutes}m ${seconds}s`;
+	}
+	return `${seconds}s`;
 }
 
 /**
@@ -355,8 +373,11 @@ export const AgentUsageChart = memo(function AgentUsageChart({
 			{/* Chart container */}
 			<div className="relative">
 				{allDates.length === 0 || agents.length === 0 ? (
-					<div style={{ height: chartHeight }}>
-						<EmptyState theme={theme} className="h-full" message="No usage data available" />
+					<div
+						className="flex items-center justify-center"
+						style={{ height: chartHeight, color: theme.colors.textDim }}
+					>
+						<span className="text-sm">No usage data available</span>
 					</div>
 				) : (
 					<svg

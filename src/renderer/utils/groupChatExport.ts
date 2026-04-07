@@ -8,7 +8,6 @@
 
 import { marked } from 'marked';
 import type { GroupChat, GroupChatMessage, GroupChatHistoryEntry, Theme } from '../types';
-import { formatDurationCompact, formatTimestamp } from '../../shared/formatters';
 
 // Configure marked for GFM (tables, strikethrough, etc.)
 marked.setOptions({
@@ -29,14 +28,26 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * Compute and format chat duration from message timestamps
+ * Format a timestamp for display
+ */
+function formatTimestamp(timestamp: string | number): string {
+	const date = new Date(timestamp);
+	return date.toLocaleString();
+}
+
+/**
+ * Format duration from milliseconds
  */
 function formatDuration(messages: GroupChatMessage[]): string {
 	if (messages.length < 2) return '0m';
 
 	const firstTimestamp = new Date(messages[0].timestamp).getTime();
 	const lastTimestamp = new Date(messages[messages.length - 1].timestamp).getTime();
-	return formatDurationCompact(lastTimestamp - firstTimestamp);
+	const durationMs = lastTimestamp - firstTimestamp;
+	const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
+	const durationMins = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+
+	return durationHours > 0 ? `${durationHours}h ${durationMins}m` : `${durationMins}m`;
 }
 
 /**
@@ -120,7 +131,7 @@ export function generateGroupChatExportHtml(
       <div class="message ${isUser ? 'message-user' : 'message-agent'}">
         <div class="message-header">
           <span class="message-from" style="color: ${color}">${escapeHtml(msg.from)}</span>
-          <span class="message-time">${formatTimestamp(msg.timestamp, 'full')}</span>
+          <span class="message-time">${formatTimestamp(msg.timestamp)}</span>
           ${msg.readOnly ? '<span class="read-only-badge">read-only</span>' : ''}
         </div>
         <div class="message-content">${formattedContent}</div>
@@ -674,7 +685,7 @@ export function generateGroupChatExportHtml(
 
     <header class="header">
       <h1>${escapeHtml(groupChat.name)}</h1>
-      <p class="subtitle">Group Chat Export - ${formatTimestamp(groupChat.createdAt, 'full')}</p>
+      <p class="subtitle">Group Chat Export - ${formatTimestamp(groupChat.createdAt)}</p>
     </header>
 
     <div class="stats-grid">
@@ -702,7 +713,7 @@ export function generateGroupChatExportHtml(
         <span class="info-label">Group Chat ID</span>
         <span class="info-value">${escapeHtml(groupChat.id)}</span>
         <span class="info-label">Created</span>
-        <span class="info-value">${formatTimestamp(groupChat.createdAt, 'full')}</span>
+        <span class="info-value">${formatTimestamp(groupChat.createdAt)}</span>
         <span class="info-label">Moderator</span>
         <span class="info-value">${escapeHtml(groupChat.moderatorAgentId)}</span>
       </div>
@@ -729,7 +740,7 @@ export function generateGroupChatExportHtml(
     </section>
 
     <footer class="footer">
-      <p>Exported from <a href="https://runmaestro.ai" target="_blank">Maestro</a> on ${formatTimestamp(Date.now(), 'full')}</p>
+      <p>Exported from <a href="https://runmaestro.ai" target="_blank">Maestro</a> on ${formatTimestamp(Date.now())}</p>
       <p class="footer-theme">Theme: ${escapeHtml(theme.name)}</p>
     </footer>
   </div>

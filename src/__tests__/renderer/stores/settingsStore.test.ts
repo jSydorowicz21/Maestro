@@ -2,15 +2,21 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import {
 	useSettingsStore,
 	loadAllSettings,
+	getBadgeLevelForTime,
 	selectIsLeaderboardRegistered,
+	getSettingsState,
+	getSettingsActions,
+	DEFAULT_CONTEXT_MANAGEMENT_SETTINGS,
+	DEFAULT_AUTO_RUN_STATS,
+	DEFAULT_USAGE_STATS,
+	DEFAULT_KEYBOARD_MASTERY_STATS,
+	DEFAULT_ONBOARDING_STATS,
+	DEFAULT_AI_COMMANDS,
 } from '../../../renderer/stores/settingsStore';
 import type { SettingsStoreState } from '../../../renderer/stores/settingsStore';
 import type { FileExplorerIconTheme } from '../../../renderer/utils/fileExplorerIcons/shared';
 import { DEFAULT_SHORTCUTS, TAB_SHORTCUTS } from '../../../renderer/constants/shortcuts';
 import { DEFAULT_CUSTOM_THEME_COLORS } from '../../../renderer/constants/themes';
-
-// Capture initial store defaults before any test mutates state
-const initialState = useSettingsStore.getState();
 
 /**
  * Reset the Zustand store to initial state between tests.
@@ -57,19 +63,19 @@ function resetStore() {
 		logViewerSelectedLevels: ['debug', 'info', 'warn', 'error', 'toast'],
 		shortcuts: DEFAULT_SHORTCUTS,
 		tabShortcuts: TAB_SHORTCUTS,
-		customAICommands: initialState.customAICommands,
+		customAICommands: DEFAULT_AI_COMMANDS,
 		totalActiveTimeMs: 0,
-		autoRunStats: initialState.autoRunStats,
-		usageStats: initialState.usageStats,
+		autoRunStats: DEFAULT_AUTO_RUN_STATS,
+		usageStats: DEFAULT_USAGE_STATS,
 		ungroupedCollapsed: false,
 		tourCompleted: false,
 		firstAutoRunCompleted: false,
-		onboardingStats: initialState.onboardingStats,
+		onboardingStats: DEFAULT_ONBOARDING_STATS,
 		leaderboardRegistration: null,
 		webInterfaceUseCustomPort: false,
 		webInterfaceCustomPort: 8080,
-		contextManagementSettings: initialState.contextManagementSettings,
-		keyboardMasteryStats: initialState.keyboardMasteryStats,
+		contextManagementSettings: DEFAULT_CONTEXT_MANAGEMENT_SETTINGS,
+		keyboardMasteryStats: DEFAULT_KEYBOARD_MASTERY_STATS,
 		colorBlindMode: false,
 		documentGraphShowExternalLinks: false,
 		documentGraphMaxNodes: 50,
@@ -88,6 +94,8 @@ function resetStore() {
 		directorNotesSettings: { provider: 'claude-code', defaultLookbackDays: 7 },
 		wakatimeApiKey: '',
 		wakatimeEnabled: false,
+		forcedParallelExecution: false,
+		forcedParallelAcknowledged: false,
 	});
 }
 
@@ -114,7 +122,7 @@ describe('settingsStore', () => {
 	// ========================================================================
 
 	describe('initial state', () => {
-		it('has correct default values for all 66 fields', () => {
+		it('has correct default values for all 68 fields', () => {
 			const state = useSettingsStore.getState();
 
 			expect(state.settingsLoaded).toBe(false);
@@ -156,19 +164,19 @@ describe('settingsStore', () => {
 			expect(state.logViewerSelectedLevels).toEqual(['debug', 'info', 'warn', 'error', 'toast']);
 			expect(state.shortcuts).toEqual(DEFAULT_SHORTCUTS);
 			expect(state.tabShortcuts).toEqual(TAB_SHORTCUTS);
-			expect(state.customAICommands).toEqual(initialState.customAICommands);
+			expect(state.customAICommands).toEqual(DEFAULT_AI_COMMANDS);
 			expect(state.totalActiveTimeMs).toBe(0);
-			expect(state.autoRunStats).toEqual(initialState.autoRunStats);
-			expect(state.usageStats).toEqual(initialState.usageStats);
+			expect(state.autoRunStats).toEqual(DEFAULT_AUTO_RUN_STATS);
+			expect(state.usageStats).toEqual(DEFAULT_USAGE_STATS);
 			expect(state.ungroupedCollapsed).toBe(false);
 			expect(state.tourCompleted).toBe(false);
 			expect(state.firstAutoRunCompleted).toBe(false);
-			expect(state.onboardingStats).toEqual(initialState.onboardingStats);
+			expect(state.onboardingStats).toEqual(DEFAULT_ONBOARDING_STATS);
 			expect(state.leaderboardRegistration).toBeNull();
 			expect(state.webInterfaceUseCustomPort).toBe(false);
 			expect(state.webInterfaceCustomPort).toBe(8080);
-			expect(state.contextManagementSettings).toEqual(initialState.contextManagementSettings);
-			expect(state.keyboardMasteryStats).toEqual(initialState.keyboardMasteryStats);
+			expect(state.contextManagementSettings).toEqual(DEFAULT_CONTEXT_MANAGEMENT_SETTINGS);
+			expect(state.keyboardMasteryStats).toEqual(DEFAULT_KEYBOARD_MASTERY_STATS);
 			expect(state.colorBlindMode).toBe(false);
 			expect(state.documentGraphShowExternalLinks).toBe(false);
 			expect(state.documentGraphMaxNodes).toBe(50);
@@ -190,6 +198,8 @@ describe('settingsStore', () => {
 			});
 			expect(state.wakatimeApiKey).toBe('');
 			expect(state.wakatimeEnabled).toBe(false);
+			expect(state.forcedParallelExecution).toBe(false);
+			expect(state.forcedParallelAcknowledged).toBe(false);
 		});
 	});
 
@@ -436,7 +446,7 @@ describe('settingsStore', () => {
 
 			it('setCustomAICommands updates state and persists', () => {
 				const commands = [
-					...initialState.customAICommands,
+					...DEFAULT_AI_COMMANDS,
 					{
 						id: 'test',
 						command: '/test',
@@ -611,6 +621,31 @@ describe('settingsStore', () => {
 				useSettingsStore.getState().setWakatimeEnabled(true);
 				expect(useSettingsStore.getState().wakatimeEnabled).toBe(true);
 				expect(window.maestro.settings.set).toHaveBeenCalledWith('wakatimeEnabled', true);
+			});
+		});
+
+		describe('Forced Parallel Execution', () => {
+			it('setForcedParallelExecution updates state and persists', () => {
+				useSettingsStore.getState().setForcedParallelExecution(true);
+				expect(useSettingsStore.getState().forcedParallelExecution).toBe(true);
+				expect(window.maestro.settings.set).toHaveBeenCalledWith('forcedParallelExecution', true);
+			});
+
+			it('setForcedParallelAcknowledged updates state and persists', () => {
+				useSettingsStore.getState().setForcedParallelAcknowledged(true);
+				expect(useSettingsStore.getState().forcedParallelAcknowledged).toBe(true);
+				expect(window.maestro.settings.set).toHaveBeenCalledWith(
+					'forcedParallelAcknowledged',
+					true
+				);
+			});
+
+			it('forcedParallelExecution defaults to false', () => {
+				expect(useSettingsStore.getState().forcedParallelExecution).toBe(false);
+			});
+
+			it('forcedParallelAcknowledged defaults to false', () => {
+				expect(useSettingsStore.getState().forcedParallelAcknowledged).toBe(false);
 			});
 		});
 	});
@@ -873,7 +908,7 @@ describe('settingsStore', () => {
 	describe('auto-run stats actions', () => {
 		it('setAutoRunStats directly replaces stats', () => {
 			const newStats = {
-				...initialState.autoRunStats,
+				...DEFAULT_AUTO_RUN_STATS,
 				totalRuns: 10,
 				cumulativeTimeMs: 60000,
 			};
@@ -884,7 +919,7 @@ describe('settingsStore', () => {
 
 		it('recordAutoRunComplete increments totalRuns', () => {
 			useSettingsStore.setState({
-				autoRunStats: { ...initialState.autoRunStats, totalRuns: 5 },
+				autoRunStats: { ...DEFAULT_AUTO_RUN_STATS, totalRuns: 5 },
 			});
 			vi.clearAllMocks();
 
@@ -894,7 +929,7 @@ describe('settingsStore', () => {
 
 		it('recordAutoRunComplete detects new longest run record', () => {
 			useSettingsStore.setState({
-				autoRunStats: { ...initialState.autoRunStats, longestRunMs: 10000 },
+				autoRunStats: { ...DEFAULT_AUTO_RUN_STATS, longestRunMs: 10000 },
 			});
 			vi.clearAllMocks();
 
@@ -905,7 +940,7 @@ describe('settingsStore', () => {
 
 		it('recordAutoRunComplete returns isNewRecord false when not a record', () => {
 			useSettingsStore.setState({
-				autoRunStats: { ...initialState.autoRunStats, longestRunMs: 50000 },
+				autoRunStats: { ...DEFAULT_AUTO_RUN_STATS, longestRunMs: 50000 },
 			});
 			vi.clearAllMocks();
 
@@ -916,7 +951,7 @@ describe('settingsStore', () => {
 
 		it('recordAutoRunComplete does NOT add to cumulativeTimeMs (already tracked incrementally)', () => {
 			useSettingsStore.setState({
-				autoRunStats: { ...initialState.autoRunStats, cumulativeTimeMs: 100000 },
+				autoRunStats: { ...DEFAULT_AUTO_RUN_STATS, cumulativeTimeMs: 100000 },
 			});
 			vi.clearAllMocks();
 
@@ -929,7 +964,7 @@ describe('settingsStore', () => {
 			// Set cumulative time above 15min threshold (900000ms) but badge not yet unlocked
 			useSettingsStore.setState({
 				autoRunStats: {
-					...initialState.autoRunStats,
+					...DEFAULT_AUTO_RUN_STATS,
 					cumulativeTimeMs: 15 * 60 * 1000, // 15 minutes
 					lastBadgeUnlockLevel: 0,
 				},
@@ -943,7 +978,7 @@ describe('settingsStore', () => {
 
 		it('updateAutoRunProgress adds delta to cumulativeTimeMs', () => {
 			useSettingsStore.setState({
-				autoRunStats: { ...initialState.autoRunStats, cumulativeTimeMs: 50000 },
+				autoRunStats: { ...DEFAULT_AUTO_RUN_STATS, cumulativeTimeMs: 50000 },
 			});
 			vi.clearAllMocks();
 
@@ -956,7 +991,7 @@ describe('settingsStore', () => {
 			const justBelow15Min = 15 * 60 * 1000 - 1000;
 			useSettingsStore.setState({
 				autoRunStats: {
-					...initialState.autoRunStats,
+					...DEFAULT_AUTO_RUN_STATS,
 					cumulativeTimeMs: justBelow15Min,
 					lastBadgeUnlockLevel: 0,
 				},
@@ -971,7 +1006,7 @@ describe('settingsStore', () => {
 
 		it('updateAutoRunProgress returns isNewRecord: false', () => {
 			useSettingsStore.setState({
-				autoRunStats: { ...initialState.autoRunStats, cumulativeTimeMs: 50000 },
+				autoRunStats: { ...DEFAULT_AUTO_RUN_STATS, cumulativeTimeMs: 50000 },
 			});
 			vi.clearAllMocks();
 
@@ -982,7 +1017,7 @@ describe('settingsStore', () => {
 		it('acknowledgeBadge sets lastAcknowledgedBadgeLevel', () => {
 			useSettingsStore.setState({
 				autoRunStats: {
-					...initialState.autoRunStats,
+					...DEFAULT_AUTO_RUN_STATS,
 					currentBadgeLevel: 3,
 					lastAcknowledgedBadgeLevel: 1,
 				},
@@ -996,7 +1031,7 @@ describe('settingsStore', () => {
 		it('acknowledgeBadge takes Math.max to not go backwards', () => {
 			useSettingsStore.setState({
 				autoRunStats: {
-					...initialState.autoRunStats,
+					...DEFAULT_AUTO_RUN_STATS,
 					lastAcknowledgedBadgeLevel: 5,
 				},
 			});
@@ -1009,7 +1044,7 @@ describe('settingsStore', () => {
 		it('getUnacknowledgedBadgeLevel returns level when current > acknowledged', () => {
 			useSettingsStore.setState({
 				autoRunStats: {
-					...initialState.autoRunStats,
+					...DEFAULT_AUTO_RUN_STATS,
 					currentBadgeLevel: 3,
 					lastAcknowledgedBadgeLevel: 1,
 				},
@@ -1021,13 +1056,38 @@ describe('settingsStore', () => {
 		it('getUnacknowledgedBadgeLevel returns null when all acknowledged', () => {
 			useSettingsStore.setState({
 				autoRunStats: {
-					...initialState.autoRunStats,
+					...DEFAULT_AUTO_RUN_STATS,
 					currentBadgeLevel: 3,
 					lastAcknowledgedBadgeLevel: 3,
 				},
 			});
 
 			expect(useSettingsStore.getState().getUnacknowledgedBadgeLevel()).toBeNull();
+		});
+	});
+
+	describe('getBadgeLevelForTime', () => {
+		it('returns correct level for various thresholds', () => {
+			const MINUTE = 60 * 1000;
+			const HOUR = 60 * MINUTE;
+			const DAY = 24 * HOUR;
+			const WEEK = 7 * DAY;
+			const MONTH = 30 * DAY;
+			const YEAR = 365 * DAY;
+
+			expect(getBadgeLevelForTime(0)).toBe(0);
+			expect(getBadgeLevelForTime(14 * MINUTE)).toBe(0); // below 15min
+			expect(getBadgeLevelForTime(15 * MINUTE)).toBe(1);
+			expect(getBadgeLevelForTime(1 * HOUR)).toBe(2);
+			expect(getBadgeLevelForTime(8 * HOUR)).toBe(3);
+			expect(getBadgeLevelForTime(1 * DAY)).toBe(4);
+			expect(getBadgeLevelForTime(1 * WEEK)).toBe(5);
+			expect(getBadgeLevelForTime(1 * MONTH)).toBe(6);
+			expect(getBadgeLevelForTime(3 * MONTH)).toBe(7);
+			expect(getBadgeLevelForTime(6 * MONTH)).toBe(8);
+			expect(getBadgeLevelForTime(1 * YEAR)).toBe(9);
+			expect(getBadgeLevelForTime(5 * YEAR)).toBe(10);
+			expect(getBadgeLevelForTime(10 * YEAR)).toBe(11);
 		});
 	});
 
@@ -1097,7 +1157,7 @@ describe('settingsStore', () => {
 		it('getOnboardingAnalytics returns correct rates', () => {
 			useSettingsStore.setState({
 				onboardingStats: {
-					...initialState.onboardingStats,
+					...DEFAULT_ONBOARDING_STATS,
 					wizardStartCount: 10,
 					wizardCompletionCount: 7,
 					tourStartCount: 5,
@@ -1170,7 +1230,7 @@ describe('settingsStore', () => {
 		it('recordShortcutUsage skips already-tracked shortcut', () => {
 			useSettingsStore.setState({
 				keyboardMasteryStats: {
-					...initialState.keyboardMasteryStats,
+					...DEFAULT_KEYBOARD_MASTERY_STATS,
 					usedShortcuts: ['toggleSidebar'],
 				},
 			});
@@ -1198,7 +1258,7 @@ describe('settingsStore', () => {
 			}
 			useSettingsStore.setState({
 				keyboardMasteryStats: {
-					...initialState.keyboardMasteryStats,
+					...DEFAULT_KEYBOARD_MASTERY_STATS,
 					usedShortcuts: fakeShortcuts,
 					currentLevel: 0,
 				},
@@ -1221,7 +1281,7 @@ describe('settingsStore', () => {
 		it('acknowledgeKeyboardMasteryLevel updates level', () => {
 			useSettingsStore.setState({
 				keyboardMasteryStats: {
-					...initialState.keyboardMasteryStats,
+					...DEFAULT_KEYBOARD_MASTERY_STATS,
 					currentLevel: 2,
 					lastAcknowledgedLevel: 0,
 				},
@@ -1235,7 +1295,7 @@ describe('settingsStore', () => {
 			// Has unacknowledged level
 			useSettingsStore.setState({
 				keyboardMasteryStats: {
-					...initialState.keyboardMasteryStats,
+					...DEFAULT_KEYBOARD_MASTERY_STATS,
 					currentLevel: 3,
 					lastAcknowledgedLevel: 1,
 				},
@@ -1245,7 +1305,7 @@ describe('settingsStore', () => {
 			// All acknowledged
 			useSettingsStore.setState({
 				keyboardMasteryStats: {
-					...initialState.keyboardMasteryStats,
+					...DEFAULT_KEYBOARD_MASTERY_STATS,
 					currentLevel: 3,
 					lastAcknowledgedLevel: 3,
 				},
@@ -1261,7 +1321,7 @@ describe('settingsStore', () => {
 	describe('context management actions', () => {
 		it('setContextManagementSettings fully replaces settings', () => {
 			const newSettings = {
-				...initialState.contextManagementSettings,
+				...DEFAULT_CONTEXT_MANAGEMENT_SETTINGS,
 				autoGroomContexts: false,
 				maxContextTokens: 50000,
 			};
@@ -1484,7 +1544,7 @@ describe('settingsStore', () => {
 			const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
 			vi.mocked(window.maestro.settings.getAll).mockResolvedValue({
 				autoRunStats: {
-					...initialState.autoRunStats,
+					...DEFAULT_AUTO_RUN_STATS,
 					cumulativeTimeMs: 100000,
 				},
 				// Migration not yet applied
@@ -1766,6 +1826,27 @@ describe('settingsStore', () => {
 			// Final state should reflect the last user intent: enabled
 			expect(useSettingsStore.getState().persistentWebLink).toBe(true);
 			expect(window.maestro.live.persistCurrentToken).toHaveBeenCalled();
+		});
+	});
+
+	// ========================================================================
+	// 14. Non-React Access
+	// ========================================================================
+
+	describe('non-React access', () => {
+		it('getSettingsState returns current state', () => {
+			useSettingsStore.setState({ fontSize: 20 });
+			const state = getSettingsState();
+			expect(state.fontSize).toBe(20);
+		});
+
+		it('getSettingsActions returns action functions that work', () => {
+			const actions = getSettingsActions();
+			expect(typeof actions.setFontSize).toBe('function');
+
+			actions.setFontSize(22);
+			expect(useSettingsStore.getState().fontSize).toBe(22);
+			expect(window.maestro.settings.set).toHaveBeenCalledWith('fontSize', 22);
 		});
 	});
 });

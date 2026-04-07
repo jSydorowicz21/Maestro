@@ -104,7 +104,6 @@ export function useAvailableAgents(
 			const detectedAgents = await window.maestro.agents.detect();
 			setRawAgents(detectedAgents);
 		} catch (err) {
-			// Expected: agent detection can fail if agent is not installed
 			console.error('Failed to detect agents:', err);
 			setError(err instanceof Error ? err.message : 'Failed to detect agents');
 			setRawAgents([]);

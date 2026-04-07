@@ -8,9 +8,6 @@ import {
 import type { Session, AITab, LogEntry, ToolType } from '../../../renderer/types';
 import type { SendToAgentOptions } from '../../../renderer/components/SendToAgentModal';
 import * as contextGroomer from '../../../renderer/services/contextGroomer';
-import { createMockSession } from '../../helpers/mockSession';
-import { createMockAITab } from '../../helpers/mockTab';
-import { useSessionStore } from '../../../renderer/stores/sessionStore';
 
 // Mock the context grooming service
 vi.mock('../../../renderer/services/contextGroomer', async () => {
@@ -88,17 +85,22 @@ vi.mock('../../../renderer/utils/tabHelpers', () => ({
 
 // Create a mock tab
 function createMockTab(id: string, logs: LogEntry[] = []): AITab {
-	return createMockAITab({
+	return {
 		id,
 		name: `Tab ${id}`,
 		agentSessionId: `session-${id}`,
+		starred: false,
 		logs,
+		inputValue: '',
+		stagedImages: [],
+		createdAt: Date.now(),
+		state: 'idle',
 		saveToHistory: true,
-	});
+	};
 }
 
-// Convenience wrapper: creates a session with a pre-populated AI tab containing logs
-function createTestSession(
+// Create a minimal session for testing
+function createMockSession(
 	id: string,
 	toolType: ToolType = 'claude-code',
 	state: 'idle' | 'busy' | 'error' | 'connecting' = 'idle'
@@ -107,14 +109,37 @@ function createTestSession(
 		{ id: 'log-1', timestamp: Date.now(), source: 'user', text: 'Hello' },
 		{ id: 'log-2', timestamp: Date.now() + 100, source: 'ai', text: 'Hi there!' },
 	]);
-	return createMockSession({
+
+	return {
 		id,
 		name: `Session ${id}`,
 		toolType,
 		state,
+		cwd: '/test/project',
+		fullPath: '/test/project',
+		projectRoot: '/test/project',
+		aiLogs: [],
+		shellLogs: [],
+		workLog: [],
+		contextUsage: 0,
+		inputMode: 'ai',
+		aiPid: 0,
+		terminalPid: 0,
+		port: 0,
+		isLive: false,
+		changedFiles: [],
+		isGitRepo: false,
+		fileTree: [],
+		fileExplorerExpanded: [],
+		fileExplorerScrollPos: 0,
+		activeTimeMs: 0,
+		executionQueue: [],
 		aiTabs: [tab],
 		activeTabId: tab.id,
-	});
+		closedTabHistory: [],
+		terminalTabs: [],
+		activeTerminalTabId: null,
+	};
 }
 
 describe('useSendToAgent', () => {
@@ -152,7 +177,7 @@ describe('useSendToAgent', () => {
 	describe('startTransfer', () => {
 		it('transitions through grooming and creating states', async () => {
 			const { result } = renderHook(() => useSendToAgent());
-			const sourceSession = createTestSession('source-1', 'claude-code');
+			const sourceSession = createMockSession('source-1', 'claude-code');
 			const request: TransferRequest = {
 				sourceSession,
 				sourceTabId: 'tab-1',
@@ -175,7 +200,7 @@ describe('useSendToAgent', () => {
 
 		it('returns error when source tab is not found', async () => {
 			const { result } = renderHook(() => useSendToAgent());
-			const sourceSession = createTestSession('source-1', 'claude-code');
+			const sourceSession = createMockSession('source-1', 'claude-code');
 			const request: TransferRequest = {
 				sourceSession,
 				sourceTabId: 'non-existent-tab',
@@ -195,7 +220,7 @@ describe('useSendToAgent', () => {
 
 		it('skips grooming when groomContext is false', async () => {
 			const { result } = renderHook(() => useSendToAgent());
-			const sourceSession = createTestSession('source-1', 'claude-code');
+			const sourceSession = createMockSession('source-1', 'claude-code');
 			const request: TransferRequest = {
 				sourceSession,
 				sourceTabId: 'tab-1',
@@ -215,7 +240,7 @@ describe('useSendToAgent', () => {
 		it('uses buildContextTransferPrompt for agent-specific grooming', async () => {
 			const spy = vi.spyOn(contextGroomer, 'buildContextTransferPrompt');
 			const { result } = renderHook(() => useSendToAgent());
-			const sourceSession = createTestSession('source-1', 'claude-code');
+			const sourceSession = createMockSession('source-1', 'claude-code');
 			const request: TransferRequest = {
 				sourceSession,
 				sourceTabId: 'tab-1',
@@ -239,7 +264,7 @@ describe('useSendToAgent', () => {
 			});
 
 			const { result } = renderHook(() => useSendToAgent());
-			const sourceSession = createTestSession('source-1', 'claude-code');
+			const sourceSession = createMockSession('source-1', 'claude-code');
 			const request: TransferRequest = {
 				sourceSession,
 				sourceTabId: 'tab-1',
@@ -274,7 +299,7 @@ describe('useSendToAgent', () => {
 			);
 
 			const { result } = renderHook(() => useSendToAgent());
-			const sourceSession = createTestSession('source-1', 'claude-code');
+			const sourceSession = createMockSession('source-1', 'claude-code');
 
 			await act(async () => {
 				await result.current.startTransfer({
@@ -310,7 +335,7 @@ describe('useSendToAgent', () => {
 			);
 
 			const { result } = renderHook(() => useSendToAgent());
-			const sourceSession = createTestSession('source-1', 'claude-code');
+			const sourceSession = createMockSession('source-1', 'claude-code');
 
 			// Start transfer without awaiting
 			const transferPromise = result.current.startTransfer({
@@ -334,7 +359,7 @@ describe('useSendToAgent', () => {
 	describe('reset', () => {
 		it('resets state to idle', async () => {
 			const { result } = renderHook(() => useSendToAgent());
-			const sourceSession = createTestSession('source-1', 'claude-code');
+			const sourceSession = createMockSession('source-1', 'claude-code');
 
 			// Complete a transfer
 			await act(async () => {
@@ -362,7 +387,7 @@ describe('useSendToAgent', () => {
 	describe('session name generation', () => {
 		it('generates name with arrow format: Source → Target', async () => {
 			const { result } = renderHook(() => useSendToAgent());
-			const sourceSession = createTestSession('source-1', 'claude-code');
+			const sourceSession = createMockSession('source-1', 'claude-code');
 			sourceSession.name = 'My Project';
 
 			await act(async () => {
@@ -386,6 +411,7 @@ describe('useSendToAgent', () => {
 });
 
 describe('useSendToAgentWithSessions', () => {
+	const mockSetSessions = vi.fn();
 	const mockOnSessionCreated = vi.fn();
 	const mockOnNavigateToSession = vi.fn();
 
@@ -402,20 +428,18 @@ describe('useSendToAgentWithSessions', () => {
 	});
 
 	it('adds new session to sessions state', async () => {
-		const sessions = [createTestSession('existing-1')];
-
-		// Seed the Zustand store so we can verify a session was added
-		useSessionStore.setState({ sessions: [...sessions] });
+		const sessions = [createMockSession('existing-1')];
 
 		const { result } = renderHook(() =>
 			useSendToAgentWithSessions({
 				sessions,
+				setSessions: mockSetSessions,
 				onSessionCreated: mockOnSessionCreated,
 				onNavigateToSession: mockOnNavigateToSession,
 			})
 		);
 
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 
 		await act(async () => {
 			await result.current.executeTransfer(sourceSession, 'tab-1', 'opencode', {
@@ -424,28 +448,22 @@ describe('useSendToAgentWithSessions', () => {
 			});
 		});
 
-		// Verify the new session was added to the Zustand store
-		const storeSessions = useSessionStore.getState().sessions;
-		expect(storeSessions.length).toBeGreaterThan(sessions.length);
-		const newSession = storeSessions.find((s) => s.id !== 'existing-1');
-		expect(newSession).toBeDefined();
+		expect(mockSetSessions).toHaveBeenCalled();
 	});
 
 	it('sets autoSendOnActivate flag on new session tab for automatic context injection', async () => {
-		const sessions = [createTestSession('existing-1')];
-
-		// Seed the Zustand store so we can verify the new session's tab flags
-		useSessionStore.setState({ sessions: [...sessions] });
+		const sessions = [createMockSession('existing-1')];
 
 		const { result } = renderHook(() =>
 			useSendToAgentWithSessions({
 				sessions,
+				setSessions: mockSetSessions,
 				onSessionCreated: mockOnSessionCreated,
 				onNavigateToSession: mockOnNavigateToSession,
 			})
 		);
 
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 
 		await act(async () => {
 			await result.current.executeTransfer(sourceSession, 'tab-1', 'opencode', {
@@ -454,9 +472,14 @@ describe('useSendToAgentWithSessions', () => {
 			});
 		});
 
-		// Verify the new session was added to the Zustand store with correct tab flags
-		const storeSessions = useSessionStore.getState().sessions;
-		const newSession = storeSessions.find((s) => s.id !== 'existing-1');
+		// Get the session that was added via setSessions
+		const setSessionsCall = mockSetSessions.mock.calls.find(
+			(call) => typeof call[0] === 'function'
+		);
+		expect(setSessionsCall).toBeDefined();
+		const updateFn = setSessionsCall![0] as (prev: Session[]) => Session[];
+		const updatedSessions = updateFn(sessions);
+		const newSession = updatedSessions.find((s) => s.id !== 'existing-1');
 
 		expect(newSession).toBeDefined();
 		expect(newSession!.aiTabs[0].autoSendOnActivate).toBe(true);
@@ -465,17 +488,18 @@ describe('useSendToAgentWithSessions', () => {
 	});
 
 	it('calls onSessionCreated callback with new session info', async () => {
-		const sessions = [createTestSession('existing-1')];
+		const sessions = [createMockSession('existing-1')];
 
 		const { result } = renderHook(() =>
 			useSendToAgentWithSessions({
 				sessions,
+				setSessions: mockSetSessions,
 				onSessionCreated: mockOnSessionCreated,
 				onNavigateToSession: mockOnNavigateToSession,
 			})
 		);
 
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 		sourceSession.name = 'Test Project';
 
 		await act(async () => {
@@ -492,17 +516,18 @@ describe('useSendToAgentWithSessions', () => {
 	});
 
 	it('calls onNavigateToSession when provided', async () => {
-		const sessions = [createTestSession('existing-1')];
+		const sessions = [createMockSession('existing-1')];
 
 		const { result } = renderHook(() =>
 			useSendToAgentWithSessions({
 				sessions,
+				setSessions: mockSetSessions,
 				onSessionCreated: mockOnSessionCreated,
 				onNavigateToSession: mockOnNavigateToSession,
 			})
 		);
 
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 
 		await act(async () => {
 			await result.current.executeTransfer(sourceSession, 'tab-1', 'opencode', {
@@ -515,18 +540,16 @@ describe('useSendToAgentWithSessions', () => {
 	});
 
 	it('returns error when source tab not found', async () => {
-		const sessions = [createTestSession('existing-1')];
-
-		// Seed the Zustand store so we can verify no session was added
-		useSessionStore.setState({ sessions: [...sessions] });
+		const sessions = [createMockSession('existing-1')];
 
 		const { result } = renderHook(() =>
 			useSendToAgentWithSessions({
 				sessions,
+				setSessions: mockSetSessions,
 			})
 		);
 
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 
 		let transferResult;
 		await act(async () => {
@@ -540,22 +563,21 @@ describe('useSendToAgentWithSessions', () => {
 
 		expect(transferResult.success).toBe(false);
 		expect(transferResult.error).toBe('Source tab not found');
-		// Verify no new session was added to the store
-		const storeSessions = useSessionStore.getState().sessions;
-		expect(storeSessions.length).toBe(sessions.length);
+		expect(mockSetSessions).not.toHaveBeenCalled();
 	});
 
 	it('skips session creation when createNewSession is false', async () => {
-		const sessions = [createTestSession('existing-1')];
+		const sessions = [createMockSession('existing-1')];
 
 		const { result } = renderHook(() =>
 			useSendToAgentWithSessions({
 				sessions,
+				setSessions: mockSetSessions,
 				onSessionCreated: mockOnSessionCreated,
 			})
 		);
 
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 
 		await act(async () => {
 			await result.current.executeTransfer(sourceSession, 'tab-1', 'opencode', {
@@ -583,7 +605,7 @@ describe('error handling', () => {
 		});
 
 		const { result } = renderHook(() => useSendToAgent());
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 
 		await act(async () => {
 			await result.current.startTransfer({
@@ -610,7 +632,7 @@ describe('error handling', () => {
 		});
 
 		const { result } = renderHook(() => useSendToAgent());
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 		const options = { groomContext: true, createNewSession: true };
 
 		await act(async () => {
@@ -638,7 +660,7 @@ describe('error handling', () => {
 		});
 
 		const { result } = renderHook(() => useSendToAgent());
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 
 		await act(async () => {
 			await result.current.startTransfer({
@@ -677,7 +699,7 @@ describe('error handling', () => {
 		});
 
 		const { result } = renderHook(() => useSendToAgent());
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 
 		await act(async () => {
 			await result.current.startTransfer({
@@ -728,7 +750,7 @@ describe('error handling', () => {
 
 	it('classifies source tab not found as source_not_found error', async () => {
 		const { result } = renderHook(() => useSendToAgent());
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 
 		await act(async () => {
 			await result.current.startTransfer({
@@ -752,7 +774,7 @@ describe('error handling', () => {
 		});
 
 		const { result } = renderHook(() => useSendToAgent());
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 
 		await act(async () => {
 			await result.current.startTransfer({
@@ -778,7 +800,7 @@ describe('error handling', () => {
 		);
 
 		const { result } = renderHook(() => useSendToAgent());
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 
 		// Start transfer (it will hang)
 		result.current.startTransfer({
@@ -810,7 +832,7 @@ describe('transfer edge cases', () => {
 
 	it('handles transfer to same agent type (should still work)', async () => {
 		const { result } = renderHook(() => useSendToAgent());
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 
 		let transferResult;
 		await act(async () => {
@@ -828,7 +850,7 @@ describe('transfer edge cases', () => {
 
 	it('handles session with empty logs', async () => {
 		const { result } = renderHook(() => useSendToAgent());
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 		sourceSession.aiTabs[0].logs = []; // Empty logs
 
 		let transferResult;
@@ -848,7 +870,7 @@ describe('transfer edge cases', () => {
 
 	it('handles session with long session name', async () => {
 		const { result } = renderHook(() => useSendToAgent());
-		const sourceSession = createTestSession('source-1', 'claude-code');
+		const sourceSession = createMockSession('source-1', 'claude-code');
 		sourceSession.name = 'A'.repeat(200); // Very long name
 
 		let transferResult;
@@ -876,7 +898,7 @@ describe('transfer edge cases', () => {
 			});
 
 			const { result } = renderHook(() => useSendToAgent());
-			const sourceSession = createTestSession('source-1', 'claude-code');
+			const sourceSession = createMockSession('source-1', 'claude-code');
 
 			let transferResult;
 			await act(async () => {

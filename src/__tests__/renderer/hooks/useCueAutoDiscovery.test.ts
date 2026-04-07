@@ -25,12 +25,16 @@ beforeEach(() => {
 	mockEnable.mockResolvedValue(undefined);
 	mockDisable.mockResolvedValue(undefined);
 
-	Object.assign(window.maestro.cue, {
-		refreshSession: mockRefreshSession,
-		removeSession: mockRemoveSession,
-		enable: mockEnable,
-		disable: mockDisable,
-	});
+	(window as any).maestro = {
+		...(window as any).maestro,
+		cue: {
+			...(window as any).maestro?.cue,
+			refreshSession: mockRefreshSession,
+			removeSession: mockRemoveSession,
+			enable: mockEnable,
+			disable: mockDisable,
+		},
+	};
 
 	// Reset session store
 	useSessionStore.setState({ sessionsLoaded: false });

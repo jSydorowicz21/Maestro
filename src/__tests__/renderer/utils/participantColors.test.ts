@@ -543,21 +543,21 @@ describe('participantColors', () => {
 	});
 
 	describe('loadColorPreferences', () => {
-		let savedGet: typeof window.maestro.settings.get;
-		let savedSet: typeof window.maestro.settings.set;
+		let originalMaestro: typeof window.maestro;
 
 		beforeEach(() => {
-			savedGet = window.maestro.settings.get;
-			savedSet = window.maestro.settings.set;
-			// Override settings methods on the existing namespace (setup.ts provides base)
-			Object.assign(window.maestro.settings, {
-				get: vi.fn(),
-				set: vi.fn(),
-			});
+			originalMaestro = window.maestro;
+			// @ts-expect-error - mock partial maestro object
+			window.maestro = {
+				settings: {
+					get: vi.fn(),
+					set: vi.fn(),
+				},
+			};
 		});
 
 		afterEach(() => {
-			Object.assign(window.maestro.settings, { get: savedGet, set: savedSet });
+			window.maestro = originalMaestro;
 		});
 
 		it('should return stored preferences', async () => {
@@ -592,21 +592,21 @@ describe('participantColors', () => {
 	});
 
 	describe('saveColorPreferences', () => {
-		let savedGet: typeof window.maestro.settings.get;
-		let savedSet: typeof window.maestro.settings.set;
+		let originalMaestro: typeof window.maestro;
 
 		beforeEach(() => {
-			savedGet = window.maestro.settings.get;
-			savedSet = window.maestro.settings.set;
-			// Override settings methods on the existing namespace (setup.ts provides base)
-			Object.assign(window.maestro.settings, {
-				get: vi.fn(),
-				set: vi.fn().mockResolvedValue(undefined),
-			});
+			originalMaestro = window.maestro;
+			// @ts-expect-error - mock partial maestro object
+			window.maestro = {
+				settings: {
+					get: vi.fn(),
+					set: vi.fn().mockResolvedValue(undefined),
+				},
+			};
 		});
 
 		afterEach(() => {
-			Object.assign(window.maestro.settings, { get: savedGet, set: savedSet });
+			window.maestro = originalMaestro;
 		});
 
 		it('should call settings.set with the correct key and preferences', async () => {
@@ -630,26 +630,26 @@ describe('participantColors', () => {
 	});
 
 	describe('integration: round-trip preferences', () => {
-		let savedGet: typeof window.maestro.settings.get;
-		let savedSet: typeof window.maestro.settings.set;
+		let originalMaestro: typeof window.maestro;
 		let mockStore: Record<string, unknown>;
 
 		beforeEach(() => {
-			savedGet = window.maestro.settings.get;
-			savedSet = window.maestro.settings.set;
+			originalMaestro = window.maestro;
 			mockStore = {};
-			// Override settings methods on the existing namespace (setup.ts provides base)
-			Object.assign(window.maestro.settings, {
-				get: vi.fn((key: string) => Promise.resolve(mockStore[key] ?? null)),
-				set: vi.fn((key: string, value: unknown) => {
-					mockStore[key] = value;
-					return Promise.resolve();
-				}),
-			});
+			// @ts-expect-error - mock partial maestro object
+			window.maestro = {
+				settings: {
+					get: vi.fn((key: string) => Promise.resolve(mockStore[key] ?? null)),
+					set: vi.fn((key: string, value: unknown) => {
+						mockStore[key] = value;
+						return Promise.resolve();
+					}),
+				},
+			};
 		});
 
 		afterEach(() => {
-			Object.assign(window.maestro.settings, { get: savedGet, set: savedSet });
+			window.maestro = originalMaestro;
 		});
 
 		it('should persist and retrieve preferences across calls', async () => {

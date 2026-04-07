@@ -14,9 +14,7 @@
 import { memo, useMemo } from 'react';
 import { Briefcase, Coffee } from 'lucide-react';
 import type { Theme } from '../../types';
-import { EmptyState } from '../ui';
 import type { StatsAggregation } from '../../hooks/stats/useStats';
-import { formatElapsedTime as formatDuration } from '../../../shared/formatters';
 
 interface WeekdayComparisonChartProps {
 	/** Aggregated stats data from the API */
@@ -25,6 +23,26 @@ interface WeekdayComparisonChartProps {
 	theme: Theme;
 	/** Enable colorblind-friendly colors */
 	colorBlindMode?: boolean;
+}
+
+/**
+ * Format duration in milliseconds to human-readable string
+ */
+function formatDuration(ms: number): string {
+	if (ms === 0) return '0s';
+
+	const totalSeconds = Math.floor(ms / 1000);
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+
+	if (hours > 0) {
+		return `${hours}h ${minutes}m`;
+	}
+	if (minutes > 0) {
+		return `${minutes}m ${seconds}s`;
+	}
+	return `${seconds}s`;
 }
 
 export const WeekdayComparisonChart = memo(function WeekdayComparisonChart({
@@ -102,7 +120,12 @@ export const WeekdayComparisonChart = memo(function WeekdayComparisonChart({
 				<h3 className="text-sm font-medium mb-4" style={{ color: theme.colors.textMain }}>
 					Weekday vs Weekend
 				</h3>
-				<EmptyState theme={theme} message="No daily data available" className="h-24" />
+				<div
+					className="flex items-center justify-center h-24"
+					style={{ color: theme.colors.textDim }}
+				>
+					<span className="text-sm">No daily data available</span>
+				</div>
 			</div>
 		);
 	}

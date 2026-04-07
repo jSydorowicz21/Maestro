@@ -6,8 +6,6 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useFocusAfterRender } from '../hooks/utils/useFocusAfterRender';
-import { useEventListener } from '../hooks/utils/useEventListener';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -15,6 +13,7 @@ import {
 	RefreshCw,
 	X,
 	Search,
+	Loader2,
 	Package,
 	ArrowLeft,
 	ChevronDown,
@@ -26,7 +25,7 @@ import {
 } from 'lucide-react';
 import type { Theme } from '../types';
 import type { MarketplacePlaybook } from '../../shared/marketplace-types';
-import { useModalLayer } from '../hooks/ui/useModalLayer';
+import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { useMarketplace } from '../hooks/batch/useMarketplace';
 import {
@@ -35,8 +34,6 @@ import {
 	createMarkdownComponents,
 } from '../utils/markdownConfig';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
-import { GhostIconButton } from './ui/GhostIconButton';
-import { EmptyState, Spinner } from './ui';
 
 // ============================================================================
 // Types
@@ -247,38 +244,43 @@ function PlaybookDetailView({
 
 	// Keyboard shortcuts for scrolling the document preview
 	// OPT+Up/Down: page up/down, CMD+Up/Down: home/end
-	useEventListener('keydown', (e) => {
-		const scrollContainer = previewScrollRef.current;
-		if (!scrollContainer) return;
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			const scrollContainer = previewScrollRef.current;
+			if (!scrollContainer) return;
 
-		// Don't handle if typing in an input
-		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-			return;
-		}
-
-		const pageHeight = scrollContainer.clientHeight * 0.9; // 90% of visible height
-
-		// CMD+Up/Down: Home/End
-		if (e.metaKey && !e.altKey && !e.shiftKey) {
-			if (e.key === 'ArrowUp') {
-				e.preventDefault();
-				scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
-			} else if (e.key === 'ArrowDown') {
-				e.preventDefault();
-				scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+			// Don't handle if typing in an input
+			if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+				return;
 			}
-		}
-		// OPT+Up/Down: Page up/down
-		else if (e.altKey && !e.metaKey && !e.shiftKey) {
-			if (e.key === 'ArrowUp') {
-				e.preventDefault();
-				scrollContainer.scrollBy({ top: -pageHeight, behavior: 'smooth' });
-			} else if (e.key === 'ArrowDown') {
-				e.preventDefault();
-				scrollContainer.scrollBy({ top: pageHeight, behavior: 'smooth' });
+
+			const pageHeight = scrollContainer.clientHeight * 0.9; // 90% of visible height
+
+			// CMD+Up/Down: Home/End
+			if (e.metaKey && !e.altKey && !e.shiftKey) {
+				if (e.key === 'ArrowUp') {
+					e.preventDefault();
+					scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+				} else if (e.key === 'ArrowDown') {
+					e.preventDefault();
+					scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+				}
 			}
-		}
-	});
+			// OPT+Up/Down: Page up/down
+			else if (e.altKey && !e.metaKey && !e.shiftKey) {
+				if (e.key === 'ArrowUp') {
+					e.preventDefault();
+					scrollContainer.scrollBy({ top: -pageHeight, behavior: 'smooth' });
+				} else if (e.key === 'ArrowDown') {
+					e.preventDefault();
+					scrollContainer.scrollBy({ top: pageHeight, behavior: 'smooth' });
+				}
+			}
+		};
+
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
+	}, []);
 
 	// Generate prose styles scoped to marketplace panel
 	const proseStyles = useMemo(
@@ -308,15 +310,17 @@ function PlaybookDetailView({
 	);
 
 	// Close dropdown when clicking outside
-	useEventListener(
-		'mousedown',
-		(e) => {
+	useEffect(() => {
+		const handleClickOutside = (e: MouseEvent) => {
 			if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
 				setShowDocDropdown(false);
 			}
-		},
-		showDocDropdown ? document : null
-	);
+		};
+		if (showDocDropdown) {
+			document.addEventListener('mousedown', handleClickOutside);
+			return () => document.removeEventListener('mousedown', handleClickOutside);
+		}
+	}, [showDocDropdown]);
 
 	const handleDocumentSelect = (filename: string | null) => {
 		if (filename === null) {
@@ -336,9 +340,13 @@ function PlaybookDetailView({
 				style={{ borderColor: theme.colors.border }}
 			>
 				{/* Back button */}
-				<GhostIconButton onClick={onBack} size="md" tooltip="Back to list (Esc)">
+				<button
+					onClick={onBack}
+					className="p-1.5 rounded hover:bg-white/10 transition-colors"
+					title="Back to list (Esc)"
+				>
 					<ArrowLeft className="w-5 h-5" style={{ color: theme.colors.textDim }} />
-				</GhostIconButton>
+				</button>
 
 				{/* Playbook title and category */}
 				<div className="flex-1 min-w-0">
@@ -622,7 +630,7 @@ function PlaybookDetailView({
 						<style>{proseStyles}</style>
 						{isLoadingDocument ? (
 							<div className="flex items-center justify-center h-32">
-								<Spinner size="lg" style={{ color: theme.colors.accent }} />
+								<Loader2 className="w-6 h-6 animate-spin" style={{ color: theme.colors.accent }} />
 							</div>
 						) : (
 							<div className="prose prose-sm max-w-none" style={{ color: theme.colors.textMain }}>
@@ -696,7 +704,7 @@ function PlaybookDetailView({
 					>
 						{isImporting ? (
 							<span className="flex items-center gap-2">
-								<Spinner />
+								<Loader2 className="w-4 h-4 animate-spin" />
 								Importing...
 							</span>
 						) : (
@@ -725,6 +733,8 @@ export function MarketplaceModal({
 	sshRemoteId,
 	onImportComplete,
 }: MarketplaceModalProps) {
+	// Layer stack for escape handling
+	const { registerLayer, unregisterLayer } = useLayerStack();
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
 
@@ -812,23 +822,37 @@ export function MarketplaceModal({
 	const handleBackToListRef = useRef(handleBackToList);
 	handleBackToListRef.current = handleBackToList;
 
-	const handleEscape = useCallback(() => {
-		if (showHelpRef.current) {
-			setShowHelp(false);
-		} else if (showDetailViewRef.current) {
-			handleBackToListRef.current();
-		} else {
-			onCloseRef.current();
+	// Register with layer stack for escape handling
+	useEffect(() => {
+		if (isOpen) {
+			const id = registerLayer({
+				type: 'modal',
+				priority: MODAL_PRIORITIES.MARKETPLACE,
+				blocksLowerLayers: true,
+				capturesFocus: true,
+				focusTrap: 'strict',
+				ariaLabel: 'Playbook Exchange',
+				onEscape: () => {
+					if (showHelpRef.current) {
+						setShowHelp(false);
+					} else if (showDetailViewRef.current) {
+						handleBackToListRef.current();
+					} else {
+						onCloseRef.current();
+					}
+				},
+			});
+			return () => unregisterLayer(id);
 		}
-	}, []);
-
-	useModalLayer(MODAL_PRIORITIES.MARKETPLACE, 'Playbook Exchange', handleEscape, {
-		isOpen,
-		focusTrap: 'strict',
-	});
+	}, [isOpen, registerLayer, unregisterLayer]);
 
 	// Focus search input when modal opens
-	useFocusAfterRender(searchInputRef, isOpen, 50);
+	useEffect(() => {
+		if (isOpen) {
+			const timer = setTimeout(() => searchInputRef.current?.focus(), 50);
+			return () => clearTimeout(timer);
+		}
+	}, [isOpen]);
 
 	// Handle selecting a playbook (opens detail view)
 	const handleSelectPlaybook = useCallback(
@@ -917,23 +941,25 @@ export function MarketplaceModal({
 	}, [isRemoteSession]);
 
 	// Cmd+F to focus search input
-	useEventListener(
-		'keydown',
-		(e) => {
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
 			// Cmd+F or Ctrl+F to focus search (only in list view)
 			if ((e.metaKey || e.ctrlKey) && e.key === 'f' && !showDetailView) {
 				e.preventDefault();
 				searchInputRef.current?.focus();
 				searchInputRef.current?.select();
 			}
-		},
-		isOpen ? window : null
-	);
+		};
+
+		if (isOpen) {
+			window.addEventListener('keydown', handleKeyDown);
+			return () => window.removeEventListener('keydown', handleKeyDown);
+		}
+	}, [isOpen, showDetailView]);
 
 	// Keyboard shortcuts for category tabs (list view) or document navigation (detail view): Cmd+Shift+[ and Cmd+Shift+]
-	useEventListener(
-		'keydown',
-		(e) => {
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
 			if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
 				if (e.key === '[' || e.key === ']') {
 					e.preventDefault();
@@ -980,14 +1006,26 @@ export function MarketplaceModal({
 					}
 				}
 			}
-		},
-		isOpen ? window : null
-	);
+		};
+
+		if (isOpen) {
+			window.addEventListener('keydown', handleKeyDown);
+			return () => window.removeEventListener('keydown', handleKeyDown);
+		}
+	}, [
+		isOpen,
+		categories,
+		selectedCategory,
+		showDetailView,
+		selectedPlaybook,
+		selectedDocFilename,
+		handleSelectDocument,
+		handleCategoryChange,
+	]);
 
 	// Arrow key navigation for tiles (list view only)
-	useEventListener(
-		'keydown',
-		(e) => {
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
 			// Only handle in list view, not detail view
 			if (showDetailView) return;
 
@@ -1036,9 +1074,20 @@ export function MarketplaceModal({
 					}
 					break;
 			}
-		},
-		isOpen ? window : null
-	);
+		};
+
+		if (isOpen) {
+			window.addEventListener('keydown', handleKeyDown);
+			return () => window.removeEventListener('keydown', handleKeyDown);
+		}
+	}, [
+		isOpen,
+		showDetailView,
+		filteredPlaybooks,
+		selectedTileIndex,
+		gridColumns,
+		handleSelectPlaybook,
+	]);
 
 	// Don't render if not open
 	if (!isOpen) return null;
@@ -1096,14 +1145,15 @@ export function MarketplaceModal({
 								</h2>
 								{/* Help button */}
 								<div className="relative">
-									<GhostIconButton
+									<button
 										ref={helpButtonRef}
 										onClick={() => setShowHelp(!showHelp)}
-										tooltip="About the Playbook Exchange"
+										className="p-1 rounded hover:bg-white/10 transition-colors"
+										title="About the Playbook Exchange"
 										aria-label="Help"
 									>
 										<HelpCircle className="w-4 h-4" style={{ color: theme.colors.textDim }} />
-									</GhostIconButton>
+									</button>
 									{showHelp && (
 										<div
 											className="absolute top-full left-0 mt-2 w-80 p-4 rounded-lg shadow-xl z-50"
@@ -1181,12 +1231,11 @@ export function MarketplaceModal({
 									{fromCache ? `Cached ${formatCacheAge(cacheAge)}` : 'Live'}
 								</span>
 								{/* Refresh button */}
-								<GhostIconButton
+								<button
 									onClick={() => refresh()}
 									disabled={isRefreshing}
-									size="md"
-									className="disabled:opacity-50"
-									tooltip="Refresh marketplace data"
+									className="p-1.5 rounded hover:bg-white/10 transition-colors disabled:opacity-50"
+									title="Refresh marketplace data"
 									aria-label="Refresh marketplace"
 									aria-busy={isRefreshing}
 								>
@@ -1194,16 +1243,16 @@ export function MarketplaceModal({
 										className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`}
 										style={{ color: theme.colors.textDim }}
 									/>
-								</GhostIconButton>
+								</button>
 								{/* Close button */}
-								<GhostIconButton
+								<button
 									onClick={onClose}
-									size="md"
-									tooltip="Close (Esc)"
+									className="p-1.5 rounded hover:bg-white/10 transition-colors"
+									title="Close (Esc)"
 									aria-label="Close marketplace"
 								>
 									<X className="w-5 h-5" style={{ color: theme.colors.textDim }} />
-								</GhostIconButton>
+								</button>
 							</div>
 						</div>
 
@@ -1312,17 +1361,37 @@ export function MarketplaceModal({
 									</button>
 								</div>
 							) : filteredPlaybooks.length === 0 ? (
-								<EmptyState
-									theme={theme}
-									icon={<Package className="w-16 h-16" />}
-									message={searchQuery ? 'No results found' : 'No playbooks available'}
-									description={
-										searchQuery
-											? 'Try adjusting your search or browse a different category'
-											: 'Check back later for new playbooks'
-									}
-									className="h-full min-h-[200px] py-12"
-								/>
+								<div className="flex flex-col items-center justify-center h-full min-h-[200px] text-center py-12">
+									<Package
+										className="w-16 h-16 mb-4"
+										style={{ color: theme.colors.textDim, opacity: 0.5 }}
+									/>
+									{searchQuery ? (
+										<>
+											<p
+												className="text-lg font-medium mb-2"
+												style={{ color: theme.colors.textMain }}
+											>
+												No results found
+											</p>
+											<p className="text-sm" style={{ color: theme.colors.textDim }}>
+												Try adjusting your search or browse a different category
+											</p>
+										</>
+									) : (
+										<>
+											<p
+												className="text-lg font-medium mb-2"
+												style={{ color: theme.colors.textMain }}
+											>
+												No playbooks available
+											</p>
+											<p className="text-sm" style={{ color: theme.colors.textDim }}>
+												Check back later for new playbooks
+											</p>
+										</>
+									)}
+								</div>
 							) : (
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 									{filteredPlaybooks.map((playbook, index) => (

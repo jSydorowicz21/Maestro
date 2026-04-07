@@ -6,8 +6,7 @@
  * by FileExplorerPanel in a future refactor.
  */
 
-import { useRef, useCallback } from 'react';
-import { useEventListener } from '../hooks/utils/useEventListener';
+import { useEffect, useRef, useCallback } from 'react';
 import { FileText, Target, ExternalLink, Copy } from 'lucide-react';
 import type { Theme } from '../types';
 import { useContextMenuPosition } from '../hooks/ui/useContextMenuPosition';
@@ -55,14 +54,18 @@ export function FileContextMenu({
 	const { left, top, ready } = useContextMenuPosition(menuRef, menu.x, menu.y);
 
 	// Dismiss on click outside or Escape
-	useEventListener('mousedown', () => onDismissRef.current(), document);
-	useEventListener(
-		'keydown',
-		(e: KeyboardEvent) => {
+	useEffect(() => {
+		const handleMouseDown = () => onDismissRef.current();
+		const handleKey = (e: KeyboardEvent) => {
 			if (e.key === 'Escape') onDismissRef.current();
-		},
-		document
-	);
+		};
+		document.addEventListener('mousedown', handleMouseDown);
+		document.addEventListener('keydown', handleKey);
+		return () => {
+			document.removeEventListener('mousedown', handleMouseDown);
+			document.removeEventListener('keydown', handleKey);
+		};
+	}, []);
 
 	const handlePreview = useCallback(() => {
 		onPreview?.(menu.filePath);

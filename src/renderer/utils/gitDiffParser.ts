@@ -63,7 +63,6 @@ export function parseGitDiff(diffText: string): ParsedFileDiff[] {
 				isDeletedFile,
 			};
 		} catch (error) {
-			// Expected: diff output may contain malformed sections from external git data
 			console.error('Failed to parse diff section:', error);
 			// Return a fallback structure if parsing fails
 			return {

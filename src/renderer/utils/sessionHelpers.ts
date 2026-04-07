@@ -10,6 +10,7 @@
 
 import type { Session, ToolType, ProcessConfig } from '../types';
 import { createMergedSession } from './tabHelpers';
+import { getStdinFlags } from './spawnHelpers';
 
 /**
  * Options for creating a session for a specific agent type.
@@ -70,6 +71,8 @@ export interface BuildSpawnConfigOptions {
 	sessionCustomEnvVars?: Record<string, string>;
 	/** Per-session custom model override */
 	sessionCustomModel?: string;
+	/** Per-session custom effort/reasoning level */
+	sessionCustomEffort?: string;
 	/** Per-session custom context window */
 	sessionCustomContextWindow?: number;
 	/** Per-session SSH remote config (takes precedence over agent-level SSH config) */
@@ -78,6 +81,8 @@ export interface BuildSpawnConfigOptions {
 		remoteId: string | null;
 		workingDirOverride?: string;
 	};
+	/** Whether the prompt includes images (default: false) */
+	hasImages?: boolean;
 }
 
 /**
@@ -117,27 +122,36 @@ export async function buildSpawnConfigForAgent(
 		sessionCustomArgs,
 		sessionCustomEnvVars,
 		sessionCustomModel,
+		sessionCustomEffort,
 		sessionCustomContextWindow,
 		sessionSshRemoteConfig,
+		hasImages = false,
 	} = options;
 
 	// Fetch the agent configuration from main process
 	const agentConfig = await window.maestro.agents.get(toolType);
 
 	if (!agentConfig) {
-		// Expected: agent may not be installed on this machine
 		console.error(`[sessionHelpers] Agent not found: ${toolType}`);
 		return null;
 	}
 
 	if (!agentConfig.available) {
-		// Expected: agent binary may not be available (not installed or not in PATH)
 		console.error(`[sessionHelpers] Agent not available: ${toolType}`);
 		return null;
 	}
 
 	// Use the agent's path (resolved location) or command
 	const command = agentConfig.path || agentConfig.command;
+
+	// Determine whether to send the prompt via stdin on Windows to avoid
+	// exceeding the command line length limit (~8KB cmd.exe).
+	const isSshSession = Boolean(sessionSshRemoteConfig?.enabled);
+	const { sendPromptViaStdin, sendPromptViaStdinRaw } = getStdinFlags({
+		isSshSession,
+		supportsStreamJsonInput: agentConfig.capabilities?.supportsStreamJsonInput ?? false,
+		hasImages,
+	});
 
 	// Build the spawn config
 	// The main process will use the agent's argument builders (resumeArgs, readOnlyArgs, etc.)
@@ -159,9 +173,13 @@ export async function buildSpawnConfigForAgent(
 		sessionCustomArgs,
 		sessionCustomEnvVars,
 		sessionCustomModel,
+		sessionCustomEffort,
 		sessionCustomContextWindow,
 		// Per-session SSH remote config (takes precedence over agent-level SSH config)
 		sessionSshRemoteConfig,
+		// Windows stdin handling - send prompt via stdin to avoid command line length limits
+		sendPromptViaStdin,
+		sendPromptViaStdinRaw,
 	};
 
 	return spawnConfig;
@@ -210,13 +228,11 @@ export async function createSessionForAgent(
 	const agentConfig = await window.maestro.agents.get(agentType);
 
 	if (!agentConfig) {
-		// Expected: agent may not be installed on this machine
 		console.error(`[sessionHelpers] Agent not found: ${agentType}`);
 		return null;
 	}
 
 	if (!agentConfig.available) {
-		// Expected: agent binary may not be available (not installed or not in PATH)
 		console.error(`[sessionHelpers] Agent not available: ${agentType}`);
 		return null;
 	}
@@ -361,7 +377,7 @@ export function isSessionRemote(session: SessionSshInfo | null | undefined): boo
  *
  * Returns the context needed for cross-host history sync when:
  * - The session uses an SSH remote
- * - The syncHistory setting is not disabled (defaults to true)
+ * - The syncHistory setting is explicitly enabled
  *
  * @param session - Session with SSH remote fields and cwd
  * @returns Shared context object, or undefined if not applicable
@@ -374,8 +390,8 @@ export function buildSharedHistoryContext(
 	const config = session.sessionSshRemoteConfig;
 	if (!config?.enabled || !config.remoteId) return undefined;
 
-	// Respect the syncHistory toggle (defaults to true)
-	if (config.syncHistory === false) return undefined;
+	// Respect the syncHistory toggle (opt-in, defaults to false)
+	if (!config.syncHistory) return undefined;
 
 	const remoteCwd = session.cwd;
 	if (!remoteCwd) return undefined;

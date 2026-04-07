@@ -13,11 +13,9 @@
  */
 
 import { memo, useMemo } from 'react';
-import { EmptyState } from '../ui';
 import type { Theme } from '../../types';
 import type { StatsAggregation } from '../../hooks/stats/useStats';
 import { COLORBLIND_AGENT_PALETTE } from '../../constants/colorblindPalettes';
-import { formatElapsedTime as formatDuration } from '../../../shared/formatters';
 
 interface AgentEfficiencyChartProps {
 	/** Aggregated stats data from the API */
@@ -26,6 +24,26 @@ interface AgentEfficiencyChartProps {
 	theme: Theme;
 	/** Enable colorblind-friendly colors */
 	colorBlindMode?: boolean;
+}
+
+/**
+ * Format duration in milliseconds to human-readable string
+ */
+function formatDuration(ms: number): string {
+	if (ms === 0) return '0s';
+
+	const totalSeconds = Math.floor(ms / 1000);
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+
+	if (hours > 0) {
+		return `${hours}h ${minutes}m`;
+	}
+	if (minutes > 0) {
+		return `${minutes}m ${seconds}s`;
+	}
+	return `${seconds}s`;
 }
 
 /**
@@ -100,7 +118,12 @@ export const AgentEfficiencyChart = memo(function AgentEfficiencyChart({
 				<h3 className="text-sm font-medium mb-4" style={{ color: theme.colors.textMain }}>
 					Agent Efficiency
 				</h3>
-				<EmptyState theme={theme} className="h-24" message="No agent query data available" />
+				<div
+					className="flex items-center justify-center h-24"
+					style={{ color: theme.colors.textDim }}
+				>
+					<span className="text-sm">No agent query data available</span>
+				</div>
 			</div>
 		);
 	}

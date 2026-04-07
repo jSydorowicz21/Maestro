@@ -4,8 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { InputArea } from '../../../renderer/components/InputArea';
 import { formatShortcutKeys, formatEnterToSend } from '../../../renderer/utils/shortcutFormatter';
 import type { Session, Theme } from '../../../renderer/types';
-import { createMockSession as createBaseSession } from '../../helpers/mockSession';
-import { mockTheme } from '../../helpers/mockTheme';
 
 // Mock scrollIntoView since jsdom doesn't support it
 Element.prototype.scrollIntoView = vi.fn();
@@ -99,10 +97,35 @@ vi.mock('../../../renderer/components/InlineWizard', () => ({
 		</div>
 	)),
 }));
-// Local wrapper: extracts wizardState from overrides and places it on the default tab
+
+// Default theme for tests
+const mockTheme: Theme = {
+	id: 'dracula',
+	name: 'Dracula',
+	mode: 'dark',
+	colors: {
+		bgMain: '#282a36',
+		bgSidebar: '#21222c',
+		bgActivity: '#343746',
+		textMain: '#f8f8f2',
+		textDim: '#6272a4',
+		accent: '#bd93f9',
+		accentForeground: '#282a36',
+		border: '#44475a',
+		success: '#50fa7b',
+		error: '#ff5555',
+		warning: '#f1fa8c',
+		info: '#8be9fd',
+	},
+};
+
+// Default session for tests
+// Note: wizardState is per-tab, so pass it separately or via aiTabs override
 const createMockSession = (overrides: Partial<Session> & { wizardState?: any } = {}): Session => {
+	// Extract wizardState from overrides (it should go on the tab, not session)
 	const { wizardState, ...sessionOverrides } = overrides;
 
+	// Build aiTabs - if wizardState is provided, add it to the first tab
 	const defaultTab = {
 		id: 'tab-1',
 		logs: [],
@@ -120,11 +143,34 @@ const createMockSession = (overrides: Partial<Session> & { wizardState?: any } =
 		...(wizardState ? { wizardState } : {}),
 	};
 
-	return createBaseSession({
+	return {
+		id: 'session-1',
+		name: 'Test Session',
+		toolType: 'claude-code',
+		state: 'idle',
+		inputMode: 'ai',
+		cwd: '/Users/test/project',
+		projectRoot: '/Users/test/project',
+		aiPid: 0,
+		terminalPid: 0,
 		aiTabs: [defaultTab],
 		activeTabId: 'tab-1',
+		shellLogs: [],
+		usageStats: { inputTokens: 0, outputTokens: 0, totalCost: 0 },
+		agentSessionId: null,
+		isGitRepo: false,
+		fileTree: [],
+		fileExplorerExpanded: [],
+		messageQueue: [],
+		shellCommandHistory: [],
+		aiCommandHistory: [],
+		closedTabHistory: [],
+		shellCwd: '/Users/test/project',
+		busySource: null,
+		terminalTabs: [],
+		activeTerminalTabId: null,
 		...sessionOverrides,
-	});
+	};
 };
 
 // Default props factory
@@ -297,9 +343,9 @@ describe('InputArea', () => {
 			});
 			render(<InputArea {...props} />);
 
-			const toggle = screen.getByTitle(/Toggle read-only mode/);
+			const toggle = screen.getByTitle(/Toggle plan mode/);
 			expect(toggle).toBeInTheDocument();
-			expect(toggle).toHaveTextContent('Read-only');
+			expect(toggle).toHaveTextContent('Plan-Mode');
 		});
 
 		it('hides read-only toggle when agent does not support read-only mode', async () => {
@@ -339,7 +385,7 @@ describe('InputArea', () => {
 			render(<InputArea {...props} />);
 
 			// Read-only toggle should not be present
-			expect(screen.queryByTitle(/Toggle read-only mode/)).not.toBeInTheDocument();
+			expect(screen.queryByTitle(/Toggle (plan mode|Read-Only mode)/)).not.toBeInTheDocument();
 		});
 
 		it('shows save to history toggle when onToggleTabSaveToHistory is provided', () => {
@@ -502,7 +548,7 @@ describe('InputArea', () => {
 			});
 			render(<InputArea {...props} />);
 
-			const toggle = screen.getByTitle("Toggle read-only mode (agent won't modify files)");
+			const toggle = screen.getByTitle('Toggle plan mode (agent will plan but not modify files)');
 			expect(toggle).not.toBeDisabled();
 
 			fireEvent.click(toggle);
@@ -518,7 +564,7 @@ describe('InputArea', () => {
 			render(<InputArea {...props} />);
 
 			expect(
-				screen.getByTitle("Toggle read-only mode (agent won't modify files)")
+				screen.getByTitle('Toggle plan mode (agent will plan but not modify files)')
 			).toBeInTheDocument();
 		});
 
@@ -531,7 +577,7 @@ describe('InputArea', () => {
 			});
 			render(<InputArea {...props} />);
 
-			const toggle = screen.getByTitle("Toggle read-only mode (agent won't modify files)");
+			const toggle = screen.getByTitle('Toggle plan mode (agent will plan but not modify files)');
 			expect(toggle).toHaveStyle({ color: mockTheme.colors.textDim });
 		});
 	});
@@ -625,8 +671,9 @@ describe('InputArea', () => {
 			});
 			render(<InputArea {...props} />);
 
-			expect(screen.getByText('/clear')).toBeInTheDocument();
-			expect(screen.queryByText('/help')).not.toBeInTheDocument();
+			// Fuzzy highlight splits text into spans, so use a function matcher
+			expect(screen.getByText((_, el) => el?.textContent === '/clear')).toBeInTheDocument();
+			expect(screen.queryByText((_, el) => el?.textContent === '/help')).not.toBeInTheDocument();
 		});
 
 		it('shows terminalOnly commands in terminal mode', () => {
@@ -1487,7 +1534,7 @@ describe('InputArea', () => {
 			});
 			render(<InputArea {...props} />);
 
-			fireEvent.click(screen.getByTitle(/Toggle read-only mode/));
+			fireEvent.click(screen.getByTitle(/Toggle plan mode/));
 
 			expect(onToggleTabReadOnlyMode).toHaveBeenCalled();
 		});
@@ -1773,7 +1820,7 @@ describe('InputArea', () => {
 			});
 			render(<InputArea {...props} />);
 
-			const toggle = screen.getByTitle(/Toggle read-only mode/);
+			const toggle = screen.getByTitle(/Toggle plan mode/);
 			// Should have warning color and background
 			expect(toggle).toHaveStyle({ color: mockTheme.colors.warning });
 		});

@@ -14,9 +14,8 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { useFileTreeManagement, type UseFileTreeManagementDeps } from '../../../renderer/hooks';
 import type { Session } from '../../../renderer/types';
 import type { FileNode } from '../../../renderer/types/fileTree';
-import { createMockSession } from '../../helpers/mockSession';
 import type { RightPanelHandle } from '../../../renderer/components/RightPanel';
-import type { RefObject } from 'react';
+import type { RefObject, SetStateAction } from 'react';
 import { loadFileTree, compareFileTrees } from '../../../renderer/utils/fileExplorer';
 import { gitService } from '../../../renderer/services/git';
 import { useFileExplorerStore } from '../../../renderer/stores/fileExplorerStore';
@@ -39,17 +38,48 @@ vi.mock('../../../renderer/services/git', () => ({
 // Test Helpers
 // ============================================================================
 
+const createMockSession = (overrides: Partial<Session> = {}): Session => ({
+	id: 'session-1',
+	name: 'Test Session',
+	toolType: 'claude-code',
+	state: 'idle',
+	cwd: '/test/project',
+	fullPath: '/test/project',
+	projectRoot: '/test/project',
+	aiLogs: [],
+	shellLogs: [],
+	workLog: [],
+	contextUsage: 0,
+	inputMode: 'ai',
+	aiPid: 0,
+	terminalPid: 0,
+	port: 0,
+	isLive: false,
+	changedFiles: [],
+	isGitRepo: false,
+	fileTree: [],
+	fileExplorerExpanded: [],
+	fileExplorerScrollPos: 0,
+	executionQueue: [],
+	activeTimeMs: 0,
+	aiTabs: [],
+	activeTabId: 'tab-1',
+	closedTabHistory: [],
+	...overrides,
+});
+
 const createSessionsState = (initialSessions: Session[]) => {
-	// Store sessions in the Zustand store so updateSessionWith can find them
-	useSessionStore.setState((prev) => ({
-		...prev,
-		sessions: initialSessions,
-	}));
-	const sessionsRef = { current: initialSessions };
+	let sessions = initialSessions;
+	const sessionsRef = { current: sessions };
+	const setSessions = vi.fn((updater: SetStateAction<Session[]>) => {
+		sessions = typeof updater === 'function' ? updater(sessions) : updater;
+		sessionsRef.current = sessions;
+	});
 
 	return {
-		getSessions: () => useSessionStore.getState().sessions,
+		getSessions: () => sessions,
 		sessionsRef,
+		setSessions,
 	};
 };
 
@@ -59,6 +89,7 @@ const createDeps = (
 ): UseFileTreeManagementDeps => ({
 	sessions: state.getSessions(),
 	sessionsRef: state.sessionsRef,
+	setSessions: state.setSessions,
 	activeSessionId: state.getSessions()[0]?.id ?? null,
 	activeSession: state.getSessions()[0] ?? null,
 	rightPanelRef: { current: { refreshHistoryPanel: vi.fn() } },
@@ -70,20 +101,29 @@ const createDeps = (
 // ============================================================================
 
 describe('useFileTreeManagement', () => {
+	let originalHistory: typeof window.maestro.history | undefined;
+
 	beforeEach(() => {
 		vi.clearAllMocks();
 		useFileExplorerStore.setState({ fileTreeFilter: '' });
 		// Most tests assume sessions are loaded (safety timeout can fire)
 		useSessionStore.setState({ sessionsLoaded: true });
-		Object.assign(window.maestro, {
+		originalHistory = window.maestro.history as typeof window.maestro.history | undefined;
+		window.maestro = {
+			...window.maestro,
 			history: {
 				reload: vi.fn().mockResolvedValue(true),
 			},
-		});
+		};
 	});
 
 	afterEach(() => {
-		useSessionStore.setState({ sessions: [], sessionsLoaded: false, initialFileTreeReady: false });
+		useSessionStore.setState({ sessionsLoaded: false, initialFileTreeReady: false });
+		if (originalHistory) {
+			window.maestro.history = originalHistory;
+		} else {
+			delete (window.maestro as { history?: unknown }).history;
+		}
 	});
 
 	it('refreshFileTree updates tree and returns changes', async () => {
@@ -312,7 +352,14 @@ describe('useFileTreeManagement', () => {
 			totalSize: 1000,
 		});
 
-		Object.assign(window.maestro.fs, { directorySize: mockDirectorySize });
+		const originalFs = window.maestro?.fs;
+		window.maestro = {
+			...window.maestro,
+			fs: {
+				...originalFs,
+				directorySize: mockDirectorySize,
+			},
+		};
 
 		const sshSession = createMockSession({
 			fileTree: [],
@@ -350,6 +397,10 @@ describe('useFileTreeManagement', () => {
 			expect(state.getSessions()[0].fileTree).toEqual(fullTree);
 			expect(state.getSessions()[0].fileTreeLoading).toBe(false);
 		});
+
+		if (originalFs) {
+			window.maestro.fs = originalFs;
+		}
 	});
 
 	it('does not fire shallow load for local sessions on initial mount', async () => {
@@ -396,7 +447,14 @@ describe('useFileTreeManagement', () => {
 		);
 		const mockDirectorySize = vi.fn().mockReturnValue(statsPromise);
 
-		Object.assign(window.maestro.fs, { directorySize: mockDirectorySize });
+		const originalFs = window.maestro?.fs;
+		window.maestro = {
+			...window.maestro,
+			fs: {
+				...originalFs,
+				directorySize: mockDirectorySize,
+			},
+		};
 
 		const state = createSessionsState([createMockSession({ fileTree: [] })]);
 		const deps = createDeps(state);
@@ -425,6 +483,10 @@ describe('useFileTreeManagement', () => {
 			folderCount: 2,
 			totalSize: 10000,
 		});
+
+		if (originalFs) {
+			window.maestro.fs = originalFs;
+		}
 	});
 
 	it('fetches stats for sessions with file tree but no stats (migration)', async () => {
@@ -435,7 +497,14 @@ describe('useFileTreeManagement', () => {
 			totalSize: 5000000,
 		});
 
-		Object.assign(window.maestro.fs, { directorySize: mockDirectorySize });
+		const originalFs = window.maestro?.fs;
+		window.maestro = {
+			...window.maestro,
+			fs: {
+				...originalFs,
+				directorySize: mockDirectorySize,
+			},
+		};
 
 		// Create session with file tree but no stats (simulating pre-Dec 2025 session)
 		const sessionWithTreeNoStats = createMockSession({
@@ -468,6 +537,11 @@ describe('useFileTreeManagement', () => {
 				totalSize: 5000000,
 			});
 		});
+
+		// Restore original
+		if (originalFs) {
+			window.maestro.fs = originalFs;
+		}
 	});
 
 	it('does not fire file-tree safety timeout until sessionsLoaded is true', () => {
@@ -540,7 +614,14 @@ describe('useFileTreeManagement', () => {
 	it('does not fetch stats when session already has stats', async () => {
 		const mockDirectorySize = vi.fn();
 
-		Object.assign(window.maestro.fs, { directorySize: mockDirectorySize });
+		const originalFs = window.maestro?.fs;
+		window.maestro = {
+			...window.maestro,
+			fs: {
+				...originalFs,
+				directorySize: mockDirectorySize,
+			},
+		};
 
 		// Create session with both file tree and stats (no migration needed)
 		const sessionWithStats = createMockSession({
@@ -560,5 +641,10 @@ describe('useFileTreeManagement', () => {
 		// Give it a moment to not be called
 		await new Promise((resolve) => setTimeout(resolve, 50));
 		expect(mockDirectorySize).not.toHaveBeenCalled();
+
+		// Restore original
+		if (originalFs) {
+			window.maestro.fs = originalFs;
+		}
 	});
 });

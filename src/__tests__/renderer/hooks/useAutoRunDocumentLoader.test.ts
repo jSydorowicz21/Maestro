@@ -16,7 +16,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor, cleanup } from '@testing-library/react';
 import type { Session } from '../../../renderer/types';
-import { createMockSession as _createMockSession } from '../../helpers/mockSession';
 
 // ============================================================================
 // Now import the hook and stores
@@ -26,9 +25,17 @@ import { useAutoRunDocumentLoader } from '../../../renderer/hooks/batch/useAutoR
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import { useBatchStore } from '../../../renderer/stores/batchStore';
 
-// Wrapper: old factory included a default AI tab and specific defaults
-const createMockSession = (overrides: Partial<Session> = {}): Session =>
-	_createMockSession({
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function createMockSession(overrides: Partial<Session> = {}): Session {
+	return {
+		id: 'session-1',
+		name: 'Test Agent',
+		state: 'idle',
+		busySource: undefined,
+		toolType: 'claude-code',
 		aiTabs: [
 			{
 				id: 'tab-1',
@@ -39,9 +46,19 @@ const createMockSession = (overrides: Partial<Session> = {}): Session =>
 			},
 		],
 		activeTabId: 'tab-1',
+		terminalTabs: [],
+		executionQueue: [],
+		manualHistory: [],
+		historyIndex: -1,
 		cwd: '/test',
+		thinkingStartTime: null,
+		isStarred: false,
+		isUnread: false,
+		hasUnseenOutput: false,
+		createdAt: Date.now(),
 		...overrides,
-	} as Partial<Session>);
+	} as unknown as Session;
+}
 
 // ============================================================================
 // Mock autorun IPC
@@ -86,13 +103,15 @@ beforeEach(() => {
 	mockUnwatchFolder.mockResolvedValue(undefined);
 
 	// Setup window.maestro
-	Object.assign(window.maestro.autorun, {
-		listDocs: mockListDocs,
-		readDoc: mockReadDoc,
-		watchFolder: mockWatchFolder,
-		onFileChanged: mockOnFileChanged,
-		unwatchFolder: mockUnwatchFolder,
-	});
+	(window as any).maestro = {
+		autorun: {
+			listDocs: mockListDocs,
+			readDoc: mockReadDoc,
+			watchFolder: mockWatchFolder,
+			onFileChanged: mockOnFileChanged,
+			unwatchFolder: mockUnwatchFolder,
+		},
+	};
 });
 
 afterEach(() => {

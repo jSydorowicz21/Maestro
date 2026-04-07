@@ -19,16 +19,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useAutoRunHandlers } from '../../../renderer/hooks';
 import type { Session, BatchRunConfig } from '../../../renderer/types';
-import { createMockSession as _createMockSession } from '../../helpers/mockSession';
-import { useSessionStore, updateSessionWith } from '../../../renderer/stores/sessionStore';
+import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import { useSettingsStore } from '../../../renderer/stores/settingsStore';
-
-vi.mock('../../../renderer/stores/sessionStore', async () => {
-	const actual = await vi.importActual('../../../renderer/stores/sessionStore');
-	return { ...actual, updateSessionWith: vi.fn() };
-});
-
-const mockUpdateSessionWith = vi.mocked(updateSessionWith);
 
 // Mock gitService for worktree operations
 vi.mock('../../../renderer/services/git', () => ({
@@ -51,21 +43,43 @@ import { notifyToast } from '../../../renderer/stores/notificationStore';
 // Test Helpers
 // ============================================================================
 
-// Wrapper: old factory had id 'test-session-1', isGitRepo, activeTabId, and autoRun fields
-const createMockSession = (overrides: Partial<Session> = {}): Session =>
-	_createMockSession({
-		id: 'test-session-1',
-		isGitRepo: true,
-		activeTabId: 'tab-1',
-		autoRunFolderPath: '/test/autorun',
-		autoRunSelectedFile: 'Phase 1',
-		autoRunContent: '# Phase 1\n\nInitial content',
-		autoRunContentVersion: 1,
-		autoRunMode: 'edit',
-		...overrides,
-	} as Partial<Session>);
+const createMockSession = (overrides: Partial<Session> = {}): Session => ({
+	id: 'test-session-1',
+	name: 'Test Session',
+	toolType: 'claude-code',
+	state: 'idle',
+	cwd: '/test/project',
+	fullPath: '/test/project',
+	projectRoot: '/test/project',
+	aiLogs: [],
+	shellLogs: [],
+	workLog: [],
+	contextUsage: 0,
+	inputMode: 'ai',
+	aiPid: 0,
+	terminalPid: 0,
+	port: 0,
+	isLive: false,
+	changedFiles: [],
+	isGitRepo: true,
+	fileTree: [],
+	fileExplorerExpanded: [],
+	fileExplorerScrollPos: 0,
+	executionQueue: [],
+	activeTimeMs: 0,
+	aiTabs: [],
+	activeTabId: 'tab-1',
+	closedTabHistory: [],
+	autoRunFolderPath: '/test/autorun',
+	autoRunSelectedFile: 'Phase 1',
+	autoRunContent: '# Phase 1\n\nInitial content',
+	autoRunContentVersion: 1,
+	autoRunMode: 'edit',
+	...overrides,
+});
 
 const createMockDeps = () => ({
+	setSessions: vi.fn(),
 	setAutoRunDocumentList: vi.fn(),
 	setAutoRunDocumentTree: vi.fn(),
 	setAutoRunIsLoadingDocuments: vi.fn(),
@@ -110,10 +124,10 @@ describe('useAutoRunHandlers', () => {
 				await result.current.handleAutoRunContentChange('Updated content');
 			});
 
-			expect(mockUpdateSessionWith).toHaveBeenCalledOnce();
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const updatedSession = updaterFn(mockSession);
-			expect(updatedSession.autoRunContent).toBe('Updated content');
+			expect(mockDeps.setSessions).toHaveBeenCalledOnce();
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const updatedSessions = updateFn([mockSession]);
+			expect(updatedSessions[0].autoRunContent).toBe('Updated content');
 		});
 
 		it('should NOT call writeDoc (content changes are in-memory only)', async () => {
@@ -139,7 +153,7 @@ describe('useAutoRunHandlers', () => {
 				await result.current.handleAutoRunContentChange('Content');
 			});
 
-			expect(mockUpdateSessionWith).not.toHaveBeenCalled();
+			expect(mockDeps.setSessions).not.toHaveBeenCalled();
 		});
 
 		it('should only update the active session in an array of sessions', async () => {
@@ -152,13 +166,17 @@ describe('useAutoRunHandlers', () => {
 				await result.current.handleAutoRunContentChange('Session 2 content');
 			});
 
-			// updateSessionWith is called with the active session's ID
-			expect(mockUpdateSessionWith).toHaveBeenCalledWith('session-2', expect.any(Function));
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const targetSession = createMockSession({ id: 'session-2', autoRunContent: 'Original 2' });
-			const updatedSession = updaterFn(targetSession);
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const allSessions = [
+				createMockSession({ id: 'session-1', autoRunContent: 'Original 1' }),
+				createMockSession({ id: 'session-2', autoRunContent: 'Original 2' }),
+				createMockSession({ id: 'session-3', autoRunContent: 'Original 3' }),
+			];
+			const updatedSessions = updateFn(allSessions);
 
-			expect(updatedSession.autoRunContent).toBe('Session 2 content');
+			expect(updatedSessions[0].autoRunContent).toBe('Original 1');
+			expect(updatedSessions[1].autoRunContent).toBe('Session 2 content');
+			expect(updatedSessions[2].autoRunContent).toBe('Original 3');
 		});
 
 		it('should handle empty content', async () => {
@@ -171,9 +189,9 @@ describe('useAutoRunHandlers', () => {
 				await result.current.handleAutoRunContentChange('');
 			});
 
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const updatedSession = updaterFn(mockSession);
-			expect(updatedSession.autoRunContent).toBe('');
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const updatedSessions = updateFn([mockSession]);
+			expect(updatedSessions[0].autoRunContent).toBe('');
 		});
 	});
 
@@ -192,9 +210,9 @@ describe('useAutoRunHandlers', () => {
 				result.current.handleAutoRunModeChange('edit');
 			});
 
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const updatedSession = updaterFn(mockSession);
-			expect(updatedSession.autoRunMode).toBe('edit');
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const updatedSessions = updateFn([mockSession]);
+			expect(updatedSessions[0].autoRunMode).toBe('edit');
 		});
 
 		it('should update session mode to preview', () => {
@@ -207,9 +225,9 @@ describe('useAutoRunHandlers', () => {
 				result.current.handleAutoRunModeChange('preview');
 			});
 
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const updatedSession = updaterFn(mockSession);
-			expect(updatedSession.autoRunMode).toBe('preview');
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const updatedSessions = updateFn([mockSession]);
+			expect(updatedSessions[0].autoRunMode).toBe('preview');
 		});
 
 		it('should do nothing when activeSession is null', () => {
@@ -221,7 +239,7 @@ describe('useAutoRunHandlers', () => {
 				result.current.handleAutoRunModeChange('edit');
 			});
 
-			expect(mockUpdateSessionWith).not.toHaveBeenCalled();
+			expect(mockDeps.setSessions).not.toHaveBeenCalled();
 		});
 
 		it('should only update the active session mode', () => {
@@ -234,13 +252,15 @@ describe('useAutoRunHandlers', () => {
 				result.current.handleAutoRunModeChange('preview');
 			});
 
-			// updateSessionWith is called with the active session's ID
-			expect(mockUpdateSessionWith).toHaveBeenCalledWith('session-2', expect.any(Function));
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const targetSession = createMockSession({ id: 'session-2', autoRunMode: 'edit' });
-			const updatedSession = updaterFn(targetSession);
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const allSessions = [
+				createMockSession({ id: 'session-1', autoRunMode: 'edit' }),
+				createMockSession({ id: 'session-2', autoRunMode: 'edit' }),
+			];
+			const updatedSessions = updateFn(allSessions);
 
-			expect(updatedSession.autoRunMode).toBe('preview');
+			expect(updatedSessions[0].autoRunMode).toBe('edit');
+			expect(updatedSessions[1].autoRunMode).toBe('preview');
 		});
 	});
 
@@ -264,12 +284,12 @@ describe('useAutoRunHandlers', () => {
 				});
 			});
 
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const updatedSession = updaterFn(mockSession);
-			expect(updatedSession.autoRunMode).toBe('preview');
-			expect(updatedSession.autoRunCursorPosition).toBe(100);
-			expect(updatedSession.autoRunEditScrollPos).toBe(200);
-			expect(updatedSession.autoRunPreviewScrollPos).toBe(300);
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const updatedSessions = updateFn([mockSession]);
+			expect(updatedSessions[0].autoRunMode).toBe('preview');
+			expect(updatedSessions[0].autoRunCursorPosition).toBe(100);
+			expect(updatedSessions[0].autoRunEditScrollPos).toBe(200);
+			expect(updatedSessions[0].autoRunPreviewScrollPos).toBe(300);
 		});
 
 		it('should do nothing when activeSession is null', () => {
@@ -286,7 +306,7 @@ describe('useAutoRunHandlers', () => {
 				});
 			});
 
-			expect(mockUpdateSessionWith).not.toHaveBeenCalled();
+			expect(mockDeps.setSessions).not.toHaveBeenCalled();
 		});
 	});
 
@@ -316,11 +336,11 @@ describe('useAutoRunHandlers', () => {
 				undefined // sshRemoteId - not set in test session
 			);
 
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const updatedSession = updaterFn(mockSession);
-			expect(updatedSession.autoRunSelectedFile).toBe('Phase 2');
-			expect(updatedSession.autoRunContent).toBe('# Phase 2\n\nNew document content');
-			expect(updatedSession.autoRunContentVersion).toBe(2);
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const updatedSessions = updateFn([mockSession]);
+			expect(updatedSessions[0].autoRunSelectedFile).toBe('Phase 2');
+			expect(updatedSessions[0].autoRunContent).toBe('# Phase 2\n\nNew document content');
+			expect(updatedSessions[0].autoRunContentVersion).toBe(2);
 		});
 
 		it('should handle failed document read gracefully', async () => {
@@ -338,10 +358,10 @@ describe('useAutoRunHandlers', () => {
 				await result.current.handleAutoRunSelectDocument('Missing Doc');
 			});
 
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const updatedSession = updaterFn(mockSession);
-			expect(updatedSession.autoRunSelectedFile).toBe('Missing Doc');
-			expect(updatedSession.autoRunContent).toBe('');
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const updatedSessions = updateFn([mockSession]);
+			expect(updatedSessions[0].autoRunSelectedFile).toBe('Missing Doc');
+			expect(updatedSessions[0].autoRunContent).toBe('');
 		});
 
 		it('should do nothing when activeSession is null', async () => {
@@ -354,7 +374,7 @@ describe('useAutoRunHandlers', () => {
 			});
 
 			expect(window.maestro.autorun.readDoc).not.toHaveBeenCalled();
-			expect(mockUpdateSessionWith).not.toHaveBeenCalled();
+			expect(mockDeps.setSessions).not.toHaveBeenCalled();
 		});
 
 		it('should do nothing when autoRunFolderPath is not set', async () => {
@@ -368,7 +388,7 @@ describe('useAutoRunHandlers', () => {
 			});
 
 			expect(window.maestro.autorun.readDoc).not.toHaveBeenCalled();
-			expect(mockUpdateSessionWith).not.toHaveBeenCalled();
+			expect(mockDeps.setSessions).not.toHaveBeenCalled();
 		});
 
 		it('should increment contentVersion to force sync', async () => {
@@ -386,9 +406,9 @@ describe('useAutoRunHandlers', () => {
 				await result.current.handleAutoRunSelectDocument('Phase 2');
 			});
 
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const updatedSession = updaterFn(mockSession);
-			expect(updatedSession.autoRunContentVersion).toBe(6);
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const updatedSessions = updateFn([mockSession]);
+			expect(updatedSessions[0].autoRunContentVersion).toBe(6);
 		});
 	});
 
@@ -633,11 +653,11 @@ describe('useAutoRunHandlers', () => {
 				await result.current.handleAutoRunCreateDocument('New Doc');
 			});
 
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const updatedSession = updaterFn(mockSession);
-			expect(updatedSession.autoRunSelectedFile).toBe('New Doc');
-			expect(updatedSession.autoRunContent).toBe('');
-			expect(updatedSession.autoRunMode).toBe('edit');
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const updatedSessions = updateFn([mockSession]);
+			expect(updatedSessions[0].autoRunSelectedFile).toBe('New Doc');
+			expect(updatedSessions[0].autoRunContent).toBe('');
+			expect(updatedSessions[0].autoRunMode).toBe('edit');
 		});
 
 		it('should increment contentVersion', async () => {
@@ -657,9 +677,9 @@ describe('useAutoRunHandlers', () => {
 				await result.current.handleAutoRunCreateDocument('New Doc');
 			});
 
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const updatedSession = updaterFn(mockSession);
-			expect(updatedSession.autoRunContentVersion).toBe(4);
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const updatedSessions = updateFn([mockSession]);
+			expect(updatedSessions[0].autoRunContentVersion).toBe(4);
 		});
 
 		it('should return false when write fails', async () => {
@@ -676,7 +696,7 @@ describe('useAutoRunHandlers', () => {
 			});
 
 			expect(success).toBe(false);
-			expect(mockUpdateSessionWith).not.toHaveBeenCalled();
+			expect(mockDeps.setSessions).not.toHaveBeenCalled();
 		});
 
 		it('should return false when activeSession is null', async () => {
@@ -958,11 +978,11 @@ describe('useAutoRunHandlers', () => {
 				undefined
 			);
 
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const updatedSession = updaterFn(mockSession);
-			expect(updatedSession.autoRunFolderPath).toBe('/folder');
-			expect(updatedSession.autoRunSelectedFile).toBe('First Doc');
-			expect(updatedSession.autoRunContent).toBe('# First Doc Content');
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const updatedSessions = updateFn([mockSession]);
+			expect(updatedSessions[0].autoRunFolderPath).toBe('/folder');
+			expect(updatedSessions[0].autoRunSelectedFile).toBe('First Doc');
+			expect(updatedSessions[0].autoRunContent).toBe('# First Doc Content');
 		});
 
 		it('should handle empty folder', async () => {
@@ -984,11 +1004,11 @@ describe('useAutoRunHandlers', () => {
 			// Should not try to read a document when folder is empty
 			expect(window.maestro.autorun.readDoc).not.toHaveBeenCalled();
 
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const updatedSession = updaterFn(mockSession);
-			expect(updatedSession.autoRunFolderPath).toBe('/empty/folder');
-			expect(updatedSession.autoRunSelectedFile).toBeUndefined();
-			expect(updatedSession.autoRunContent).toBe('');
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const updatedSessions = updateFn([mockSession]);
+			expect(updatedSessions[0].autoRunFolderPath).toBe('/empty/folder');
+			expect(updatedSessions[0].autoRunSelectedFile).toBeUndefined();
+			expect(updatedSessions[0].autoRunContent).toBe('');
 		});
 
 		it('should handle listDocs failure', async () => {
@@ -1009,11 +1029,11 @@ describe('useAutoRunHandlers', () => {
 
 			expect(mockDeps.setAutoRunDocumentList).toHaveBeenCalledWith([]);
 			expect(mockDeps.setAutoRunDocumentTree).toHaveBeenCalledWith([]);
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const updatedSession = updaterFn(mockSession);
-			expect(updatedSession.autoRunFolderPath).toBe('/bad/folder');
-			expect(updatedSession.autoRunSelectedFile).toBeUndefined();
-			expect(updatedSession.autoRunContent).toBe('');
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const updatedSessions = updateFn([mockSession]);
+			expect(updatedSessions[0].autoRunFolderPath).toBe('/bad/folder');
+			expect(updatedSessions[0].autoRunSelectedFile).toBeUndefined();
+			expect(updatedSessions[0].autoRunContent).toBe('');
 		});
 
 		it('should do nothing when activeSession is null', async () => {
@@ -1026,7 +1046,7 @@ describe('useAutoRunHandlers', () => {
 			});
 
 			expect(window.maestro.autorun.listDocs).not.toHaveBeenCalled();
-			expect(mockUpdateSessionWith).not.toHaveBeenCalled();
+			expect(mockDeps.setSessions).not.toHaveBeenCalled();
 		});
 
 		it('should increment contentVersion', async () => {
@@ -1049,9 +1069,9 @@ describe('useAutoRunHandlers', () => {
 				await result.current.handleAutoRunFolderSelected('/folder');
 			});
 
-			const updaterFn = mockUpdateSessionWith.mock.calls[0][1];
-			const updatedSession = updaterFn(mockSession);
-			expect(updatedSession.autoRunContentVersion).toBe(8);
+			const updateFn = mockDeps.setSessions.mock.calls[0][0];
+			const updatedSessions = updateFn([mockSession]);
+			expect(updatedSessions[0].autoRunContentVersion).toBe(8);
 		});
 	});
 

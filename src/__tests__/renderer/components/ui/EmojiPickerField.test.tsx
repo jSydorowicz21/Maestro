@@ -10,7 +10,6 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import React from 'react';
 import { EmojiPickerField } from '../../../../renderer/components/ui/EmojiPickerField';
 import type { Theme } from '../../../../renderer/types';
-import { mockTheme } from '../../../helpers/mockTheme';
 
 // Mock emoji-mart to avoid loading actual emoji data in tests
 vi.mock('@emoji-mart/data', () => ({
@@ -36,6 +35,29 @@ vi.mock('@emoji-mart/react', () => ({
 		</div>
 	),
 }));
+
+// Mock theme for testing
+const mockTheme: Theme = {
+	id: 'test-theme',
+	name: 'Test Theme',
+	mode: 'dark',
+	colors: {
+		bgMain: '#1a1a1a',
+		bgSidebar: '#242424',
+		bgActivity: '#2a2a2a',
+		textMain: '#ffffff',
+		textDim: '#888888',
+		accent: '#3b82f6',
+		accentForeground: '#ffffff',
+		border: '#333333',
+		error: '#ef4444',
+		success: '#22c55e',
+		warning: '#f59e0b',
+		cursor: '#ffffff',
+		terminalBg: '#1a1a1a',
+	},
+};
+
 describe('EmojiPickerField', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -595,7 +617,7 @@ describe('EmojiPickerField', () => {
 			render(<EmojiPickerField theme={mockTheme} value="📂" onChange={onChange} />);
 
 			const button = screen.getByRole('button', { name: /select emoji/i });
-			expect(button).toHaveStyle({ borderColor: mockTheme.colors.border });
+			expect(button).toHaveStyle({ borderColor: '#333333' });
 		});
 
 		it('should apply theme colors to label', () => {
@@ -606,7 +628,7 @@ describe('EmojiPickerField', () => {
 			);
 
 			const label = screen.getByText('Test Label');
-			expect(label).toHaveStyle({ color: mockTheme.colors.textMain });
+			expect(label).toHaveStyle({ color: '#ffffff' });
 		});
 	});
 

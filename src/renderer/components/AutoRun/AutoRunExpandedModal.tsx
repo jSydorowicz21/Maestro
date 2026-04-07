@@ -7,21 +7,20 @@ import {
 	Edit,
 	Play,
 	Square,
+	Loader2,
 	Save,
 	RotateCcw,
 	LayoutGrid,
 	AlertTriangle,
 } from 'lucide-react';
-import { Spinner } from '../ui';
 import type { Theme, BatchRunState, SessionState, Shortcut } from '../../types';
-import { useModalLayer } from '../../hooks/ui/useModalLayer';
+import { useLayerStack } from '../../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
 import { AutoRun } from './AutoRun';
 import type { AutoRunHandle } from './types';
 import type { DocumentTaskCount } from './AutoRunDocumentSelector';
 import { ConfirmModal } from '../ConfirmModal';
 import { formatShortcutKeys } from '../../utils/shortcutFormatter';
-import { GhostIconButton } from '../ui/GhostIconButton';
 
 interface AutoRunExpandedModalProps {
 	theme: Theme;
@@ -94,8 +93,13 @@ export function AutoRunExpandedModal({
 	onOpenMarketplace,
 	...autoRunProps
 }: AutoRunExpandedModalProps) {
+	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
+	const layerIdRef = useRef<string>();
+	const onCloseRef = useRef(onClose);
+	const handleCloseRef = useRef<() => void>(() => {});
 	const autoRunRef = useRef<AutoRunHandle>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	onCloseRef.current = onClose;
 
 	// Local mode state - independent from the right panel behind the modal
 	const [localMode, setLocalMode] = useState<'edit' | 'preview'>(initialMode);
@@ -164,9 +168,7 @@ export function AutoRunExpandedModal({
 			onClose();
 		}
 	}, [isDirty, onClose]);
-
-	// Register layer on mount
-	useModalLayer(MODAL_PRIORITIES.AUTORUN_EXPANDED, 'Auto Run Expanded', handleClose);
+	handleCloseRef.current = handleClose;
 
 	// Discard changes and close
 	const handleDiscardAndClose = useCallback(() => {
@@ -174,6 +176,36 @@ export function AutoRunExpandedModal({
 		setShowUnsavedConfirm(false);
 		onClose();
 	}, [handleRevert, onClose]);
+
+	// Register layer on mount
+	useEffect(() => {
+		const id = registerLayer({
+			type: 'modal',
+			priority: MODAL_PRIORITIES.AUTORUN_EXPANDED,
+			blocksLowerLayers: true,
+			capturesFocus: true,
+			focusTrap: 'strict',
+			onEscape: () => {
+				handleCloseRef.current();
+			},
+		});
+		layerIdRef.current = id;
+
+		return () => {
+			if (layerIdRef.current) {
+				unregisterLayer(layerIdRef.current);
+			}
+		};
+	}, [registerLayer, unregisterLayer]);
+
+	// Keep escape handler up to date
+	useEffect(() => {
+		if (layerIdRef.current) {
+			updateLayerHandler(layerIdRef.current, () => {
+				handleCloseRef.current();
+			});
+		}
+	}, [handleClose, updateLayerHandler]);
 
 	// Focus the AutoRun component on mount
 	useEffect(() => {
@@ -229,18 +261,11 @@ export function AutoRunExpandedModal({
 						<button
 							onClick={() => !isLocked && setMode('edit')}
 							disabled={isLocked}
-							className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors ${
-								localMode === 'edit' && !isLocked ? 'font-semibold' : ''
-							} ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+							className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
 							style={{
-								backgroundColor:
-									localMode === 'edit' && !isLocked ? theme.colors.bgMain : 'transparent',
-								color: isLocked
-									? theme.colors.textDim
-									: localMode === 'edit'
-										? theme.colors.textMain
-										: theme.colors.textDim,
-								border: `1px solid ${localMode === 'edit' && !isLocked ? theme.colors.accent : theme.colors.border}`,
+								color: theme.colors.accent,
+								border: `1px solid ${theme.colors.accent}${localMode === 'edit' && !isLocked ? '' : '40'}`,
+								backgroundColor: `${theme.colors.accent}${localMode === 'edit' && !isLocked ? '30' : '15'}`,
 							}}
 							title={isLocked ? 'Editing disabled while Auto Run active' : 'Edit document'}
 						>
@@ -249,17 +274,11 @@ export function AutoRunExpandedModal({
 						</button>
 						<button
 							onClick={() => setMode('preview')}
-							className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors ${
-								localMode === 'preview' || isLocked ? 'font-semibold' : ''
-							}`}
+							className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors"
 							style={{
-								backgroundColor:
-									localMode === 'preview' || isLocked ? theme.colors.bgMain : 'transparent',
-								color:
-									localMode === 'preview' || isLocked
-										? theme.colors.textMain
-										: theme.colors.textDim,
-								border: `1px solid ${localMode === 'preview' || isLocked ? theme.colors.accent : theme.colors.border}`,
+								color: theme.colors.accent,
+								border: `1px solid ${theme.colors.accent}${localMode === 'preview' || isLocked ? '' : '40'}`,
+								backgroundColor: `${theme.colors.accent}${localMode === 'preview' || isLocked ? '30' : '15'}`,
 							}}
 							title="Preview document"
 						>
@@ -342,7 +361,7 @@ export function AutoRunExpandedModal({
 								title={isStopping ? 'Stopping after current task...' : 'Stop auto-run'}
 							>
 								{isStopping ? (
-									<Spinner size="xs" className="w-3.5 h-3.5" />
+									<Loader2 className="w-3.5 h-3.5 animate-spin" />
 								) : (
 									<Square className="w-3.5 h-3.5" />
 								)}
@@ -358,11 +377,11 @@ export function AutoRunExpandedModal({
 									onOpenBatchRunner?.();
 								}}
 								disabled={isAgentBusy}
-								className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors ${isAgentBusy ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}`}
+								className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${isAgentBusy ? 'opacity-50 cursor-not-allowed' : ''}`}
 								style={{
-									backgroundColor: theme.colors.accent,
-									color: theme.colors.accentForeground,
-									border: `1px solid ${theme.colors.accent}`,
+									color: theme.colors.accent,
+									border: `1px solid ${theme.colors.accent}40`,
+									backgroundColor: `${theme.colors.accent}15`,
 								}}
 								title={isAgentBusy ? 'Cannot run while agent is thinking' : 'Run auto-run on tasks'}
 							>
@@ -374,10 +393,10 @@ export function AutoRunExpandedModal({
 						{onOpenMarketplace && (
 							<button
 								onClick={onOpenMarketplace}
-								className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs transition-colors hover:opacity-90"
+								className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors hover:bg-white/10"
 								style={{
 									color: theme.colors.accent,
-									border: `1px solid ${theme.colors.accent}`,
+									border: `1px solid ${theme.colors.accent}40`,
 									backgroundColor: `${theme.colors.accent}15`,
 								}}
 								title="Browse Playbook Exchange - discover and share community playbooks"
@@ -392,16 +411,24 @@ export function AutoRunExpandedModal({
 					<div className="flex items-center gap-2">
 						<button
 							onClick={handleClose}
-							className="flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors hover:bg-white/10"
-							style={{ color: theme.colors.textDim }}
+							className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors hover:bg-white/10"
+							style={{
+								color: theme.colors.accent,
+								border: `1px solid ${theme.colors.accent}40`,
+								backgroundColor: `${theme.colors.accent}15`,
+							}}
 							title={`Collapse${shortcuts?.toggleAutoRunExpanded ? ` (${formatShortcutKeys(shortcuts.toggleAutoRunExpanded.keys)})` : ' (Esc)'}`}
 						>
 							<Minimize2 className="w-4 h-4" />
 							Collapse
 						</button>
-						<GhostIconButton onClick={handleClose} tooltip="Close (Esc)">
+						<button
+							onClick={handleClose}
+							className="p-1 rounded hover:bg-white/10 transition-colors"
+							title="Close (Esc)"
+						>
 							<X className="w-5 h-5" style={{ color: theme.colors.textDim }} />
-						</GhostIconButton>
+						</button>
 					</div>
 				</div>
 

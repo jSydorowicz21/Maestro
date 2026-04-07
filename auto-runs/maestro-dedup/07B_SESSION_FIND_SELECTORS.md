@@ -200,19 +200,46 @@ All 86 useTabHandlers tests pass. 2 pre-existing failures in unrelated files (us
 
 ### 7. Consolidate getSshRemoteById (6 definitions, 5 redundant)
 
-- [ ] Verify canonical location: `main/stores/getters.ts:115`
-- [ ] Remove local copy in `agentSessions.ts:82` and replace with import
-- [ ] Remove local copy in `agents.ts:202` and replace with import
-- [ ] Remove local copy in `autorun.ts:43` and replace with import
-- [ ] Remove local copy in `git.ts:54` and replace with import
-- [ ] Remove local copy in `marketplace.ts:66` and replace with import
-- [ ] Run targeted tests for each changed file
+- [x] Verify canonical location: `main/stores/getters.ts:115`
+- [x] Remove local copy in `agentSessions.ts:82` and replace with import
+- [x] Remove local copy in `agents.ts:202` and replace with import
+- [x] Remove local copy in `autorun.ts:43` and replace with import
+- [x] Remove local copy in `git.ts:54` and replace with import
+- [x] Remove local copy in `marketplace.ts:66` and replace with import
+- [x] Run targeted tests for each changed file
+
+**Findings (Task 7):**
+Prior session had already migrated `agentSessions.ts`, `agents.ts`, and `autorun.ts` to import from `../../stores`. Two files needed work this session:
+
+| File                  | Change                                                                                                                                                                                 | Notes                                                                                  |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `git.ts`              | Fixed import from `getEnabledSshRemoteById` to `getSshRemoteById` (matching agents.ts/autorun.ts pattern); removed dead `gitSettingsStore` assignment                                  | Previous session removed local function but used wrong import name                     |
+| `marketplace.ts`      | Removed local `getSshRemoteById` function (lines 62-73); removed `marketplaceSettingsStore` variable and assignment; imported `getEnabledSshRemoteById` from stores; updated call site | Local function checked `enabled` flag, so `getEnabledSshRemoteById` preserves behavior |
+| `git.test.ts`         | Replaced stale `gitSettingsStore` mock with `../../../../main/stores` mock providing `getSshRemoteById`; updated 3 SSH test cases                                                      | All 147 tests pass                                                                     |
+| `marketplace.test.ts` | Added `../../../../main/stores` mock providing `getEnabledSshRemoteById`; updated 2 SSH override test cases to use mock directly                                                       | All 45 tests pass                                                                      |
+
+After consolidation: only 1 definition remains in `main/stores/getters.ts` (plus the `getEnabledSshRemoteById` wrapper). Zero local copies.
 
 ### 8. Verify full build
 
-- [ ] Run lint: `rtk npm run lint`
-- [ ] Run tests: `CI=1 rtk vitest run`
-- [ ] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
+- [x] Run lint: `rtk npm run lint`
+- [x] Run tests: `CI=1 rtk vitest run`
+- [x] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
+
+**Findings (Task 8):**
+Fixed 15 TypeScript errors in `git.ts` left from the previous session's Task 7 migration:
+
+- Removed unused `SshRemoteConfig` import (TS6133)
+- Prefixed unused `deps` parameter as `_deps` (TS6133) - parameter kept to preserve caller API
+- Added undefined guards to 18 `getSshRemoteById(sshRemoteId)` calls: `sshRemoteId ? getSshRemoteById(sshRemoteId) : undefined` (TS2345 - `string | undefined` not assignable to `string`)
+
+Verification results:
+
+- **Lint:** Passes cleanly
+- **Types:** Both `tsconfig.main.json` and `tsconfig.lint.json` compile with zero errors
+- **Tests:** 23,494 pass, 55 fail (all pre-existing Windows platform failures - path separator issues in `pathUtils.test.ts`, `cue-executor.test.ts`, `cue-yaml-loader.test.ts`, etc.). Zero new failures from our changes.
+- **git.test.ts:** All 147 tests pass
+- **marketplace.test.ts:** All 45 tests pass
 
 ---
 

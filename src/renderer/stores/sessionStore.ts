@@ -14,11 +14,9 @@
  */
 
 import { create } from 'zustand';
-import type { Session, Group, LogEntry, AITab } from '../types';
+import type { Session, Group, LogEntry } from '../types';
 import { generateId } from '../utils/ids';
 import { getActiveTab } from '../utils/tabHelpers';
-import { resolve } from './utils';
-import { captureException } from '../utils/sentry';
 
 // ============================================================================
 // Store Types
@@ -72,6 +70,12 @@ export interface SessionStoreActions {
 	 * Resets cycle position (so next Cmd+J/K starts fresh).
 	 */
 	setActiveSessionId: (id: string) => void;
+
+	/**
+	 * Set the active session ID from persisted state on startup.
+	 * Updates local state only — does not write back to disk.
+	 */
+	hydrateActiveSessionId: (id: string) => void;
 
 	/**
 	 * Set the active session ID without resetting cycle position.
@@ -141,6 +145,13 @@ export type SessionStore = SessionStoreState & SessionStoreActions;
 // Helpers
 // ============================================================================
 
+/**
+ * Helper to resolve a value-or-updater argument, matching React's setState signature.
+ */
+function resolve<T>(valOrFn: T | ((prev: T) => T), prev: T): T {
+	return typeof valOrFn === 'function' ? (valOrFn as (prev: T) => T)(prev) : valOrFn;
+}
+
 // ============================================================================
 // Store Implementation
 // ============================================================================
@@ -193,7 +204,16 @@ export const useSessionStore = create<SessionStore>()((set) => ({
 		}),
 
 	// Active session
-	setActiveSessionId: (id) => set({ activeSessionId: id, cyclePosition: -1 }),
+	setActiveSessionId: (id) => {
+		set({ activeSessionId: id, cyclePosition: -1 });
+		// Fire-and-forget: persist to disk for restore on next launch.
+		// Not awaited — UI state must update synchronously; if the write
+		// fails the only consequence is the session won't be pre-selected
+		// on next launch (falls back to first session).
+		window.maestro?.sessions?.setActiveSessionId(id);
+	},
+
+	hydrateActiveSessionId: (id) => set({ activeSessionId: id, cyclePosition: -1 }),
 
 	setActiveSessionIdInternal: (v) =>
 		set((s) => ({ activeSessionId: resolve(v, s.activeSessionId) })),
@@ -290,9 +310,6 @@ export const useSessionStore = create<SessionStore>()((set) => ({
 					console.error(
 						'[addLogToTab] No target tab found - session has no aiTabs, this should not happen'
 					);
-					captureException(new Error('[addLogToTab] No target tab found - session has no aiTabs'), {
-						extra: { sessionId, tabId },
-					});
 					return session;
 				}
 
@@ -307,94 +324,6 @@ export const useSessionStore = create<SessionStore>()((set) => ({
 			return { sessions: newSessions };
 		}),
 }));
-
-// ============================================================================
-// Standalone Update Helpers
-// ============================================================================
-// These functions use useSessionStore directly, so callers don't need to
-// receive `setSessions` as a prop. Import them wherever you need to update
-// session or tab state.
-
-/**
- * Update a specific AI tab within a session using a function updater.
- * No-op if the session or tab is not found.
- *
- * @example
- * updateAiTab(sessionId, tabId, (tab) => ({ ...tab, inputValue: 'hello' }));
- */
-export function updateAiTab(
-	sessionId: string,
-	tabId: string,
-	updater: (tab: AITab) => AITab
-): void {
-	useSessionStore.setState((state) => {
-		let sessionFound = false;
-		let tabFound = false;
-		const newSessions = state.sessions.map((session) => {
-			if (session.id !== sessionId) return session;
-			sessionFound = true;
-			const newTabs = session.aiTabs.map((tab) => {
-				if (tab.id !== tabId) return tab;
-				tabFound = true;
-				return updater(tab);
-			});
-			if (!tabFound) return session;
-			return { ...session, aiTabs: newTabs };
-		});
-		if (!sessionFound || !tabFound) return state;
-		return { sessions: newSessions };
-	});
-}
-
-/**
- * Update the active AI tab of a session using a function updater.
- * Resolves the active tab via `activeTabId` (with fallback to first tab).
- * No-op if the session is not found or has no tabs.
- *
- * @example
- * updateActiveAiTab(sessionId, (tab) => ({ ...tab, state: 'busy' }));
- */
-export function updateActiveAiTab(sessionId: string, updater: (tab: AITab) => AITab): void {
-	useSessionStore.setState((state) => {
-		let found = false;
-		const newSessions = state.sessions.map((session) => {
-			if (session.id !== sessionId) return session;
-
-			const activeTab =
-				session.aiTabs.find((t) => t.id === session.activeTabId) ?? session.aiTabs[0];
-			if (!activeTab) return session;
-
-			found = true;
-			return {
-				...session,
-				aiTabs: session.aiTabs.map((tab) => (tab.id === activeTab.id ? updater(tab) : tab)),
-			};
-		});
-		if (!found) return state;
-		return { sessions: newSessions };
-	});
-}
-
-/**
- * Update a session by ID using a function updater.
- * More flexible than the store's `updateSession` action (which takes Partial<Session>).
- * No-op if the session is not found.
- *
- * @example
- * updateSessionWith(sessionId, (s) => ({ ...s, state: 'idle', contextUsage: 0 }));
- */
-export function updateSessionWith(sessionId: string, updater: (session: Session) => Session): void {
-	useSessionStore.setState((state) => {
-		let found = false;
-		const newSessions = state.sessions.map((session) => {
-			if (session.id !== sessionId) return session;
-			found = true;
-			return updater(session);
-		});
-		if (!found) return state;
-		return { sessions: newSessions };
-	});
-}
 
 // ============================================================================
 // Selector Helpers
@@ -420,3 +349,117 @@ export const selectSessionById =
 	(id: string) =>
 	(state: SessionStore): Session | undefined =>
 		state.sessions.find((s) => s.id === id);
+
+/**
+ * Select all bookmarked sessions.
+ *
+ * @example
+ * const bookmarked = useSessionStore(selectBookmarkedSessions);
+ */
+export const selectBookmarkedSessions = (state: SessionStore): Session[] =>
+	state.sessions.filter((s) => s.bookmarked);
+
+/**
+ * Select sessions belonging to a specific group.
+ *
+ * @example
+ * const groupSessions = useSessionStore(selectSessionsByGroup('group-1'));
+ */
+export const selectSessionsByGroup =
+	(groupId: string) =>
+	(state: SessionStore): Session[] =>
+		state.sessions.filter((s) => s.groupId === groupId);
+
+/**
+ * Select ungrouped sessions (no groupId set).
+ *
+ * @example
+ * const ungrouped = useSessionStore(selectUngroupedSessions);
+ */
+export const selectUngroupedSessions = (state: SessionStore): Session[] =>
+	state.sessions.filter((s) => !s.groupId && !s.parentSessionId);
+
+/**
+ * Select a group by ID.
+ *
+ * @example
+ * const group = useSessionStore(selectGroupById('group-1'));
+ */
+export const selectGroupById =
+	(id: string) =>
+	(state: SessionStore): Group | undefined =>
+		state.groups.find((g) => g.id === id);
+
+/**
+ * Select session count.
+ *
+ * @example
+ * const count = useSessionStore(selectSessionCount);
+ */
+export const selectSessionCount = (state: SessionStore): number => state.sessions.length;
+
+/**
+ * Select whether initial load is complete (sessions loaded from disk).
+ *
+ * @example
+ * const ready = useSessionStore(selectIsReady);
+ */
+export const selectIsReady = (state: SessionStore): boolean =>
+	state.sessionsLoaded && state.initialLoadComplete;
+
+/**
+ * Select whether any session is currently busy (agent actively processing).
+ *
+ * @example
+ * const anyBusy = useSessionStore(selectIsAnySessionBusy);
+ */
+export const selectIsAnySessionBusy = (state: SessionStore): boolean =>
+	state.sessions.some((s) => s.state === 'busy');
+
+// ============================================================================
+// Non-React Access
+// ============================================================================
+
+/**
+ * Get current session store state outside React.
+ * Replaces sessionsRef.current, groupsRef.current, activeSessionIdRef.current.
+ *
+ * @example
+ * const { sessions, activeSessionId } = getSessionState();
+ */
+export function getSessionState() {
+	return useSessionStore.getState();
+}
+
+/**
+ * Get stable action references outside React.
+ * These never change, so they're safe to call from anywhere.
+ *
+ * @example
+ * const { setSessions, setActiveSessionId } = getSessionActions();
+ */
+export function getSessionActions() {
+	const state = useSessionStore.getState();
+	return {
+		setSessions: state.setSessions,
+		addSession: state.addSession,
+		removeSession: state.removeSession,
+		updateSession: state.updateSession,
+		setActiveSessionId: state.setActiveSessionId,
+		setActiveSessionIdInternal: state.setActiveSessionIdInternal,
+		setGroups: state.setGroups,
+		addGroup: state.addGroup,
+		removeGroup: state.removeGroup,
+		updateGroup: state.updateGroup,
+		toggleGroupCollapsed: state.toggleGroupCollapsed,
+		setSessionsLoaded: state.setSessionsLoaded,
+		setInitialLoadComplete: state.setInitialLoadComplete,
+		setInitialFileTreeReady: state.setInitialFileTreeReady,
+		toggleBookmark: state.toggleBookmark,
+		addRemovedWorktreePath: state.addRemovedWorktreePath,
+		setRemovedWorktreePaths: state.setRemovedWorktreePaths,
+		setCyclePosition: state.setCyclePosition,
+		resetCyclePosition: state.resetCyclePosition,
+		addLogToTab: state.addLogToTab,
+	};
+}

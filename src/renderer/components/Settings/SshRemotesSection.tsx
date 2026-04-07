@@ -27,6 +27,7 @@ import {
 	Check,
 	CheckCircle,
 	XCircle,
+	Loader2,
 	Wifi,
 	WifiOff,
 } from 'lucide-react';
@@ -34,8 +35,6 @@ import type { Theme } from '../../types';
 import type { SshRemoteConfig } from '../../../shared/types';
 import { useSshRemotes } from '../../hooks';
 import { SshRemoteModal } from './SshRemoteModal';
-import { GhostIconButton } from '../ui/GhostIconButton';
-import { Spinner } from '../ui';
 
 export interface SshRemotesSectionProps {
 	/** Theme object for styling */
@@ -133,7 +132,7 @@ export function SshRemotesSection({ theme }: SshRemotesSectionProps) {
 				className="flex items-center gap-3 p-4 rounded-xl border"
 				style={{ backgroundColor: theme.colors.bgMain, borderColor: theme.colors.border }}
 			>
-				<Spinner size="md" style={{ color: theme.colors.accent }} />
+				<Loader2 className="w-5 h-5 animate-spin" style={{ color: theme.colors.accent }} />
 				<span className="text-sm" style={{ color: theme.colors.textDim }}>
 					Loading SSH remotes...
 				</span>
@@ -262,22 +261,22 @@ export function SshRemotesSection({ theme }: SshRemotesSectionProps) {
 											{/* Actions */}
 											<div className="flex items-center gap-1">
 												{/* Test Connection */}
-												<GhostIconButton
-													size="md"
+												<button
+													type="button"
 													onClick={() => handleTestFromList(config)}
 													disabled={isTesting || !config.enabled}
-													className="disabled:opacity-50"
+													className="p-1.5 rounded hover:bg-white/10 transition-colors disabled:opacity-50"
 													style={{ color: theme.colors.textDim }}
-													tooltip="Test connection"
+													title="Test connection"
 												>
 													{isTesting ? (
-														<Spinner />
+														<Loader2 className="w-4 h-4 animate-spin" />
 													) : config.enabled ? (
 														<Wifi className="w-4 h-4" />
 													) : (
 														<WifiOff className="w-4 h-4" />
 													)}
-												</GhostIconButton>
+												</button>
 
 												{/* Set as Default */}
 												<button
@@ -296,26 +295,31 @@ export function SshRemotesSection({ theme }: SshRemotesSectionProps) {
 												</button>
 
 												{/* Edit */}
-												<GhostIconButton
-													size="md"
+												<button
+													type="button"
 													onClick={() => handleEdit(config)}
+													className="p-1.5 rounded hover:bg-white/10 transition-colors"
 													style={{ color: theme.colors.textDim }}
-													tooltip="Edit"
+													title="Edit"
 												>
 													<Edit2 className="w-4 h-4" />
-												</GhostIconButton>
+												</button>
 
 												{/* Delete */}
-												<GhostIconButton
-													size="md"
+												<button
+													type="button"
 													onClick={() => handleDelete(config.id)}
 													disabled={isDeleting}
-													className="disabled:opacity-50"
+													className="p-1.5 rounded hover:bg-white/10 transition-colors disabled:opacity-50"
 													style={{ color: theme.colors.error }}
-													tooltip="Delete"
+													title="Delete"
 												>
-													{isDeleting ? <Spinner /> : <Trash2 className="w-4 h-4" />}
-												</GhostIconButton>
+													{isDeleting ? (
+														<Loader2 className="w-4 h-4 animate-spin" />
+													) : (
+														<Trash2 className="w-4 h-4" />
+													)}
+												</button>
 											</div>
 										</div>
 									</div>

@@ -21,7 +21,6 @@ import { useFileExplorerStore } from '../../../renderer/stores/fileExplorerStore
 import type { Session } from '../../../renderer/types';
 import type { FileNode } from '../../../renderer/types/fileTree';
 import type { UseFileExplorerEffectsDeps } from '../../../renderer/hooks/git/useFileExplorerEffects';
-import { createMockSession } from '../../helpers/mockSession';
 
 // --- Mocks ---
 
@@ -49,6 +48,37 @@ vi.mock('../../../renderer/utils/fileExplorer', () => ({
 }));
 
 // --- Test Helpers ---
+
+const createMockSession = (overrides: Partial<Session> = {}): Session =>
+	({
+		id: 'session-1',
+		name: 'Test Session',
+		toolType: 'claude-code',
+		state: 'idle',
+		cwd: '/test/project',
+		fullPath: '/test/project',
+		projectRoot: '/test/project',
+		aiLogs: [],
+		shellLogs: [],
+		workLog: [],
+		contextUsage: 0,
+		inputMode: 'ai',
+		aiPid: 0,
+		terminalPid: 0,
+		port: 0,
+		isLive: false,
+		changedFiles: [],
+		isGitRepo: false,
+		fileTree: [],
+		fileExplorerExpanded: ['src'],
+		fileExplorerScrollPos: 0,
+		executionQueue: [],
+		activeTimeMs: 0,
+		aiTabs: [],
+		activeTabId: 'tab-1',
+		closedTabHistory: [],
+		...overrides,
+	}) as Session;
 
 const createDeps = (
 	overrides: Partial<UseFileExplorerEffectsDeps> = {}
@@ -86,16 +116,19 @@ beforeEach(() => {
 	});
 
 	// Setup window.maestro
-	Object.assign(window.maestro.shell, { openExternal: vi.fn(), openPath: vi.fn() });
-	Object.assign(window.maestro.fs, {
-		readFile: vi.fn().mockResolvedValue('file content'),
-		stat: vi.fn().mockResolvedValue({ modifiedAt: '2024-01-01T00:00:00Z' }),
-	});
-	Object.assign(window.maestro.settings, {
-		get: vi.fn().mockResolvedValue(undefined),
-		set: vi.fn().mockResolvedValue(undefined),
-		getAll: vi.fn().mockResolvedValue({}),
-	});
+	(window as any).maestro = {
+		...(window as any).maestro,
+		shell: { openExternal: vi.fn(), openPath: vi.fn() },
+		fs: {
+			readFile: vi.fn().mockResolvedValue('file content'),
+			stat: vi.fn().mockResolvedValue({ modifiedAt: '2024-01-01T00:00:00Z' }),
+		},
+		settings: {
+			get: vi.fn().mockResolvedValue(undefined),
+			set: vi.fn().mockResolvedValue(undefined),
+			getAll: vi.fn().mockResolvedValue({}),
+		},
+	};
 });
 
 // ============================================================================
@@ -707,7 +740,7 @@ describe('useFileExplorerEffects', () => {
 				window.dispatchEvent(event);
 			});
 
-			expect(toggleFolder).toHaveBeenCalledWith('src', 'session-1');
+			expect(toggleFolder).toHaveBeenCalledWith('src', 'session-1', expect.any(Function));
 		});
 
 		it('Cmd+ArrowDown jumps to last item', async () => {
@@ -1381,7 +1414,7 @@ describe('useFileExplorerEffects', () => {
 			});
 
 			// Should collapse 'src' folder
-			expect(toggleFolder).toHaveBeenCalledWith('src', 'session-1');
+			expect(toggleFolder).toHaveBeenCalledWith('src', 'session-1', expect.any(Function));
 		});
 
 		it('ArrowLeft on file navigates to parent folder', async () => {
@@ -1414,7 +1447,7 @@ describe('useFileExplorerEffects', () => {
 			});
 
 			// Should collapse parent 'src' and navigate to it
-			expect(toggleFolder).toHaveBeenCalledWith('src', 'session-1');
+			expect(toggleFolder).toHaveBeenCalledWith('src', 'session-1', expect.any(Function));
 			expect(useFileExplorerStore.getState().selectedFileIndex).toBe(0);
 		});
 
@@ -1445,7 +1478,7 @@ describe('useFileExplorerEffects', () => {
 			});
 
 			// Should expand 'src' folder
-			expect(toggleFolder).toHaveBeenCalledWith('src', 'session-1');
+			expect(toggleFolder).toHaveBeenCalledWith('src', 'session-1', expect.any(Function));
 		});
 
 		it('ArrowRight does nothing on already-expanded folder', async () => {

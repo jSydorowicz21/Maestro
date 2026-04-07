@@ -22,8 +22,6 @@ import type {
 	BatchRunState,
 	SessionState,
 } from '../../renderer/types';
-import { createMockSession } from '../helpers/mockSession';
-import { createMockTheme } from '../helpers/mockTheme';
 
 // Helper to wrap component in LayerStackProvider with custom rerender
 const renderWithProviders = (ui: React.ReactElement) => {
@@ -174,25 +172,92 @@ vi.mock('../../renderer/hooks/useLiveOverlay', () => ({
 vi.mock('qrcode.react', () => ({
 	QRCodeSVG: () => <div data-testid="qrcode">QR Code</div>,
 }));
-// Override specific window.maestro namespaces (setup.ts provides the base mock)
-const overrideMaestroMock = () => {
-	Object.assign(window.maestro.fs, {
-		readFile: vi.fn().mockResolvedValue('data:image/png;base64,abc123'),
-		readDir: vi.fn().mockResolvedValue([]),
-	});
-	Object.assign(window.maestro.autorun, {
-		listDocs: vi.fn().mockResolvedValue({ success: true, files: ['Phase 1', 'Phase 2'], tree: [] }),
-		readDoc: vi.fn().mockResolvedValue({ success: true, content: '# Test Content' }),
-		listImages: vi.fn().mockResolvedValue({ success: true, images: [] }),
-		saveImage: vi.fn().mockResolvedValue({ success: true, relativePath: 'images/test-123.png' }),
-		deleteImage: vi.fn().mockResolvedValue({ success: true }),
-		writeDoc: vi.fn().mockResolvedValue({ success: true }),
-	});
-	Object.assign(window.maestro.settings, {
-		get: vi.fn().mockResolvedValue(null),
-		set: vi.fn().mockResolvedValue(undefined),
-	});
+
+// Create a mock theme for testing
+const createMockTheme = (): Theme => ({
+	id: 'test-theme',
+	name: 'Test Theme',
+	mode: 'dark',
+	colors: {
+		bgMain: '#1a1a1a',
+		bgPanel: '#252525',
+		bgActivity: '#2d2d2d',
+		bgSidebar: '#1e1e1e',
+		textMain: '#ffffff',
+		textDim: '#888888',
+		accent: '#0066ff',
+		accentForeground: '#ffffff',
+		border: '#333333',
+		highlight: '#0066ff33',
+		success: '#00aa00',
+		warning: '#ffaa00',
+		error: '#ff0000',
+	},
+});
+
+// Setup window.maestro mock
+const setupMaestroMock = () => {
+	const mockMaestro = {
+		fs: {
+			readFile: vi.fn().mockResolvedValue('data:image/png;base64,abc123'),
+			readDir: vi.fn().mockResolvedValue([]),
+		},
+		autorun: {
+			listDocs: vi
+				.fn()
+				.mockResolvedValue({ success: true, files: ['Phase 1', 'Phase 2'], tree: [] }),
+			readDoc: vi.fn().mockResolvedValue({ success: true, content: '# Test Content' }),
+			listImages: vi.fn().mockResolvedValue({ success: true, images: [] }),
+			saveImage: vi.fn().mockResolvedValue({ success: true, relativePath: 'images/test-123.png' }),
+			deleteImage: vi.fn().mockResolvedValue({ success: true }),
+			writeDoc: vi.fn().mockResolvedValue({ success: true }),
+		},
+		settings: {
+			get: vi.fn().mockResolvedValue(null),
+			set: vi.fn().mockResolvedValue(undefined),
+		},
+	};
+
+	(window as any).maestro = mockMaestro;
+	return mockMaestro;
 };
+
+// Create mock session
+const createMockSession = (overrides: Partial<Session> = {}): Session => ({
+	id: 'test-session-1',
+	name: 'Test Session 1',
+	cwd: '/test/path',
+	projectRoot: '/test/path',
+	fullPath: '/test/path',
+	toolType: 'claude-code',
+	state: 'idle',
+	inputMode: 'ai',
+	isGitRepo: true,
+	aiPid: 1234,
+	terminalPid: 5678,
+	port: 3000,
+	aiTabs: [{ id: 'tab-1', name: 'Tab 1', logs: [] }],
+	activeTabId: 'tab-1',
+	closedTabHistory: [],
+	shellLogs: [],
+	fileTree: [],
+	fileExplorerExpanded: [],
+	fileExplorerScrollPos: 0,
+	executionQueue: [],
+	changedFiles: [],
+	isLive: false,
+	contextUsage: 0,
+	workLog: [],
+	autoRunFolderPath: '/test/autorun',
+	autoRunSelectedFile: 'Phase 1',
+	autoRunMode: 'edit',
+	autoRunContent: '# Session 1 Content\n\n- [ ] Task 1',
+	autoRunContentVersion: 0,
+	autoRunCursorPosition: 0,
+	autoRunEditScrollPos: 0,
+	autoRunPreviewScrollPos: 0,
+	...overrides,
+});
 
 // Create mock group
 const createMockGroup = (overrides: Partial<Group> = {}): Group => ({
@@ -518,8 +583,10 @@ const IntegrationTestWrapper = ({
 };
 
 describe('Auto Run + Session List Integration', () => {
+	let mockMaestro: ReturnType<typeof setupMaestroMock>;
+
 	beforeEach(() => {
-		overrideMaestroMock();
+		mockMaestro = setupMaestroMock();
 		vi.useFakeTimers({ shouldAdvanceTime: true });
 		vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
 			cb(0);
