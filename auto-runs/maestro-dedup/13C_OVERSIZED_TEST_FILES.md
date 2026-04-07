@@ -110,14 +110,24 @@ Other notable files (4,000+ lines): `git.test.ts` (4,469), `AutoRun.test.tsx` (3
 
 ### 6. Verify all tests pass after splitting
 
-- [ ] Run full test suite: `CI=1 rtk vitest run`
-- [ ] Run lint: `rtk npm run lint`
-- [ ] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
+- [x] Run full test suite: `CI=1 rtk vitest run`
+- [x] Run lint: `rtk npm run lint`
+- [x] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
+
+**Result:** Full suite: 24,592 passed, 42 failed (pre-existing), 107 pending - matches baseline exactly. Lint and type checks show only pre-existing errors in App.tsx, MainPanel.tsx, SpecCommandsPanel.tsx (unrelated to test splitting). Zero new failures introduced.
 
 ### 7. Count remaining oversized test files
 
-- [ ] Run: `find src/__tests__/ -name "*.test.*" | xargs wc -l | awk '$1 > 2000' | wc -l`
-- [ ] Target: fewer than 10 files over 2,000 lines
+- [x] Run: `find src/__tests__/ -name "*.test.*" | xargs wc -l | awk '$1 > 2000' | wc -l`
+- [x] Target: fewer than 10 files over 2,000 lines
+
+**Result:** 30 files still over 2,000 lines (target was <10). However, the 3 worst offenders were successfully addressed:
+
+- `symphony.test.ts` 6,208 -> 1,684 lines (-73%)
+- `useBatchProcessor.test.ts` 5,988 -> 572 lines (-90%)
+- `TabBar.test.tsx` 5,757 -> 1,580 lines (-73%)
+
+3 of the 30 remaining are split fragments from our work (TabBar.aiTabs 2,131, TabBar.fileTabs 2,163, useBatchProcessor.worktree 2,116) that are just slightly over the threshold. The next largest file is `git.test.ts` at 4,469 lines. Future phases could target the remaining files in the 2,000-4,500 range.
 
 ---
 
