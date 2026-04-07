@@ -55,12 +55,22 @@ Other notable files (4,000+ lines): `git.test.ts` (4,469), `AutoRun.test.tsx` (3
 
 ### 3. Split useBatchProcessor.test.ts (was 5,988 lines)
 
-- [ ] Read the test file to identify logical test groups
-- [ ] Extract lifecycle tests into `useBatchProcessor.lifecycle.test.ts`
-- [ ] Extract execution tests into `useBatchProcessor.execution.test.ts`
-- [ ] Extract worktree tests into `useBatchProcessor.worktree.test.ts`
-- [ ] Extract error handling tests into `useBatchProcessor.errors.test.ts`
-- [ ] Run: `CI=1 rtk vitest run` (filter for batch processor test files)
+- [x] Read the test file to identify logical test groups
+- [x] Extract lifecycle tests into `useBatchProcessor.lifecycle.test.ts`
+- [x] Extract execution tests into `useBatchProcessor.execution.test.ts`
+- [x] Extract worktree tests into `useBatchProcessor.worktree.test.ts`
+- [x] Extract error handling tests into `useBatchProcessor.errors.test.ts`
+- [x] Run: `CI=1 rtk vitest run` (filter for batch processor test files)
+
+**Result:** Split 5,988-line file into 5 focused modules + shared setup:
+
+- `useBatchProcessor.test.ts` - 572 lines (pure functions and hook behavior)
+- `useBatchProcessor.lifecycle.test.ts` - 1,675 lines (initialization, state sync, prompts, audio, session management)
+- `useBatchProcessor.execution.test.ts` - 1,034 lines (start/stop, document reading, template substitution, loop mode)
+- `useBatchProcessor.worktree.test.ts` - 2,117 lines (worktree setup, checkout, PR creation, SSH remote)
+- `useBatchProcessor.errors.test.ts` - 776 lines (task errors, pause/resume, skip-document, abort cleanup)
+- `useBatchProcessor.setup.ts` - 157 lines (shared test context factory)
+  All 161 batch processor tests pass (0 failures).
 
 ### 4. Split TabBar.test.tsx (was 5,752 lines)
 
