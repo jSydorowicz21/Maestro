@@ -12,9 +12,9 @@ Address the remaining oversized files after App.tsx. Priority targets are files 
 
 ## Pre-flight Checks
 
-- [ ] Phase 13-A (App.tsx decomposition) is complete
-- [ ] `rtk npm run lint` passes
-- [ ] `rtk vitest run` passes
+- [x] Phase 13-A (App.tsx decomposition) is complete (all 10 tasks checked, App.tsx reduced from 4,034 to 2,918 lines)
+- [x] `rtk npm run lint` passes (18 pre-existing errors from prior phases - 0 new; all `setSessions` missing property, `updateSessionWith`/`Spinner`/`EditingCommand` broken imports)
+- [x] `CI=1 rtk vitest run` passes (baseline: 24,573 passed, 42 pre-existing failures, 107 pending)
 
 ---
 
@@ -36,32 +36,74 @@ Current oversized files status:
 
 ### 1. Re-measure after prior phases
 
-- [ ] Run: `find src/ -name "*.ts" -o -name "*.tsx" | xargs wc -l | sort -rn | head -30`
-- [ ] Only target files still over 1,500 lines
-- [ ] Document updated line counts for decision-making
+- [x] Run: `find src/ -name "*.ts" -o -name "*.tsx" | xargs wc -l | sort -rn | head -30`
+- [x] Only target files still over 1,500 lines
+- [x] Document updated line counts for decision-making
+
+**Updated measurements (excluding test files and generated files, files >1,500 lines):**
+
+| File                                                          | Lines | Notes                          |
+| ------------------------------------------------------------- | ----- | ------------------------------ |
+| `src/web/mobile/App.tsx`                                      | 3,350 | Mobile app - separate concern  |
+| `src/main/ipc/handlers/symphony.ts`                           | 3,318 | **TARGET** - Task 2            |
+| `src/renderer/global.d.ts`                                    | 3,161 | Type declarations - skip       |
+| `src/renderer/App.tsx`                                        | 2,918 | Addressed in 13-A, coordinator |
+| `src/renderer/components/SymphonyModal.tsx`                   | 2,620 | **TARGET** - Task 3            |
+| `src/main/web-server/handlers/messageHandlers.ts`             | 2,450 | Web server handlers            |
+| `src/renderer/components/DocumentGraph/DocumentGraphView.tsx` | 2,136 |                                |
+| `src/renderer/hooks/batch/useBatchProcessor.ts`               | 2,092 |                                |
+| `src/main/group-chat/group-chat-router.ts`                    | 2,037 |                                |
+| `src/renderer/stores/settingsStore.ts`                        | 2,016 |                                |
+| `src/renderer/utils/tabHelpers.ts`                            | 2,001 |                                |
+| `src/renderer/components/MainPanel.tsx`                       | 1,986 |                                |
+| `src/renderer/components/ProcessMonitor.tsx`                  | 1,975 |                                |
+| `src/main/ipc/handlers/claude.ts`                             | 1,908 |                                |
+| `src/renderer/components/TerminalOutput.tsx`                  | 1,847 |                                |
+| `src/renderer/components/NewInstanceModal.tsx`                | 1,836 |                                |
+| `src/main/web-server/web-server-factory.ts`                   | 1,816 |                                |
+| `src/main/storage/opencode-session-storage.ts`                | 1,759 |                                |
+| `src/renderer/components/QuickActionsModal.tsx`               | 1,708 |                                |
+| `src/renderer/hooks/tabs/useTabHandlers.ts`                   | 1,625 | **TARGET** - Task 5 (>800)     |
+| `src/main/storage/codex-session-storage.ts`                   | 1,614 |                                |
+| `src/renderer/components/PlaygroundPanel.tsx`                 | 1,608 |                                |
+| `src/renderer/hooks/agent/useAgentListeners.ts`               | 1,607 |                                |
+| `src/web/mobile/AllSessionsView.tsx`                          | 1,575 | Mobile - separate concern      |
+| `src/renderer/components/FileExplorerPanel.tsx`               | 1,557 |                                |
+| `src/renderer/components/AgentSessionsBrowser.tsx`            | 1,538 |                                |
+
+**Also checked (from Important Context):**
+
+- `FilePreview.tsx` - 1,322 lines (partially resolved, >800 - Task 4 target)
+- `useInputProcessing.ts` - 1,242 lines (>800 - Task 5 target)
+- `useTabHandlers.ts` - 1,625 lines (>800 - Task 5 target)
 
 ### 2. Decompose symphony.ts handler (3,318 lines)
 
-- [ ] Read `src/main/ipc/handlers/symphony.ts` to identify logical sections
-- [ ] Create directory: `src/main/ipc/handlers/symphony/`
-- [ ] Extract and create `index.ts` - handler registration (entry point)
-- [ ] Extract and create `create.ts` - create group chat handlers
-- [ ] Extract and create `manage.ts` - manage/update group chat handlers
-- [ ] Extract and create `participants.ts` - participant management handlers
-- [ ] Extract and create `messages.ts` - message handling
-- [ ] Extract and create `export.ts` - export/history handlers
-- [ ] Update imports in any files that referenced the old single-file path
-- [ ] Run lint and tests: `rtk npm run lint && rtk vitest run`
+- [x] Read `src/main/ipc/handlers/symphony.ts` to identify logical sections
+- [x] Create directory: `src/main/ipc/handlers/symphony/`
+- [x] Extract and create `index.ts` - handler registration (entry point)
+- [x] Extract and create `helpers.ts` - validation, path, cache/state, utility functions (433 lines)
+- [x] Extract and create `git-operations.ts` - clone, branch, PR, auth operations (342 lines)
+- [x] Extract and create `registry.ts` - registry fetching, issues, star counts (625 lines)
+- [x] Extract and create `state.ts` - state/stats/cache operation handlers (140 lines)
+- [x] Extract and create `contributions.ts` - contribution lifecycle handlers (1,117 lines)
+- [x] Extract and create `workflow.ts` - session creation workflow handlers (801 lines)
+- [x] Update imports in any files that referenced the old single-file path
+- [x] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+
+**Note:** Task originally specified group-chat-oriented file names (create.ts, manage.ts, participants.ts, messages.ts, export.ts) but symphony.ts is a contribution management system, not group chat. Decomposed by actual logical sections instead: helpers, git-operations, registry, state, contributions, workflow. All 219 symphony unit tests pass. Baseline maintained: 24,573 passed, 42 pre-existing failures.
 
 ### 3. Decompose SymphonyModal.tsx
 
-- [ ] Read the file to identify extractable sub-panels and state logic
-- [ ] Extract `SymphonyParticipantList.tsx` component
-- [ ] Extract `SymphonyMessageView.tsx` component
-- [ ] Extract `SymphonyConfigPanel.tsx` component
-- [ ] Extract `useSymphonyModal.ts` state management hook
-- [ ] Keep the modal shell as the coordinator that imports and composes these
-- [ ] Run lint and tests: `rtk npm run lint && rtk vitest run`
+- [x] Read the file to identify extractable sub-panels and state logic
+- [x] Extract `SymphonyCards.tsx` component (RepositoryTile, IssueCard, ActiveContributionCard, CompletedContributionCard, AchievementCard, RepositoryTileSkeleton - 623 lines)
+- [x] Extract `SymphonyDetailView.tsx` component (RepositoryDetailView - 567 lines)
+- [x] Extract `SymphonyPreflightDialog.tsx` component (build warning dialog - 236 lines)
+- [x] Extract `useSymphonyModal.ts` state management hook (440 lines)
+- [x] Keep the modal shell as the coordinator that imports and composes these (779 lines)
+- [x] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
+
+**Note:** Task originally specified group-chat-oriented component names (SymphonyParticipantList, SymphonyMessageView, SymphonyConfigPanel) but SymphonyModal is a contribution management UI, not a messaging system. Decomposed by actual logical sections: helpers (types/constants/utils), cards (6 presentational components), detail view (repository issue browser), preflight dialog (gh CLI check), and state hook. Created `Symphony/` directory with 7 focused modules. All 6 SymphonyModal tests pass. Old import path preserved via re-export barrel. Baseline maintained: 24,573 passed, 42 pre-existing failures.
 
 ### 4. Finish FilePreview.tsx decomposition (1,320 lines)
 
@@ -69,19 +111,19 @@ Current oversized files status:
 - [ ] Extract language-specific renderers into separate components
 - [ ] Extract toolbar logic into a component or hook
 - [ ] Extract preview mode switching logic
-- [ ] Run lint and tests: `rtk npm run lint && rtk vitest run`
+- [ ] Run lint and tests: `rtk npm run lint && CI=1 rtk vitest run`
 
 ### 5. Address useTabHandlers.ts and useInputProcessing.ts
 
 - [ ] Check current size of both files (should be smaller after Phase 07)
 - [ ] If `useTabHandlers.ts` still exceeds 800 lines: split by tab operation type (create, close, reorder, activate)
 - [ ] If `useInputProcessing.ts` still exceeds 800 lines: split by input type (text, slash commands, file drops)
-- [ ] Run lint and tests after any splits: `rtk npm run lint && rtk vitest run`
+- [ ] Run lint and tests after any splits: `rtk npm run lint && CI=1 rtk vitest run`
 
 ### 6. Verify full build
 
 - [ ] Run lint: `rtk npm run lint`
-- [ ] Run tests: `rtk vitest run`
+- [ ] Run tests: `CI=1 rtk vitest run`
 - [ ] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
 
 ### 7. Final oversized file count
@@ -96,7 +138,7 @@ Current oversized files status:
 After completing changes, run targeted tests for the files you modified:
 
 ```bash
-rtk vitest run <path-to-relevant-test-files>
+CI=1 rtk vitest run <path-to-relevant-test-files>
 ```
 
 **Rule: Zero new test failures from your changes.** Pre-existing failures on the baseline are acceptable.
