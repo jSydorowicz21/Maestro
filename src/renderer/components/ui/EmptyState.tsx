@@ -39,22 +39,12 @@ export const EmptyState = memo(function EmptyState({
 			style={{ color: theme.colors.textDim }}
 			data-testid={testId}
 		>
-			{icon && (
-				<div className="mb-3 opacity-30">
-					{icon}
-				</div>
-			)}
-			<p
-				className="text-sm"
-				style={{ color: theme.colors.textDim }}
-			>
+			{icon && <div className="mb-3 opacity-30">{icon}</div>}
+			<p className="text-sm" style={{ color: theme.colors.textDim }}>
 				{message}
 			</p>
 			{description && (
-				<p
-					className="text-xs mt-1"
-					style={{ color: theme.colors.textDim, opacity: 0.7 }}
-				>
+				<p className="text-xs mt-1" style={{ color: theme.colors.textDim, opacity: 0.7 }}>
 					{description}
 				</p>
 			)}

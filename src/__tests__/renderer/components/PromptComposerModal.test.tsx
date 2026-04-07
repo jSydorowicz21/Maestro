@@ -1107,7 +1107,10 @@ describe('PromptComposerModal', () => {
 		});
 
 		it('should show mention dropdown when typing @', () => {
-			const sessions = [createMockSession({ id: 's1', name: 'Agent1' }), createMockSession({ id: 's2', name: 'Agent2' })];
+			const sessions = [
+				createMockSession({ id: 's1', name: 'Agent1' }),
+				createMockSession({ id: 's2', name: 'Agent2' }),
+			];
 			renderWithProvider(
 				<PromptComposerModal
 					isOpen={true}
@@ -1130,7 +1133,10 @@ describe('PromptComposerModal', () => {
 		});
 
 		it('should filter mentions as user types', () => {
-			const sessions = [createMockSession({ id: 's1', name: 'Agent1' }), createMockSession({ id: 's2', name: 'Other' })];
+			const sessions = [
+				createMockSession({ id: 's1', name: 'Agent1' }),
+				createMockSession({ id: 's2', name: 'Other' }),
+			];
 			renderWithProvider(
 				<PromptComposerModal
 					isOpen={true}
@@ -1199,7 +1205,10 @@ describe('PromptComposerModal', () => {
 		});
 
 		it('should navigate mentions with arrow keys', () => {
-			const sessions = [createMockSession({ id: 's1', name: 'Agent1' }), createMockSession({ id: 's2', name: 'Agent2' })];
+			const sessions = [
+				createMockSession({ id: 's1', name: 'Agent1' }),
+				createMockSession({ id: 's2', name: 'Agent2' }),
+			];
 			renderWithProvider(
 				<PromptComposerModal
 					isOpen={true}

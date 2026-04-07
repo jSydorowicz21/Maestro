@@ -1,7 +1,9 @@
 import React from 'react';
 
-export interface GhostIconButtonProps
-	extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
+export interface GhostIconButtonProps extends Omit<
+	React.ButtonHTMLAttributes<HTMLButtonElement>,
+	'children'
+> {
 	/** Icon element to render inside the button (lucide-react icon, etc.) */
 	icon?: React.ReactNode;
 	/** Padding size: 'sm' = p-1, 'md' = p-1.5 */
@@ -31,16 +33,8 @@ const SIZE_CLASSES: Record<'sm' | 'md', string> = {
  */
 export const GhostIconButton = React.forwardRef<HTMLButtonElement, GhostIconButtonProps>(
 	function GhostIconButton(
-		{
-			icon,
-			size = 'sm',
-			showOnHover = false,
-			tooltip,
-			className = '',
-			children,
-			...buttonProps
-		},
-		ref,
+		{ icon, size = 'sm', showOnHover = false, tooltip, className = '', children, ...buttonProps },
+		ref
 	) {
 		const sizeClass = SIZE_CLASSES[size];
 		const hoverClass = showOnHover ? 'opacity-0 group-hover:opacity-100' : '';
@@ -56,5 +50,5 @@ export const GhostIconButton = React.forwardRef<HTMLButtonElement, GhostIconButt
 				{children ?? icon}
 			</button>
 		);
-	},
+	}
 );

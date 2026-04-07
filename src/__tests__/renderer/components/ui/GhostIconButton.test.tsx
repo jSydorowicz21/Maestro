@@ -28,10 +28,7 @@ describe('GhostIconButton', () => {
 
 		it('should prefer children over icon prop', () => {
 			render(
-				<GhostIconButton
-					icon={<span data-testid="icon-prop">I</span>}
-					aria-label="both"
-				>
+				<GhostIconButton icon={<span data-testid="icon-prop">I</span>} aria-label="both">
 					<span data-testid="child">C</span>
 				</GhostIconButton>
 			);

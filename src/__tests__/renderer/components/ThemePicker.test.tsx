@@ -22,16 +22,32 @@ const mockThemes: Record<ThemeId, Theme> = {
 	nord: createMockTheme({ id: 'nord', name: 'Nord', mode: 'dark' }),
 	'tokyo-night': createMockTheme({ id: 'tokyo-night', name: 'Tokyo Night', mode: 'dark' }),
 	'gruvbox-dark': createMockTheme({ id: 'gruvbox-dark', name: 'Gruvbox Dark', mode: 'dark' }),
-	'catppuccin-mocha': createMockTheme({ id: 'catppuccin-mocha', name: 'Catppuccin Mocha', mode: 'dark' }),
+	'catppuccin-mocha': createMockTheme({
+		id: 'catppuccin-mocha',
+		name: 'Catppuccin Mocha',
+		mode: 'dark',
+	}),
 	pedurple: createMockTheme({ id: 'pedurple', name: 'Pedurple', mode: 'dark' }),
-	'maestros-choice': createMockTheme({ id: 'maestros-choice', name: "Maestro's Choice", mode: 'dark' }),
+	'maestros-choice': createMockTheme({
+		id: 'maestros-choice',
+		name: "Maestro's Choice",
+		mode: 'dark',
+	}),
 	'dre-synth': createMockTheme({ id: 'dre-synth', name: 'Dre Synth', mode: 'dark' }),
 	inquest: createMockTheme({ id: 'inquest', name: 'InQuest', mode: 'dark' }),
 	'github-light': createMockTheme({ id: 'github-light', name: 'GitHub Light', mode: 'light' }),
-	'solarized-light': createMockTheme({ id: 'solarized-light', name: 'Solarized Light', mode: 'light' }),
+	'solarized-light': createMockTheme({
+		id: 'solarized-light',
+		name: 'Solarized Light',
+		mode: 'light',
+	}),
 	'one-light': createMockTheme({ id: 'one-light', name: 'One Light', mode: 'light' }),
 	'gruvbox-light': createMockTheme({ id: 'gruvbox-light', name: 'Gruvbox Light', mode: 'light' }),
-	'catppuccin-latte': createMockTheme({ id: 'catppuccin-latte', name: 'Catppuccin Latte', mode: 'light' }),
+	'catppuccin-latte': createMockTheme({
+		id: 'catppuccin-latte',
+		name: 'Catppuccin Latte',
+		mode: 'light',
+	}),
 	'ayu-light': createMockTheme({ id: 'ayu-light', name: 'Ayu Light', mode: 'light' }),
 };
 
@@ -196,17 +212,37 @@ describe('ThemePicker', () => {
 				nord: createMockTheme({ id: 'nord', name: 'Nord', mode: 'dark' }),
 				'tokyo-night': createMockTheme({ id: 'tokyo-night', name: 'Tokyo Night', mode: 'dark' }),
 				'gruvbox-dark': createMockTheme({ id: 'gruvbox-dark', name: 'Gruvbox Dark', mode: 'dark' }),
-				'catppuccin-mocha': createMockTheme({ id: 'catppuccin-mocha', name: 'Catppuccin Mocha', mode: 'dark' }),
+				'catppuccin-mocha': createMockTheme({
+					id: 'catppuccin-mocha',
+					name: 'Catppuccin Mocha',
+					mode: 'dark',
+				}),
 				pedurple: createMockTheme({ id: 'pedurple', name: 'Pedurple', mode: 'dark' }),
-				'maestros-choice': createMockTheme({ id: 'maestros-choice', name: "Maestro's Choice", mode: 'dark' }),
+				'maestros-choice': createMockTheme({
+					id: 'maestros-choice',
+					name: "Maestro's Choice",
+					mode: 'dark',
+				}),
 				'dre-synth': createMockTheme({ id: 'dre-synth', name: 'Dre Synth', mode: 'dark' }),
 				inquest: createMockTheme({ id: 'inquest', name: 'InQuest', mode: 'dark' }),
 				// Make light themes actually dark mode for this test
 				'github-light': createMockTheme({ id: 'github-light', name: 'GitHub Light', mode: 'dark' }),
-				'solarized-light': createMockTheme({ id: 'solarized-light', name: 'Solarized Light', mode: 'dark' }),
+				'solarized-light': createMockTheme({
+					id: 'solarized-light',
+					name: 'Solarized Light',
+					mode: 'dark',
+				}),
 				'one-light': createMockTheme({ id: 'one-light', name: 'One Light', mode: 'dark' }),
-				'gruvbox-light': createMockTheme({ id: 'gruvbox-light', name: 'Gruvbox Light', mode: 'dark' }),
-				'catppuccin-latte': createMockTheme({ id: 'catppuccin-latte', name: 'Catppuccin Latte', mode: 'dark' }),
+				'gruvbox-light': createMockTheme({
+					id: 'gruvbox-light',
+					name: 'Gruvbox Light',
+					mode: 'dark',
+				}),
+				'catppuccin-latte': createMockTheme({
+					id: 'catppuccin-latte',
+					name: 'Catppuccin Latte',
+					mode: 'dark',
+				}),
 				'ayu-light': createMockTheme({ id: 'ayu-light', name: 'Ayu Light', mode: 'dark' }),
 			};
 

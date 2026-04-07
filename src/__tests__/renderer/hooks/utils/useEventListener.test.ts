@@ -80,10 +80,9 @@ describe('useEventListener', () => {
 			const handler1 = vi.fn();
 			const handler2 = vi.fn();
 
-			const { rerender } = renderHook(
-				({ handler }) => useEventListener('keydown', handler),
-				{ initialProps: { handler: handler1 } },
-			);
+			const { rerender } = renderHook(({ handler }) => useEventListener('keydown', handler), {
+				initialProps: { handler: handler1 },
+			});
 
 			// Initial attach
 			const initialAddCount = addSpy.mock.calls.length;
@@ -111,9 +110,7 @@ describe('useEventListener', () => {
 			const elRemoveSpy = vi.spyOn(element, 'removeEventListener');
 			const handler = vi.fn();
 
-			const { unmount } = renderHook(() =>
-				useEventListener('click', handler, element),
-			);
+			const { unmount } = renderHook(() => useEventListener('click', handler, element));
 
 			expect(elAddSpy).toHaveBeenCalledWith('click', expect.any(Function), undefined);
 
@@ -133,14 +130,16 @@ describe('useEventListener', () => {
 			const docRemoveSpy = vi.spyOn(document, 'removeEventListener');
 			const handler = vi.fn();
 
-			const { unmount } = renderHook(() =>
-				useEventListener('visibilitychange', handler, document),
-			);
+			const { unmount } = renderHook(() => useEventListener('visibilitychange', handler, document));
 
 			expect(docAddSpy).toHaveBeenCalledWith('visibilitychange', expect.any(Function), undefined);
 
 			unmount();
-			expect(docRemoveSpy).toHaveBeenCalledWith('visibilitychange', expect.any(Function), undefined);
+			expect(docRemoveSpy).toHaveBeenCalledWith(
+				'visibilitychange',
+				expect.any(Function),
+				undefined
+			);
 
 			docAddSpy.mockRestore();
 			docRemoveSpy.mockRestore();
@@ -151,14 +150,10 @@ describe('useEventListener', () => {
 		it('should not attach a listener when element is null', () => {
 			const handler = vi.fn();
 
-			renderHook(() =>
-				useEventListener('keydown', handler, null),
-			);
+			renderHook(() => useEventListener('keydown', handler, null));
 
 			// Should not have been called on window either
-			const keydownCalls = addSpy.mock.calls.filter(
-				(call) => call[0] === 'keydown',
-			);
+			const keydownCalls = addSpy.mock.calls.filter((call) => call[0] === 'keydown');
 			expect(keydownCalls).toHaveLength(0);
 		});
 
@@ -175,9 +170,7 @@ describe('useEventListener', () => {
 		it('should pass capture option to addEventListener', () => {
 			const handler = vi.fn();
 
-			renderHook(() =>
-				useEventListener('keydown', handler, window, { capture: true }),
-			);
+			renderHook(() => useEventListener('keydown', handler, window, { capture: true }));
 
 			expect(addSpy).toHaveBeenCalledWith('keydown', expect.any(Function), { capture: true });
 		});
@@ -185,9 +178,7 @@ describe('useEventListener', () => {
 		it('should pass passive option to addEventListener', () => {
 			const handler = vi.fn();
 
-			renderHook(() =>
-				useEventListener('wheel', handler, window, { passive: true }),
-			);
+			renderHook(() => useEventListener('wheel', handler, window, { passive: true }));
 
 			expect(addSpy).toHaveBeenCalledWith('wheel', expect.any(Function), { passive: true });
 		});
@@ -195,9 +186,7 @@ describe('useEventListener', () => {
 		it('should pass boolean option (capture shorthand) to addEventListener', () => {
 			const handler = vi.fn();
 
-			renderHook(() =>
-				useEventListener('keydown', handler, window, true),
-			);
+			renderHook(() => useEventListener('keydown', handler, window, true));
 
 			expect(addSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true);
 		});

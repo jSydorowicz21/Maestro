@@ -54,13 +54,13 @@ Replace 130+ `console.log` calls in the group chat router (and 26 in group-chat-
 - [x] For messages with data objects: use `logger.debug('msg', { data })` instead of `console.log('msg:', data)`
 - [x] Preserve all existing log message content
 - [x] Run targeted tests after completing: `CI=1 rtk vitest run` (filter for group-chat-router tests)
-  - All 4 related test files pass (group-chat-router.test.ts, group-chat.integration.test.ts). Zero console.* calls remain in the file. Log levels assigned: debug for trace/diagnostic, info for significant actions (spawn success, history entries, auto-add, synthesis start), warn for recoverable warnings, error for failure cases.
+  - All 4 related test files pass (group-chat-router.test.ts, group-chat.integration.test.ts). Zero console.\* calls remain in the file. Log levels assigned: debug for trace/diagnostic, info for significant actions (spawn success, history entries, auto-add, synthesis start), warn for recoverable warnings, error for failure cases.
 
 ### 4. Migrate group-chat-agent.ts (26 calls)
 
 - [x] Apply same pattern as Task 3
 - [x] Run targeted tests: `CI=1 rtk vitest run` (filter for group-chat-agent tests)
-  - All 71 tests pass across group-chat-agent.test.ts (22 tests) and groupChat.test.ts (49 tests). Zero console.* calls remain. Log levels: debug for trace/diagnostic messages, info for notable state (participant already exists, participant added), error for failure cases (chat not found, moderator not active, agent not available, spawn failed) with structured data context.
+  - All 71 tests pass across group-chat-agent.test.ts (22 tests) and groupChat.test.ts (49 tests). Zero console.\* calls remain. Log levels: debug for trace/diagnostic messages, info for notable state (participant already exists, participant added), error for failure cases (chat not found, moderator not active, agent not available, spawn failed) with structured data context.
 
 ### 5. Migrate other high-frequency files
 

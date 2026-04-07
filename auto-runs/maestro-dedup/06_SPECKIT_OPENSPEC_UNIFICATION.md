@@ -48,6 +48,7 @@ Also: `EditingCommand` interface has 3 definitions.
 **Diff findings:**
 
 **Managers (speckit-manager.ts:531 vs openspec-manager.ts:472):**
+
 - Identical: `StoredPrompt`, `StoredData` interfaces, `loadUserCustomizations`, `saveUserCustomizations`, `getBundledPrompts`, `getBundledMetadata`, `getMetadata`, `getPrompts`, `savePrompt`, `resetPrompt`, `getCommand`, `getCommandBySlash`
 - Parameterizable: LOG_CONTEXT, file prefix (`speckit.`/`openspec.`), customizations filename, prompts dir name, COMMANDS list, default metadata (URLs/versions), UPSTREAM_COMMANDS
 - **NOT shareable: `refreshPrompts()`** - completely different implementations:
@@ -56,15 +57,19 @@ Also: `EditingCommand` interface has 3 definitions.
 - Command/Metadata types have identical fields but different names
 
 **UI panels (SpecKitCommandsPanel.tsx:419 vs OpenSpecCommandsPanel.tsx:421):**
+
 - 99% identical. Differences: icon (`Wand2` vs `GitBranch`), label text, description text, external URL, IPC namespace (`window.maestro.speckit` vs `openspec`), type imports, console messages, empty state icon/text
 
 **IPC handlers (speckit.ts:101 vs openspec.ts:101):**
+
 - 100% identical logic. Differences: LOG_CONTEXT, IPC channel names (`speckit:*` vs `openspec:*`), imported function/type names, log messages
 
 **Renderer services (speckit.ts:57 vs openspec.ts:57):**
+
 - 100% identical logic. Differences: type names, IPC namespace, log prefix, function names
 
 **Prompt templates (speckit/index.ts:154 vs openspec/index.ts:108):**
+
 - Identical structure. Differences: command definition list (10 vs 5), file imports (10 vs 5 .md files), type names, exported prompts. Same `CommandDefinition` interface fields.
 
 ### Task 2: Design the shared base
@@ -80,20 +85,20 @@ Also: `EditingCommand` interface has 3 definitions.
 ```typescript
 // Replaces SpecKitCommand, OpenSpecCommand, BmadCommand (all identical fields)
 export interface SpecCommand {
-  id: string;
-  command: string;
-  description: string;
-  prompt: string;
-  isCustom: boolean;
-  isModified: boolean;
+	id: string;
+	command: string;
+	description: string;
+	prompt: string;
+	isCustom: boolean;
+	isModified: boolean;
 }
 
 // Replaces SpecKitMetadata, OpenSpecMetadata, BmadMetadata (all identical fields)
 export interface SpecCommandMetadata {
-  lastRefreshed: string;
-  commitSha: string;
-  sourceVersion: string;
-  sourceUrl: string;
+	lastRefreshed: string;
+	commitSha: string;
+	sourceVersion: string;
+	sourceUrl: string;
 }
 ```
 
@@ -101,21 +106,21 @@ export interface SpecCommandMetadata {
 
 ```typescript
 interface CommandDefinition {
-  readonly id: string;
-  readonly command: string;        // e.g., '/speckit.constitution'
-  readonly description: string;
-  readonly isCustom: boolean;
+	readonly id: string;
+	readonly command: string; // e.g., '/speckit.constitution'
+	readonly description: string;
+	readonly isCustom: boolean;
 }
 
 export interface SpecCommandManagerConfig {
-  featureName: string;             // 'speckit' | 'openspec' | 'bmad'
-  logContext: string;              // '[SpecKit]' | '[OpenSpec]' | '[BMAD]'
-  customizationsFile: string;      // 'speckit-customizations.json'
-  promptsSubdir: string;          // 'speckit' - used for bundled path and user prompts path
-  filePrefix: string;             // 'speckit' - prefix for prompt .md files (e.g., 'speckit.constitution.md')
-  commands: readonly CommandDefinition[];
-  defaultMetadata: SpecCommandMetadata;
-  upstreamCommands: readonly string[];  // IDs that can be fetched from upstream
+	featureName: string; // 'speckit' | 'openspec' | 'bmad'
+	logContext: string; // '[SpecKit]' | '[OpenSpec]' | '[BMAD]'
+	customizationsFile: string; // 'speckit-customizations.json'
+	promptsSubdir: string; // 'speckit' - used for bundled path and user prompts path
+	filePrefix: string; // 'speckit' - prefix for prompt .md files (e.g., 'speckit.constitution.md')
+	commands: readonly CommandDefinition[];
+	defaultMetadata: SpecCommandMetadata;
+	upstreamCommands: readonly string[]; // IDs that can be fetched from upstream
 }
 ```
 
@@ -147,6 +152,7 @@ export class SpecCommandManager {
 #### What is NOT shared: `refreshPrompts()`
 
 `refreshPrompts()` has completely different implementations:
+
 - **SpecKit**: Downloads ZIP from GitHub releases, extracts with `unzip` CLI, uses `fsSync`/`https`/`child_process`
 - **OpenSpec**: Fetches AGENTS.md raw file, parses sections with regex markers (`parseAgentsMd()`)
 - **Bmad**: Has its own fetch strategy
@@ -191,24 +197,24 @@ export async function refreshSpeckitPrompts(): Promise<SpecCommandMetadata> { ..
 
 All functions from both managers are covered by the design:
 
-| Function | Shared in class? | Notes |
-|---|---|---|
-| `getUserDataPath()` | Yes (private) | Parameterized by `customizationsFile` |
-| `loadUserCustomizations()` | Yes (private) | Identical logic |
-| `saveUserCustomizations()` | Yes (private) | Identical logic |
-| `getBundledPromptsPath()` | Yes (private) | Parameterized by `promptsSubdir` |
-| `getUserPromptsPath()` | Yes (private) | Parameterized by `promptsSubdir` |
-| `getBundledPrompts()` | Yes (private) | Parameterized by `commands`, `filePrefix` |
-| `getBundledMetadata()` | Yes (private) | Parameterized by `defaultMetadata` |
-| `getMetadata()` | Yes (public) | Identical logic |
-| `getPrompts()` | Yes (public) | Parameterized by `filePrefix` |
-| `savePrompt()` | Yes (public) | Parameterized by `featureName` for logs |
-| `resetPrompt()` | Yes (public) | Parameterized by `featureName` |
-| `getCommand()` | Yes (public) | Identical logic |
-| `getCommandBySlash()` | Yes (public) | Identical logic |
-| `refreshPrompts()` | No | Stays in each wrapper - completely different |
-| `downloadFile()` (SpecKit only) | No | SpecKit-specific, stays in wrapper |
-| `parseAgentsMd()` (OpenSpec only) | No | OpenSpec-specific, stays in wrapper |
+| Function                          | Shared in class? | Notes                                        |
+| --------------------------------- | ---------------- | -------------------------------------------- |
+| `getUserDataPath()`               | Yes (private)    | Parameterized by `customizationsFile`        |
+| `loadUserCustomizations()`        | Yes (private)    | Identical logic                              |
+| `saveUserCustomizations()`        | Yes (private)    | Identical logic                              |
+| `getBundledPromptsPath()`         | Yes (private)    | Parameterized by `promptsSubdir`             |
+| `getUserPromptsPath()`            | Yes (private)    | Parameterized by `promptsSubdir`             |
+| `getBundledPrompts()`             | Yes (private)    | Parameterized by `commands`, `filePrefix`    |
+| `getBundledMetadata()`            | Yes (private)    | Parameterized by `defaultMetadata`           |
+| `getMetadata()`                   | Yes (public)     | Identical logic                              |
+| `getPrompts()`                    | Yes (public)     | Parameterized by `filePrefix`                |
+| `savePrompt()`                    | Yes (public)     | Parameterized by `featureName` for logs      |
+| `resetPrompt()`                   | Yes (public)     | Parameterized by `featureName`               |
+| `getCommand()`                    | Yes (public)     | Identical logic                              |
+| `getCommandBySlash()`             | Yes (public)     | Identical logic                              |
+| `refreshPrompts()`                | No               | Stays in each wrapper - completely different |
+| `downloadFile()` (SpecKit only)   | No               | SpecKit-specific, stays in wrapper           |
+| `parseAgentsMd()` (OpenSpec only) | No               | OpenSpec-specific, stays in wrapper          |
 
 Estimated line reduction: ~450 lines from managers + thin wrappers total ~30 lines each = ~1,001 - 60 - (new shared ~200) = ~740 lines saved from managers alone.
 
@@ -221,6 +227,7 @@ Estimated line reduction: ~450 lines from managers + thin wrappers total ~30 lin
 
 **Consolidation notes:**
 Found 2 definitions (not 3 - one may have been consolidated in a prior phase):
+
 1. `src/renderer/types/index.ts:807` - base `EditingCommand { id, prompt }` used by SpecKit, OpenSpec, Bmad panels
 2. `src/renderer/components/AICommandsPanel.tsx:25` - local `EditingCommand { id, command, description, prompt }` (superset)
 
@@ -234,6 +241,7 @@ Resolution: Kept base `EditingCommand` in `types/index.ts`, added `EditingAIComm
 - [x] Run type checking: `rtk tsc -p tsconfig.main.json --noEmit`
 
 **Implementation notes:**
+
 - Created `SpecCommandManager` class (230 lines) with all shared logic: `getMetadata`, `getPrompts`, `savePrompt`, `resetPrompt`, `getCommand`, `getCommandBySlash`, plus internal helpers
 - Exposed `getUserPromptsPath()` and `updateMetadata()` as semi-public methods for use by feature-specific refresh implementations
 - speckit-manager.ts reduced from 531 to 222 lines (refresh logic + downloadFile + config + re-exports)
@@ -249,6 +257,7 @@ Resolution: Kept base `EditingCommand` in `types/index.ts`, added `EditingAIComm
 - [x] Run type checking: `rtk tsc -p tsconfig.lint.json --noEmit`
 
 **Implementation notes:**
+
 - Created `SpecCommandsPanel.tsx` (310 lines) with `SpecCommandsPanelConfig` interface parameterizing: icon, label, descriptionPrefix/Suffix, externalUrl/Label, emptyText, logPrefix, and IPC namespace
 - Defined `SpecCommandsIPC` interface to abstract `window.maestro.speckit`/`window.maestro.openspec` IPC shapes (identical signatures for getMetadata, getPrompts, savePrompt, resetPrompt, refresh)
 - Uses `SpecCommand`/`SpecCommandMetadata` types from shared `spec-command-manager.ts` (Task 4)
@@ -264,6 +273,7 @@ Resolution: Kept base `EditingCommand` in `types/index.ts`, added `EditingAIComm
 - [x] Reduce `src/main/ipc/handlers/openspec.ts` to thin registration calling shared handlers
 
 **Implementation notes:**
+
 - Created `spec-commands.ts` (113 lines) with `registerSpecCommandHandlers()` factory accepting `SpecCommandHandlerConfig` (channelPrefix, logContext, featureName, displayName, formatRefreshLog) and `SpecCommandHandlerFunctions` (6 manager function refs)
 - speckit.ts reduced from 101 to 44 lines (config + function bindings)
 - openspec.ts reduced from 101 to 44 lines (config + function bindings)
@@ -278,6 +288,7 @@ Resolution: Kept base `EditingCommand` in `types/index.ts`, added `EditingAIComm
 - [x] Reduce `src/renderer/services/openspec.ts` to thin wrapper
 
 **Implementation notes:**
+
 - Created `specCommands.ts` (100 lines) with `createSpecCommandService()` factory function accepting `SpecCommandServiceConfig` (logPrefix, getIPC callback) and returning `SpecCommandService` (getCommands, getMetadata, getCommand)
 - `getIPC` is a lazy callback so services can be created at module scope before `window.maestro` is initialized
 - Includes null-safety for the IPC namespace (handles `window.maestro?.speckit` being undefined)

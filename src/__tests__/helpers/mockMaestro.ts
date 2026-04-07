@@ -31,7 +31,7 @@ export function resetMaestroMocks(): void {
  */
 export function mockMaestroNamespace(
 	namespace: keyof typeof window.maestro,
-	overrides: Record<string, unknown>,
+	overrides: Record<string, unknown>
 ): void {
 	const target = window.maestro[namespace];
 	if (typeof target === 'object' && target !== null) {

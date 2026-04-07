@@ -32,6 +32,7 @@ Create two shared hooks to replace repetitive patterns:
 - [x] Determine the most common default delay
 
 **Survey Results (2026-04-06):**
+
 - 0ms: 18 instances (useModalHandlers x6, InputArea x2, App.tsx, FilePreview, GroupChatHistoryPanel, HistoryPanel, LightboxModal, useGroupChatHandlers, useKeyboardNavigation, useMainKeyboardHandler x2, SshRemoteModal)
 - 50ms: 21 instances (AgentSessionsBrowser x6, AgentSessionsModal, App.tsx, CreateWorktreeModal, AgentDrawer, FileSearchModal, MarketplaceModal, MergeSessionModal, QuickActionsModal, SendToAgentModal, ShortcutsTab, ThemeTab, SymphonyModal, TabSwitcherModal, useSymphonyContribution, MobileHistoryPanel)
 - 100ms: 4 instances (BatchRunnerModal, useMainKeyboardHandler x2, useWizardHandlers)
@@ -56,6 +57,7 @@ Create two shared hooks to replace repetitive patterns:
 - [x] Run tests: `CI=1 rtk vitest run <hook-test-path>`
 
 **Test Results (2026-04-06):**
+
 - Test file: `src/__tests__/renderer/hooks/utils/useFocusAfterRender.test.ts`
 - 10 tests across 4 describe blocks: basic focus, delay parameter, cleanup on unmount, shouldFocus parameter
 - Also tests: null ref safety, shouldFocus toggling from false->true, cancellation when shouldFocus changes mid-delay
@@ -69,6 +71,7 @@ Create two shared hooks to replace repetitive patterns:
 - [x] Run targeted tests after each batch of files
 
 **Migration Results (2026-04-06):**
+
 - **15 useEffect-based patterns migrated** across 15 files to use `useFocusAfterRender`
 - **30 event-handler-based patterns kept inline** (inside useCallback/onClick handlers)
 - Migrated files:
@@ -87,6 +90,7 @@ Create two shared hooks to replace repetitive patterns:
 - [x] Identify top offenders: `App.tsx` (30), `activityBus.ts` (10), `MarketplaceModal.tsx` (10), `SymphonyModal.tsx` (8), `useMainKeyboardHandler.ts` (8)
 
 **Survey Results (2026-04-06):**
+
 - ~103 addEventListener/removeEventListener pairs across 64 files (excluding `__tests__`, `main.tsx` global error handlers)
 - Top offenders (add+remove line count):
   1. `App.tsx` - 30 lines (15 pairs, mostly custom `maestro:*` events)
@@ -121,6 +125,7 @@ Create two shared hooks to replace repetitive patterns:
 - [x] Run tests: `CI=1 rtk vitest run <hook-test-path>`
 
 **Test Results (2026-04-06):**
+
 - Test file: `src/__tests__/renderer/hooks/utils/useEventListener.test.ts`
 - 12 tests across 5 describe blocks: attach/detach, handler ref stability, custom element target, null element, options support
 - Tests cover: mount attach, unmount detach, handler called on event, handler not called after unmount, handler update without re-attach, custom HTML element, document target, null element safety, capture/passive/boolean options
@@ -133,6 +138,7 @@ Create two shared hooks to replace repetitive patterns:
 - [x] Run targeted tests after each file
 
 **Migration Results (2026-04-06):**
+
 - **93 useEventListener calls** across **55 consumer files** (including barrel export)
 - **~86 addEventListener/removeEventListener pairs migrated** from ~103 original pairs across 64 files
 - **17 remaining addEventListener occurrences** across 9 files (all legitimate exceptions):
@@ -165,6 +171,7 @@ Create two shared hooks to replace repetitive patterns:
 - [x] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
 
 **Verification Results (2026-04-06):**
+
 - `npm run lint`: clean (no errors)
 - `tsc -p tsconfig.main.json --noEmit`: clean
 - `tsc -p tsconfig.lint.json --noEmit`: clean

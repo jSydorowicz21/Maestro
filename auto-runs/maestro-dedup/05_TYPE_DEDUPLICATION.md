@@ -39,7 +39,7 @@ Types in `src/shared/` are importable by all three. The problem is that instead 
 - [x] Find AgentCapabilities definitions: 1 definition (resolved in Phase 02) at `src/shared/types.ts:152`
 - [x] Find UsageStats definitions: 6 identical defs (except web makes fields optional). Fields: inputTokens, outputTokens, cacheReadInputTokens, cacheCreationInputTokens, totalCostUsd, contextWindow, reasoningTokens?. Locations: shared/types.ts:43, main/parsers/usage-aggregator.ts:33, main/preload/process.ts:101, main/process-manager/types.ts:91, renderer/global.d.ts:95, web/hooks/useWebSocket.ts:29
 - [x] Find SessionInfo definitions: 3 defs with DIFFERENT fields (not true duplicates). shared/types.ts:31 (basic), debug-package/collectors/sessions.ts:13 (debug-specific), group-chat/group-chat-router.ts:60 (SSH/custom args)
-- [x] Find AgentConfig definitions: 6 defs with varying field subsets. shared/types.ts:263, main/agents/definitions.ts:72 (richest), main/preload/agents.ts:20 (minimal), renderer/global.d.ts:65, renderer/types/index.ts:753, __tests__/integration/group-chat-integration.test.ts:43 (test-specific)
+- [x] Find AgentConfig definitions: 6 defs with varying field subsets. shared/types.ts:263, main/agents/definitions.ts:72 (richest), main/preload/agents.ts:20 (minimal), renderer/global.d.ts:65, renderer/types/index.ts:753, **tests**/integration/group-chat-integration.test.ts:43 (test-specific)
 - [x] Find AgentConfigsData definitions: 4 identical defs `{ configs: Record<string, Record<string, any>> }`. Locations: main/stores/types.ts:105, main/ipc/handlers/agents.ts:183, main/ipc/handlers/process.ts:49, main/ipc/handlers/tabNaming.ts:47
 - [x] For each, record: file path, line number, field list (see above)
 
@@ -132,6 +132,7 @@ For each of the 17 interfaces with 3 definitions (51 total), from SCAN-TYPES.md:
 Consolidated 24 interfaces across the codebase. Summary of changes:
 
 **4+ definition interfaces (7):**
+
 - StatsAggregation (4->1): canonical shared/stats-types.ts, replaced in useStats.ts, UsageDashboardModal.tsx, preload/stats.ts
 - AutoRunSession (4->1): canonical shared/stats-types.ts, replaced in AutoRunStats.tsx, LongestAutoRunsTable.tsx, preload/stats.ts (Omit pattern)
 - SlashCommand (4->2): canonical renderer/slashCommands.ts, replaced in InputArea.tsx, MainPanel.tsx (web/mobile kept separate - different build target)
@@ -141,6 +142,7 @@ Consolidated 24 interfaces across the codebase. Summary of changes:
 - ClaudeSessionOriginsData (3->1): canonical stores/types.ts, replaced in claude.ts, claude-session-storage.ts
 
 **3-definition interfaces (17):**
+
 - UpdateStatus (3->1): moved to shared/types.ts, replaced in auto-updater.ts, preload/system.ts, UpdateCheckModal.tsx
 - SshConfigHost (3->1): moved to shared/types.ts, replaced in ssh-config-parser.ts, preload/sshRemote.ts, SshRemoteModal.tsx
 - SpecKitMetadata (3->1): canonical speckit-manager.ts, replaced in prompts/speckit/index.ts, types/index.ts
@@ -158,6 +160,7 @@ Consolidated 24 interfaces across the codebase. Summary of changes:
 - AgentSessionInfo (3->1): canonical session-storage.ts, replaced in cli/agent-sessions.ts; renamed drawer version to PipelineAgentInfo
 
 **Not true duplicates (skipped):**
+
 - ProgressStage (2 remaining): different `id` types (GroomingProgress['stage'] vs SummarizeProgress['stage'])
 - LogEntry (3): different fields across renderer vs web platforms
 - ProcessConfig main/process-manager: different internal type with function fields
