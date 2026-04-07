@@ -148,9 +148,11 @@ All 137 targeted tests pass (86 useTabHandlers + 51 useInputProcessing). Baselin
 
 ### 6. Verify full build
 
-- [ ] Run lint: `rtk npm run lint`
-- [ ] Run tests: `CI=1 rtk vitest run`
-- [ ] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
+- [x] Run lint: `rtk npm run lint`
+- [x] Run tests: `CI=1 rtk vitest run`
+- [x] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
+
+**Note:** All results match pre-existing baseline. Lint: 18 pre-existing errors (all `setSessions` missing property, `updateSessionWith`/`Spinner`/`EditingCommand` broken imports - 0 new). Tests: 24,573 passed, 42 pre-existing failures, 0 new. Types (main config): clean pass. Types (lint config): same 18 pre-existing errors. Push blocked by pre-push hook (tsc lint config) due to same 18 pre-existing errors - needs manual push with --no-verify or fixing the pre-existing errors first.
 
 ### 7. Final oversized file count
 
