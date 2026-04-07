@@ -12,9 +12,9 @@ Address 28 test files exceeding 2,000 lines. Many will shrink naturally after Ph
 
 ## Pre-flight Checks
 
-- [ ] Phase 13-B (other oversized files) is complete
-- [ ] Phase 03 (mock consolidation) is complete
-- [ ] `rtk vitest run` passes
+- [x] Phase 13-B (other oversized files) is complete
+- [x] Phase 03 (mock consolidation) is complete
+- [x] `CI=1 rtk vitest run` passes (baseline: 24,573 passed, 42 pre-existing failures, 107 pending)
 
 ---
 
@@ -22,19 +22,36 @@ Address 28 test files exceeding 2,000 lines. Many will shrink naturally after Ph
 
 ### 1. Re-measure after mock consolidation
 
-- [ ] Run: `find src/__tests__/ -name "*.test.*" | xargs wc -l | sort -rn | head -30`
-- [ ] Only target files still over 2,000 lines
-- [ ] Document which files still need splitting
+- [x] Run: `find src/__tests__/ -name "*.test.*" | xargs wc -l | sort -rn | head -30`
+- [x] Only target files still over 2,000 lines
+- [x] Document which files still need splitting
 
-### 2. Split symphony.test.ts (was 6,203 lines)
+**Measurement (2026-04-06):** 30 test files over 2,000 lines. Top 3 targets:
 
-- [ ] Read the test file to identify logical test groups
-- [ ] Extract creation flow tests into `symphony.create.test.ts`
-- [ ] Extract participant management tests into `symphony.participants.test.ts`
-- [ ] Extract message handling tests into `symphony.messages.test.ts`
-- [ ] Extract export/history tests into `symphony.export.test.ts`
-- [ ] Ensure shared setup/mocks are imported from a common file
-- [ ] Run: `rtk vitest run` (filter for symphony test files)
+- `symphony.test.ts` - 6,208 lines
+- `useBatchProcessor.test.ts` - 5,988 lines
+- `TabBar.test.tsx` - 5,757 lines
+
+Other notable files (4,000+ lines): `git.test.ts` (4,469), `AutoRun.test.tsx` (3,536), `MainPanel.test.tsx` (3,474)
+
+### 2. Split symphony.test.ts (was 6,208 lines)
+
+- [x] Read the test file to identify logical test groups
+- [x] Extract creation flow tests into `symphony.create.test.ts`
+- [x] Extract participant management tests into `symphony.participants.test.ts`
+- [x] No message handling tests found - file has no distinct message section (skipped `symphony.messages.test.ts`)
+- [x] Extract export/history tests into `symphony.export.test.ts`
+- [x] Ensure shared setup/mocks are imported from a common file
+- [x] Run: `CI=1 rtk vitest run` (filter for symphony test files)
+
+**Result:** Split 6,208-line file into 4 focused modules + shared setup:
+
+- `symphony.test.ts` - 1,684 lines (validation, helpers, cache, state)
+- `symphony.create.test.ts` - 1,600 lines (start, registerActive, cloneRepo, startContribution)
+- `symphony.participants.test.ts` - 1,658 lines (updateStatus, complete, cancel, checkPRStatuses, syncContribution)
+- `symphony.export.test.ts` - 1,526 lines (createDraftPR, fetchDocumentContent, git helpers, manualCredit, labels)
+- `symphony.setup.ts` - 80 lines (shared test context factory)
+  All 178 symphony tests pass (0 failures).
 
 ### 3. Split useBatchProcessor.test.ts (was 5,988 lines)
 
@@ -43,7 +60,7 @@ Address 28 test files exceeding 2,000 lines. Many will shrink naturally after Ph
 - [ ] Extract execution tests into `useBatchProcessor.execution.test.ts`
 - [ ] Extract worktree tests into `useBatchProcessor.worktree.test.ts`
 - [ ] Extract error handling tests into `useBatchProcessor.errors.test.ts`
-- [ ] Run: `rtk vitest run` (filter for batch processor test files)
+- [ ] Run: `CI=1 rtk vitest run` (filter for batch processor test files)
 
 ### 4. Split TabBar.test.tsx (was 5,752 lines)
 
@@ -52,7 +69,7 @@ Address 28 test files exceeding 2,000 lines. Many will shrink naturally after Ph
 - [ ] Extract file tab tests into `TabBar.fileTabs.test.tsx`
 - [ ] Extract drag-and-drop tests into `TabBar.dragDrop.test.tsx`
 - [ ] Extract keyboard navigation tests into `TabBar.keyboard.test.tsx`
-- [ ] Run: `rtk vitest run` (filter for TabBar test files)
+- [ ] Run: `CI=1 rtk vitest run` (filter for TabBar test files)
 
 ### 5. Create shared test utilities if patterns emerge
 
@@ -63,7 +80,7 @@ Address 28 test files exceeding 2,000 lines. Many will shrink naturally after Ph
 
 ### 6. Verify all tests pass after splitting
 
-- [ ] Run full test suite: `rtk vitest run`
+- [ ] Run full test suite: `CI=1 rtk vitest run`
 - [ ] Run lint: `rtk npm run lint`
 - [ ] Verify types: `rtk tsc -p tsconfig.main.json --noEmit && rtk tsc -p tsconfig.lint.json --noEmit`
 
@@ -79,7 +96,7 @@ Address 28 test files exceeding 2,000 lines. Many will shrink naturally after Ph
 After completing changes, run targeted tests for the files you modified:
 
 ```bash
-rtk vitest run <path-to-relevant-test-files>
+CI=1 rtk vitest run <path-to-relevant-test-files>
 ```
 
 **Rule: Zero new test failures from your changes.** Pre-existing failures on the baseline are acceptable.
