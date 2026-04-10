@@ -1,3 +1,5 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # IPC Patterns Reference
 
 Complete reference for Maestro's IPC (Inter-Process Communication) architecture: namespaces, handler registration, preload bridge, error handling conventions, and SSH-aware patterns.
@@ -55,9 +57,9 @@ These namespaces are exposed on `window.maestro` via the preload bridge:
 | `logger`        | `createLoggerApi()`        | `system.ts`         | Log forwarding (renderer -> main)                       |
 | `claude`        | `createClaudeApi()`        | `claude.ts`         | Claude Code session storage (DEPRECATED)                |
 | `agentSessions` | `createAgentSessionsApi()` | `agentSessions.ts`  | Multi-agent session storage (preferred)                 |
-| `tempfile`      | `createTempfileApi()`      | Files in `files.ts` | Temp file creation                                      |
+| `tempfile`      | `createTempfileApi()`      | `persistence.ts`    | Temp file creation                                      |
 | `history`       | `createHistoryApi()`       | `history.ts`        | History entry CRUD                                      |
-| `cli`           | `createCliApi()`           | Files in `files.ts` | CLI activity tracking                                   |
+| `cli`           | `createCliApi()`           | `persistence.ts`    | CLI activity tracking                                   |
 | `speckit`       | `createSpeckitApi()`       | `speckit.ts`        | Spec-Kit command management                             |
 | `openspec`      | `createOpenspecApi()`      | `openspec.ts`       | OpenSpec command management                             |
 | `notification`  | `createNotificationApi()`  | `notifications.ts`  | OS notifications and TTS                                |
@@ -76,6 +78,7 @@ These namespaces are exposed on `window.maestro` via the preload bridge:
 | `tabNaming`     | `createTabNamingApi()`     | `tabNaming.ts`      | Automatic tab name generation                           |
 | `directorNotes` | `createDirectorNotesApi()` | `director-notes.ts` | Unified history + synopsis                              |
 | `wakatime`      | `createWakatimeApi()`      | `wakatime.ts`       | WakaTime integration                                    |
+| `cue`           | `createCueApi()`           | `cue.ts`            | Maestro Cue event-driven automation                     |
 
 ---
 

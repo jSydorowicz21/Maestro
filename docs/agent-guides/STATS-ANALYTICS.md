@@ -1,3 +1,5 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # Stats and Analytics System
 
 The stats system tracks AI interaction metrics using a SQLite database with a singleton access pattern, migration-based schema evolution, and a comprehensive aggregation layer powering the Usage Dashboard.

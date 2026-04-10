@@ -1,6 +1,23 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # Deduplication Tracker
 
 Consolidated tracking of all duplicate/dead code in the Maestro codebase. Grep-verified counts from scan files. Evidence in `scans/SCAN-*.md`.
+
+**Status markers (as of 2026-04-10 verification against rc 06e5a2eb3):**
+
+- Component decomposition PARTIALLY RESOLVED: `MainPanel/`, `TabBar/`, `FilePreview/`, `AutoRun/`, `NewInstanceModal/`, `CueModal/` all exist as decomposed directories in `src/renderer/components/`. However, `AutoRun/AutoRun.tsx` (844), `NewInstanceModal/NewInstanceModal.tsx` (843), and `FilePreview/FilePreview.tsx` (1,322) are still over the 800-line target. See `scans/SCAN-OVERSIZED.md` for current counts.
+- **Shared hooks that now exist in rc (infra ready, migration not done):**
+  - `useModalLayer` at `src/renderer/hooks/ui/useModalLayer.ts`
+  - `useActiveSession` at `src/renderer/hooks/session/useActiveSession.ts`
+  - `useFocusAfterRender` at `src/renderer/hooks/utils/useFocusAfterRender.ts`
+  - `useEventListener` at `src/renderer/hooks/utils/useEventListener.ts`
+  - `useDebouncedValue`, `useThrottledCallback`, `useDebouncedCallback` at `src/renderer/hooks/utils/useThrottle.ts`
+- **Shared helpers that now exist in rc (infra ready, migration not done):**
+  - `updateSessionWith` exported from `src/renderer/stores/sessionStore.ts:444` (related to finding for Phase 07A)
+  - `selectActiveSession` and `selectSessionById` in `src/renderer/stores/sessionStore.ts`
+- **Canonical formatters in rc** (`src/shared/formatters.ts`): `formatSize`, `formatNumber`, `formatTokens`, `formatTokensCompact`, `formatRelativeTime`, `formatActiveTime`, `formatElapsedTime`, `formatCost`, `estimateTokenCount`, `formatElapsedTimeColon`, `truncatePath`, `getParentDir`, `truncateCommand`. **`formatDuration` is in `src/shared/performance-metrics.ts:336`** (not formatters.ts). `formatTime` / `formatTimestamp` NOT YET canonicalized — local copies still present in multiple files.
+- **NOT in rc** (still genuinely missing): `EmptyState`, `GhostIconButton`, `Spinner` in `src/renderer/components/ui/`; `src/__tests__/helpers/` directory; unified `SpecCommandManager` base (speckit and openspec managers still separate); `spawnGroupChatAgent.ts` helper.
 
 ## Priority Legend
 
@@ -49,7 +66,7 @@ Consolidated tracking of all duplicate/dead code in the Maestro codebase. Grep-v
 ### 5. Duplicate Interface with Self-Conflict (AgentCapabilities has 2 defs in same file)
 
 - **Evidence:** SCAN-TYPES.md, "AgentCapabilities (6 definitions)"
-- **Count:** `renderer/global.d.ts` defines `AgentCapabilities` twice (lines 61 and 104)
+- **Count:** `renderer/global.d.ts` defines `AgentCapabilities` twice (lines 63 and 106)
 - **KEEP:** One definition in `renderer/global.d.ts`, canonical in `shared/types.ts` or `main/agents/capabilities.ts`
 - **REMOVE:** The duplicate definition within the same file, plus 4 other redundant definitions
 - **Estimated savings:** ~50 lines, eliminates potential type-shadowing bug
@@ -337,7 +354,7 @@ Consolidated tracking of all duplicate/dead code in the Maestro codebase. Grep-v
 ### 39. Oversized Files (82 files over 800-line limit)
 
 - **Evidence:** SCAN-OVERSIZED.md, "Source Files Over 800 Lines"
-- **Count:** 82 source files exceed 800 lines. `App.tsx` at 4,034 (REGRESSION from 3,619), `symphony.ts` handler at 3,318 (was 3,301). `TabBar.tsx` FULLY RESOLVED (2,839 -> 542). `FilePreview.tsx` PARTIALLY RESOLVED (2,662 -> 1,320).
+- **Count:** 82 source files exceed 800 lines. `App.tsx` at 4,034 (REGRESSION from 3,619), `symphony.ts` handler at 3,318 (was 3,301). `TabBar.tsx` FULLY RESOLVED (2,839 -> 542, split into `TabBar/` directory). `FilePreview.tsx` PARTIALLY RESOLVED (2,662 -> 1,320, split into `FilePreview/` directory). Also decomposed into directories on rc: `MainPanel/`, `AutoRun/`, `NewInstanceModal/`, `CueModal/`.
 - **Action:** Decompose top offenders as part of dedup work (many contain the duplicated patterns listed above). Prioritize `App.tsx` (worst offender, growing), `SymphonyModal.tsx`, `useTabHandlers.ts`, `useInputProcessing.ts`
 - **Estimated savings:** No direct line savings, but improved maintainability
 

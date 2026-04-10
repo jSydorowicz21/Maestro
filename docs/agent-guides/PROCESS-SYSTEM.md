@@ -1,3 +1,5 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # Process System Guide
 
 Covers process spawning, output event routing, and the web server for remote access.

@@ -1,3 +1,5 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # Group Chat System
 
 The group chat system enables multi-agent collaboration through a hub-and-spoke architecture where a central moderator coordinates messages between the user and multiple AI participant agents.

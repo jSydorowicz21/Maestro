@@ -1,8 +1,10 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # Cue Pipeline System
 
 Guide for `src/main/cue/` - Maestro's event-driven automation engine.
 
-> **Branch note:** Cue source lives on the `rc` branch (not yet merged to `main`). The compiled output exists at `dist/main/cue/`. This guide documents the TypeScript source from commit `4563239d`.
+> **Branch note:** Cue source lives on the `rc` branch (not yet merged to `main`). The compiled output exists at `dist/main/cue/`. This guide was significantly refactored on rc: trigger sources moved into `src/main/cue/triggers/`, config parsing/validation into `src/main/cue/config/`, and new service modules (completion, dispatch, query, recovery, session-runtime, session-registry, session-state) were extracted from the engine.
 
 ---
 
@@ -12,15 +14,15 @@ Cue is an event-driven automation system that triggers AI agent prompts in respo
 
 ### Supported Trigger Types
 
-| Event Type            | Description                                               | Source Module          |
-| --------------------- | --------------------------------------------------------- | ---------------------- |
-| `time.heartbeat`      | Periodic interval timer ("run every N minutes")           | cue-subscription-setup |
-| `time.scheduled`      | Cron-like triggers (specific times/days)                  | cue-subscription-setup |
-| `file.changed`        | File system change via chokidar watcher                   | cue-file-watcher       |
-| `agent.completed`     | Fires when another agent finishes                         | cue-engine (reactive)  |
-| `github.pull_request` | New PRs detected via `gh` CLI polling                     | cue-github-poller      |
-| `github.issue`        | New issues detected via `gh` CLI polling                  | cue-github-poller      |
-| `task.pending`        | Unchecked markdown tasks (`- [ ]`) found in watched files | cue-task-scanner       |
+| Event Type            | Description                                               | Source Module                                 |
+| --------------------- | --------------------------------------------------------- | --------------------------------------------- |
+| `time.heartbeat`      | Periodic interval timer ("run every N minutes")           | `triggers/cue-heartbeat-trigger-source.ts`    |
+| `time.scheduled`      | Cron-like triggers (specific times/days)                  | `triggers/cue-scheduled-trigger-source.ts`    |
+| `file.changed`        | File system change via chokidar watcher                   | `triggers/cue-file-watcher-trigger-source.ts` |
+| `agent.completed`     | Fires when another agent finishes                         | `cue-engine` (reactive)                       |
+| `github.pull_request` | New PRs detected via `gh` CLI polling                     | `triggers/cue-github-poller-trigger-source.ts`|
+| `github.issue`        | New issues detected via `gh` CLI polling                  | `triggers/cue-github-poller-trigger-source.ts`|
+| `task.pending`        | Unchecked markdown tasks (`- [ ]`) found in watched files | `triggers/cue-task-scanner-trigger-source.ts` |
 
 ### Execution Patterns
 
@@ -33,11 +35,11 @@ Cue is an event-driven automation system that triggers AI agent prompts in respo
 
 ## Module Reference
 
-### cue-types.ts (188 lines)
+### cue-types.ts (~57 lines)
 
-Core type definitions. Single source of truth for the Cue data model.
+Thin re-export shim. Most type definitions have moved to `src/shared/cue/` (canonical). This file re-exports the shared types, defines `AgentCompletionData` (main-process only), provides the `createCueEvent()` factory, and exports `CUE_YAML_FILENAME` plus the deprecated `LEGACY_CUE_YAML_FILENAME` alias.
 
-**Key types:**
+Canonical types now live in `src/shared/cue/contracts.ts` (re-exported via `src/shared/cue/index.ts`):
 
 - `CueEventType` - Union of all 7 trigger types
 - `CueSubscription` - A trigger-prompt pairing with optional filter, fan-out, schedule, watch pattern, etc.
@@ -46,18 +48,12 @@ Core type definitions. Single source of truth for the Cue data model.
 - `CueEvent` - An event instance with id, type, timestamp, triggerName, payload
 - `CueRunResult` - Result of a completed/failed run (stdout, stderr, exitCode, durationMs, etc.)
 - `CueSessionStatus` - Status summary per agent (subscription count, active runs, next trigger)
-- `AgentCompletionData` - Data passed through chain propagation (includes `chainDepth`)
 - `CueGraphSession` - Session + subscriptions for the pipeline graph visualization
+- `DEFAULT_CUE_SETTINGS`, `CUE_EVENT_TYPES`, `CUE_GITHUB_STATES`, `CUE_SCHEDULE_DAYS`
 
-**Key exports:**
+### cue-engine.ts (~398 lines)
 
-- `createCueEvent()` - Factory with auto-generated UUID and timestamp
-- `CUE_YAML_FILENAME` - Default filename: `"maestro-cue.yaml"`
-- `DEFAULT_CUE_SETTINGS` - Default settings object
-
-### cue-engine.ts (~500 lines)
-
-The central coordinator. Manages session lifecycle, wires up all event sources, and dispatches through the execution pipeline.
+The central coordinator. Manages session lifecycle, wires up all event sources, and dispatches through the execution pipeline. On rc, much of the heavier logic has been extracted into dedicated service modules (`cue-completion-service.ts`, `cue-dispatch-service.ts`, `cue-query-service.ts`, `cue-recovery-service.ts`, `cue-session-runtime-service.ts`, `cue-session-registry.ts`, `cue-session-state.ts`).
 
 **Class: `CueEngine`**
 
@@ -88,7 +84,7 @@ Composed submodules (created in constructor):
 - `CueHeartbeat` - Sleep detection and heartbeat writing
 - `CueActivityLog` - In-memory ring buffer of recent results
 
-### cue-executor.ts (~530 lines)
+### cue-executor.ts (~520 lines)
 
 Spawns background agent processes when triggers fire. Follows the same spawn pattern as Auto Run via `process:spawn`.
 
@@ -115,37 +111,31 @@ Template variables populated for events:
 - `task.pending`: `cue.taskFile`, `cue.taskCount`, `cue.taskList`, `cue.taskContent`
 - `github.*`: `cue.ghNumber`, `cue.ghTitle`, `cue.ghAuthor`, `cue.ghUrl`, `cue.ghBody`, `cue.ghLabels`, etc.
 
-### cue-yaml-loader.ts (~340 lines)
+### cue-yaml-loader.ts (~119 lines)
 
-YAML discovery, parsing, validation, and watching.
+Thin facade over `config/` modules. Provides `loadCueConfig()`, `resolveCueConfigPath()`, `watchCueYaml()`, `validateCueConfig()` - delegating to the repository/normalizer/validator split below. On rc the heavy logic was extracted to:
 
-**Key functions:**
+- `config/cue-config-repository.ts` - File discovery, YAML read/parse, watching
+- `config/cue-config-normalizer.ts` - Prompt file resolution and shape normalization
+- `config/cue-config-validator.ts` - Comprehensive validation (subscription name uniqueness, event-specific required fields, schedule format, glob patterns via picomatch, settings ranges)
 
-- `resolveCueConfigPath(projectRoot)` - Checks `.maestro/cue.yaml` first, falls back to `maestro-cue.yaml`
-- `loadCueConfig(projectRoot)` - Parses YAML, resolves `prompt_file` references (reads file content into `prompt` field), validates types
-- `watchCueYaml(projectRoot, onChange)` - Chokidar watcher on both canonical and legacy paths, 1-second debounce
-- `validateCueConfig(config)` - Comprehensive validation:
-  - Subscription name uniqueness
-  - Event-specific required fields (interval_minutes for heartbeat, schedule_times for scheduled, watch for file.changed, source_session for agent.completed, etc.)
-  - Schedule time format (HH:MM, valid hours/minutes)
-  - Glob pattern validation via picomatch
-  - Filter field type validation
-  - Settings range validation (max_concurrent 1-10, queue_size 0-50)
+### triggers/ (trigger source registry)
 
-### cue-subscription-setup.ts (~340 lines)
+The `cue-subscription-setup.ts` module was deleted on rc. Each event source is now its own trigger source implementing a common interface in `triggers/cue-trigger-source.ts`:
 
-Sets up event source subscriptions (timers, watchers, pollers, task scanners) when a session is initialized.
+| File                                | Purpose                                                 |
+| ----------------------------------- | ------------------------------------------------------- |
+| `cue-trigger-source.ts`             | Common trigger source interface                         |
+| `cue-trigger-source-registry.ts`    | Registry and lookup of trigger sources                  |
+| `cue-trigger-filter.ts`             | Shared filter-matching helpers                          |
+| `cue-heartbeat-trigger-source.ts`   | `time.heartbeat` interval timer                         |
+| `cue-scheduled-trigger-source.ts`   | `time.scheduled` cron-like firing                       |
+| `cue-schedule-utils.ts`             | Next-occurrence calculation (replaces `calculateNextScheduledTime`) |
+| `cue-file-watcher-trigger-source.ts`| `file.changed` chokidar wrapper                         |
+| `cue-github-poller-trigger-source.ts`| `github.pull_request` / `github.issue` poller          |
+| `cue-task-scanner-trigger-source.ts`| `task.pending` markdown scanner                         |
 
-**Key functions:**
-
-- `calculateNextScheduledTime(times, days?)` - Computes the next occurrence of a scheduled time up to 8 days ahead
-- `setupHeartbeatSubscription()` - Fires immediately on setup, then on interval; respects filter
-- `setupScheduledSubscription()` - 60-second polling loop; deduplicates via `scheduledFiredKeys` set (scoped by sessionId)
-- `setupFileWatcherSubscription()` - Delegates to `createCueFileWatcher` with 5-second debounce
-- `setupGitHubPollerSubscription()` - Delegates to `createCueGitHubPoller`
-- `setupTaskScannerSubscription()` - Delegates to `createCueTaskScanner`
-
-### cue-run-manager.ts (~300 lines)
+### cue-run-manager.ts (~452 lines)
 
 Concurrency control, queue management, and run lifecycle.
 
@@ -161,7 +151,7 @@ Key behaviors:
 - Integrates with power management (prevents sleep during active runs)
 - Records events to SQLite via `cue-db`
 
-### cue-fan-in-tracker.ts (~180 lines)
+### cue-fan-in-tracker.ts (~249 lines)
 
 Multi-source completion tracking for `agent.completed` subscriptions with multiple `source_session` entries.
 
@@ -175,15 +165,15 @@ Key behaviors:
 - Source output truncated to 5000 chars per source
 - Propagates max `chainDepth` from all sources
 
-### cue-file-watcher.ts (~80 lines)
+### cue-file-watcher.ts
 
-Wraps chokidar to watch glob patterns with per-file debouncing.
+Wraps chokidar to watch glob patterns with per-file debouncing. (The trigger source adapter in `triggers/cue-file-watcher-trigger-source.ts` wires this into the engine.)
 
 - Watches for `change`, `add`, `unlink` events
 - Per-file debounce timers (configurable, default 5 seconds)
 - Produces `CueEvent` with payload: `path`, `filename`, `directory`, `extension`, `changeType`
 
-### cue-github-poller.ts (~270 lines)
+### cue-github-poller.ts (~313 lines)
 
 Polls GitHub CLI for new PRs/issues, tracks "seen" state in SQLite.
 
@@ -196,7 +186,7 @@ Key design:
 - 30-day retention on seen records; prunes every 24 hours
 - Has its own `execFileAsync` wrapper (local, not the shared utils version)
 
-### cue-heartbeat.ts (~90 lines)
+### cue-heartbeat.ts (~52 lines)
 
 Heartbeat writer and sleep/wake detection.
 
@@ -204,7 +194,7 @@ Heartbeat writer and sleep/wake detection.
 - On engine start, checks gap since last heartbeat; if > 2 minutes, triggers reconciler
 - 7-day event prune age
 
-### cue-reconciler.ts (~70 lines)
+### cue-reconciler.ts (~67 lines)
 
 Catches up on missed `time.heartbeat` events after sleep/wake gaps.
 
@@ -212,7 +202,7 @@ Catches up on missed `time.heartbeat` events after sleep/wake gaps.
 - Fires exactly one catch-up event per subscription (with `reconciled: true` in payload)
 - Does NOT reconcile file.changed or agent.completed events
 
-### cue-task-scanner.ts (~150 lines)
+### cue-task-scanner.ts (~189 lines)
 
 Polls markdown files for unchecked tasks (`- [ ]`).
 
@@ -222,7 +212,7 @@ Polls markdown files for unchecked tasks (`- [ ]`).
 - Seeds on first scan (no events for pre-existing tasks)
 - Produces events with `taskCount`, `taskList`, `tasks`, `content` (truncated to 10K chars)
 
-### cue-filter.ts (~130 lines)
+### cue-filter.ts (~123 lines)
 
 Filter matching engine for event payload filtering.
 
@@ -235,9 +225,24 @@ Supports:
 - Dot-notation nested key access (`source.status`)
 - All conditions are AND'd
 
-### cue-activity-log.ts (~35 lines)
+### cue-activity-log.ts (~40 lines)
 
 Simple in-memory ring buffer of completed run results (max 500). Used by the Cue Modal dashboard.
+
+### Extracted services (rc)
+
+The engine orchestration logic was split into focused services on rc:
+
+| File                             | Responsibility                                                   |
+| -------------------------------- | ---------------------------------------------------------------- |
+| `cue-completion-service.ts`      | Handles `agent.completed` routing and fan-in dispatch            |
+| `cue-dispatch-service.ts`        | Central subscription dispatch (fan-out expansion, run manager)   |
+| `cue-query-service.ts`           | Status, active runs, graph-data queries                          |
+| `cue-recovery-service.ts`        | Post-sleep reconciliation and orphan cleanup                     |
+| `cue-session-registry.ts`        | Per-session subscription bookkeeping                             |
+| `cue-session-runtime-service.ts` | Session lifecycle, YAML hot-reload, teardown                     |
+| `cue-session-state.ts`           | Immutable session state model                                    |
+| `pipeline-layout-store.ts`       | Persistence for the visual pipeline editor layout (nodes + viewport) |
 
 ### cue-db.ts (~320 lines)
 

@@ -1,3 +1,5 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # Shared Utilities Reference
 
 All utilities in Maestro organized by category. Each entry lists the file path, function name, signature, purpose, and which process it runs in (Main, Renderer, or Both via `src/shared/`).

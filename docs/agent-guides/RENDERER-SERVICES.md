@@ -1,6 +1,12 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # Renderer Services and Constants Guide
 
-Covers `src/renderer/services/` (11 files, ~3,970 lines) and `src/renderer/constants/` (8 files, ~1,596 lines).
+Covers `src/renderer/services/` (13 files, ~4,470 lines) and `src/renderer/constants/` (10 files, ~1,676 lines).
+
+Not documented in detail below but present in `services/`: `bmad.ts` (BMAD slash command service, mirrors `speckit.ts`/`openspec.ts`) and `feedbackConversation.ts` (feedback/wizard conversation flow).
+
+Not documented in detail below but present in `constants/`: `cueYamlDefaults.ts` (default Cue YAML templates).
 
 ---
 
@@ -442,9 +448,9 @@ Used by ShortcutsHelpModal, KeyboardMasteryCelebration, LeaderboardRegistrationM
 
 ---
 
-### cuePatterns.ts
+### cuePatterns.ts (~224 lines)
 
-This file does not exist in the codebase.
+Defines `CuePattern` interface and the `CUE_PATTERNS` array - preset Cue YAML templates (startup, file watch, interval, etc.) surfaced in the Cue modal for users to pick from.
 
 ---
 

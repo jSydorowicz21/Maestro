@@ -1,3 +1,5 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # State Patterns Reference
 
 Complete reference for Maestro's frontend state management: all Zustand stores, the Session data model, common patterns, and hook conventions.

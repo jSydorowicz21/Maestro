@@ -1,3 +1,5 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # Web & Mobile Interface
 
 Architecture, components, hooks, and patterns for the Maestro web/mobile remote control interface.
@@ -66,27 +68,48 @@ src/web/
 │   ├── logger.ts             # Web-specific logger
 │   ├── serviceWorker.ts      # PWA offline support
 │   └── viewState.ts          # View state persistence (localStorage)
-├── mobile/                   # Mobile-optimized React app
-│   ├── App.tsx               # Mobile app root
+├── mobile/                   # Mobile-optimized React app (~38 components)
+│   ├── App.tsx               # Mobile app root (defines MobileHeader internally)
 │   ├── index.tsx             # Mobile entry point
 │   ├── constants.ts          # Haptic patterns, breakpoints
-│   ├── AllSessionsView.tsx
+│   │
+│   ├── AllSessionsView.tsx        # Dashboard session grid
+│   ├── AutoRunDocumentCard.tsx    # Auto Run doc card
+│   ├── AutoRunDocumentViewer.tsx  # Full Auto Run doc viewer
 │   ├── AutoRunIndicator.tsx
+│   ├── AutoRunPanel.tsx
+│   ├── AutoRunSetupSheet.tsx
+│   ├── AchievementsPanel.tsx
+│   ├── AgentCreationSheet.tsx
+│   ├── CommandHistoryDrawer.tsx
 │   ├── CommandInputBar.tsx
 │   ├── CommandInputButtons.tsx
 │   ├── ConnectionStatusIndicator.tsx
+│   ├── ContextManagementSheet.tsx
+│   ├── CuePanel.tsx
+│   ├── GitDiffViewer.tsx
+│   ├── GitStatusPanel.tsx
+│   ├── GroupChatPanel.tsx
+│   ├── GroupChatSetupSheet.tsx
+│   ├── LeftPanel.tsx              # Mobile left drawer
 │   ├── MessageHistory.tsx
 │   ├── MobileHistoryPanel.tsx
 │   ├── MobileMarkdownRenderer.tsx
+│   ├── NotificationSettingsSheet.tsx
 │   ├── OfflineQueueBanner.tsx
 │   ├── QuickActionsMenu.tsx
 │   ├── RecentCommandChips.tsx
 │   ├── ResponseViewer.tsx
+│   ├── RightDrawer.tsx            # Mobile right drawer
+│   ├── RightPanel.tsx
 │   ├── SessionPillBar.tsx
 │   ├── SessionStatusBanner.tsx
+│   ├── SettingsPanel.tsx
 │   ├── SlashCommandAutocomplete.tsx
 │   ├── TabBar.tsx
-│   └── TabSearchModal.tsx
+│   ├── TabSearchModal.tsx
+│   ├── UsageDashboardPanel.tsx
+│   └── WebTerminal.tsx            # xterm-based mobile terminal
 └── public/                   # Static assets
 ```
 
@@ -224,9 +247,12 @@ interface UseSessionsReturn {
 	sessions: Session[];
 	activeSession: Session | null;
 	connectionState: WebSocketState;
-	sendCommand: (sessionId: string, command: string) => void;
-	interruptSession: (sessionId: string) => void;
-	// ... more methods
+	sendCommand: (sessionId: string, command: string) => Promise<boolean>;
+	sendToActive: (command: string) => Promise<boolean>;
+	interrupt: (sessionId: string) => Promise<boolean>;
+	interruptActive: () => Promise<boolean>;
+	switchMode: (sessionId: string, mode: InputMode) => Promise<boolean>;
+	// ... tab ops (selectTab, newTab, closeTab, ...) and more
 }
 ```
 

@@ -1,14 +1,15 @@
 # SCAN-HOOKS.md - Hook Pattern Duplicates
 
-**Refreshed 2026-04-10 against origin/rc (06e5a2eb3)**: Several consolidation hooks are now implemented in rc:
+**Refreshed 2026-04-10 against origin/rc (06e5a2eb3)**: Several consolidation hooks are now implemented in rc. Inventory verified by grep of `src/renderer/hooks/{utils,ui,session}`:
+
 - `src/renderer/hooks/ui/useModalLayer.ts` — EXISTS
 - `src/renderer/hooks/utils/useFocusAfterRender.ts` — EXISTS (but 45+ raw `setTimeout(...focus)` call sites below have NOT been migrated to it)
 - `src/renderer/hooks/utils/useEventListener.ts` — EXISTS (but 63+ manual addEventListener pairs below have NOT been migrated)
 - `src/renderer/hooks/session/useActiveSession.ts` — EXISTS (the 28 files listed below that re-derive activeSession have NOT been migrated to it)
-- `src/renderer/hooks/utils/useThrottle.ts` / `useDebouncedPersistence.ts` — EXIST (as originally documented)
-- `useDebouncedValue`, `useDebouncedCallback`, `useThrottledCallback` — do NOT exist in `src/renderer/hooks/utils/` (current contents: `useDebouncedPersistence`, `useEventListener`, `useFocusAfterRender`, `useThrottle`)
+- `src/renderer/hooks/utils/useThrottle.ts` — EXISTS and actually exports THREE hooks: `useDebouncedValue` (line 17), `useThrottledCallback` (line 41), and `useDebouncedCallback` (line 98). The filename is misleading.
+- `src/renderer/hooks/utils/useDebouncedPersistence.ts` — EXISTS (persistence-specific debouncing)
 
-Bottom line: the shared hooks exist, but the duplication surface area in the lists below has not been reduced. Individual file:line numbers below are NOT re-verified in this refresh pass.
+Bottom line: the shared hooks needed by this scan already exist, but the duplication surface area in the lists below has not been reduced. Individual file:line numbers below are NOT re-verified in this refresh pass — they should be re-grepped before any migration work begins.
 
 Generated: 2026-03-20 via `rtk grep -rn` against `src/`
 

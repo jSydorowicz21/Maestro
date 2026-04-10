@@ -1,3 +1,5 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # Remaining Systems Guide
 
 Covers four smaller subsystems: Context Providers, Renderer Types, Web Utilities, and Symphony Runner.

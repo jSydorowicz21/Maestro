@@ -11,12 +11,12 @@ Methodology: `wc -l` across `src/` excluding `node_modules`. Tests and sources c
 
 | Lines | File                                                          | Delta since 2026-03-20                                 |
 | ----- | ------------------------------------------------------------- | ------------------------------------------------------ |
-| 3350  | `web/mobile/App.tsx`                                          | +2020 **NEW critical** (was 1330)                      |
+| 3350  | `web/mobile/App.tsx`                                          | +2020 **REGRESSION to critical tier** (was 1330)       |
 | 3318  | `main/ipc/handlers/symphony.ts`                               | unchanged                                              |
 | 3093  | `renderer/App.tsx`                                            | **-941 (partial decomp in rc)**, still 3x target       |
 | 3057  | `renderer/global.d.ts`                                        | **NEW critical**, not previously flagged               |
 | 2620  | `renderer/components/SymphonyModal.tsx`                       | +10                                                    |
-| 2448  | `main/web-server/handlers/messageHandlers.ts`                 | +1497 **NEW critical** (was 951)                       |
+| 2448  | `main/web-server/handlers/messageHandlers.ts`                 | +1497 **REGRESSION to critical tier** (was 951)        |
 | 2300  | `generated/prompts.ts`                                        | +325 (generated file, exclude from dedup)              |
 | 2136  | `renderer/components/DocumentGraph/DocumentGraphView.tsx`     | -6                                                     |
 | 2107  | `renderer/utils/tabHelpers.ts`                                | +179                                                   |
@@ -100,24 +100,35 @@ Methodology: `wc -l` across `src/` excluding `node_modules`. Tests and sources c
 | 860   | `renderer/components/Wizard/screens/DirectorySelectionScreen.tsx` | unchanged                                          |
 | 845   | `renderer/hooks/worktree/useWorktreeHandlers.ts`              | unchanged                                              |
 | 844   | `renderer/components/AutoRun/AutoRun.tsx`                     | (decomposed from AutoRun.tsx, was 2287)                |
+| 844   | `renderer/hooks/groupChat/useGroupChatHandlers.ts`            | **NEW**                                                |
+| 843   | `renderer/components/NewInstanceModal/NewInstanceModal.tsx`   | (decomposed from NewInstanceModal.tsx, was 1845; main child still just over 800) |
+| 840   | `renderer/components/RightPanel.tsx`                          | +9                                                     |
+| 839   | `main/utils/remote-fs.ts`                                     | unchanged                                              |
+| 832   | `main/stats/stats-db.ts`                                      | unchanged                                              |
+| 827   | `renderer/components/Settings/SshRemoteModal.tsx`             | unchanged                                              |
+| 826   | `renderer/hooks/agent/useMergeSession.ts`                     | unchanged                                              |
+| 814   | `web/hooks/useMobileSessionManagement.ts`                     | **NEW**                                                |
+| 808   | `renderer/components/DocumentGraph/layoutAlgorithms.ts`       | unchanged                                              |
 
-**Total: 90 source files exceed 800-line limit (was 82).**
+**Total: 98 source files exceed 800-line limit (was 82).**
 
 ### Fully/partially resolved in rc since 2026-03-20
 
-- **`TabBar.tsx`** FULLY RESOLVED. Decomposed into `TabBar/` directory (TabBar.tsx 568, AITab 567, FileTab 567, TerminalTabItem 440, AITabOverlayMenu 371, NewTabPopover 141, SearchPopover 127). Largest file 568 lines.
+- **`TabBar.tsx`** FULLY RESOLVED. Decomposed into `TabBar/` directory (TabBar.tsx 568, AITab 567, FileTab 567, TerminalTabItem 440, AITabOverlayMenu 371, NewTabPopover 141, SearchPopover 127). All children under 600 lines.
 - **`FilePreview.tsx`** PARTIALLY RESOLVED. Decomposed into `FilePreview/` directory with FilePreviewHeader (412), FilePreviewToc (168), ImageViewer (197), MarkdownImage (202). Main `FilePreview.tsx` is still 1,322 lines.
 - **`MainPanel.tsx`** NEWLY RESOLVED (since scan). Decomposed into `MainPanel/` directory (MainPanel 707, MainPanelContent 703, MainPanelHeader 658, AgentErrorBanner 57, CopyNotificationToast 30). Largest 707, all under 800.
-- **`AutoRun.tsx`** NEWLY RESOLVED. Decomposed into `AutoRun/` directory (largest file `AutoRun.tsx` at 844 lines, still slightly over target but vastly improved from 2,287).
-- **`NewInstanceModal.tsx`** RESOLVED. Decomposed into `NewInstanceModal/` directory, no longer in top list.
+- **`AutoRun.tsx`** PARTIALLY RESOLVED. Decomposed into `AutoRun/` directory; main child `AutoRun.tsx` at 844 lines (still slightly over 800 target, vastly improved from 2,287).
+- **`NewInstanceModal.tsx`** PARTIALLY RESOLVED. Decomposed into `NewInstanceModal/` directory; main child `NewInstanceModal.tsx` at 843 lines (still slightly over 800 target, down from 1,845).
+- **`CueModal.tsx`** RESOLVED. Decomposed into `CueModal/` directory.
+- **Files that dropped below 800 lines (resolved since scan):** `cli/output/formatter.ts` (was >800, now 741), `cli/services/agent-spawner.ts` (628), `cli/services/storage.ts` (592), `main/group-chat/group-chat-storage.ts` (723), `renderer/utils/contextExtractor.ts` (715), `renderer/components/CuePipelineEditor/panels/NodeConfigPanel.tsx` (293).
 
 ### By severity (refreshed):
 
 - **3000+ lines (critical):** 4 files (`web/mobile/App.tsx`, `main/ipc/handlers/symphony.ts`, `renderer/App.tsx`, `renderer/global.d.ts`) — up from 3 in old scan
-- **2000-3000 lines:** 7 files (including SymphonyModal, messageHandlers, DocumentGraphView, tabHelpers, useBatchProcessor, group-chat-router)
-- **1500-2000 lines:** 10 files
-- **1000-1500 lines:** 38 files
-- **800-1000 lines:** 31 files
+- **2000-3000 lines:** 7 files (SymphonyModal, messageHandlers, prompts.ts, DocumentGraphView, tabHelpers, useBatchProcessor, group-chat-router)
+- **1500-2000 lines:** 14 files
+- **1000-1500 lines:** 43 files
+- **800-1000 lines:** 30 files
 
 ---
 
@@ -162,12 +173,12 @@ Methodology: `wc -l` across `src/` excluding `node_modules`. Tests and sources c
 
 ## Summary
 
-| Metric                    | Count | Delta        |
-| ------------------------- | ----- | ------------ |
-| Source files > 800 lines  | 90    | +8           |
-| Source files > 2000 lines | 11    | +1           |
-| Source files > 3000 lines | 4     | +1           |
-| Test files > 2000 lines   | 30    | +2           |
+| Metric                    | Count | Delta         |
+| ------------------------- | ----- | ------------- |
+| Source files > 800 lines  | 98    | +16           |
+| Source files > 2000 lines | 11    | +1            |
+| Source files > 3000 lines | 4     | +1            |
+| Test files > 2000 lines   | 30    | +2            |
 | Files with 20+ functions  | ~12   | needs re-scan |
 
 ### Top 5 worst offenders (current):

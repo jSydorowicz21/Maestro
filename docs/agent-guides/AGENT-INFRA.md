@@ -1,3 +1,5 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # Agent Infrastructure Reference
 
 Complete reference for Maestro's agent registration system: agent IDs, definitions, capabilities, detection, output parsers, error patterns, session storage, and process management.
@@ -240,7 +242,6 @@ The `AgentDetector` class detects installed agents at runtime:
 class AgentDetector {
 	setCustomPaths(paths: Record<string, string>): void; // User-configured paths
 	async detectAgents(): Promise<AgentConfig[]>; // Detect all agents (cached)
-	async refreshAgents(): Promise<AgentConfig[]>; // Force re-detection
 	async discoverModels(agentId: string, forceRefresh?): Promise<string[]>; // Model discovery
 }
 ```
@@ -257,10 +258,11 @@ Detection process:
 
 ```typescript
 checkCustomPath(customPath: string): Promise<BinaryDetectionResult>
-probeWindowsPaths(binaryName: string): Promise<BinaryDetectionResult>
-probeUnixPaths(binaryName: string): Promise<BinaryDetectionResult>
-checkBinaryExists(binaryPath: string): Promise<BinaryDetectionResult>
+probeWindowsPaths(binaryName: string): Promise<string | null>
+probeUnixPaths(binaryName: string): Promise<string | null>
+checkBinaryExists(binaryName: string): Promise<BinaryDetectionResult>
 getExpandedEnv(): NodeJS.ProcessEnv  // PATH with common binary locations
+getExpandedEnvWithShell(): Promise<NodeJS.ProcessEnv>
 ```
 
 ---
@@ -524,7 +526,7 @@ TypeScript will enforce completeness for `Record<AgentId, T>` types, guiding you
 
 ## Process Management
 
-Agent processes are spawned and managed by `ProcessManager` (`src/main/process-manager.ts`). The IPC handler in `src/main/ipc/handlers/process.ts` is the entry point.
+Agent processes are spawned and managed by `ProcessManager` (`src/main/process-manager/ProcessManager.ts`, re-exported from `src/main/process-manager/index.ts`). The IPC handler in `src/main/ipc/handlers/process.ts` is the entry point.
 
 ### Spawn Flow
 

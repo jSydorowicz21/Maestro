@@ -1,3 +1,5 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # Test Patterns
 
 Test infrastructure, conventions, mock setup, and patterns for the Maestro codebase.

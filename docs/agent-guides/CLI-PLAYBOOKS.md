@@ -1,3 +1,5 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # CLI & Playbooks
 
 Command-line interface, playbook system, batch processing, and agent spawning for headless Maestro automation.
@@ -14,25 +16,38 @@ The Maestro CLI (`maestro-cli`) provides command-line access to agents, playbook
 src/cli/
 ├── index.ts              # Entry point (Commander.js program)
 ├── commands/             # Command implementations
+│   ├── auto-run.ts
 │   ├── clean-playbooks.ts
 │   ├── list-agents.ts
 │   ├── list-groups.ts
 │   ├── list-playbooks.ts
 │   ├── list-sessions.ts
+│   ├── open-file.ts
+│   ├── refresh-auto-run.ts
+│   ├── refresh-files.ts
 │   ├── run-playbook.ts
 │   ├── send.ts
+│   ├── settings-agent.ts
+│   ├── settings-get.ts
+│   ├── settings-list.ts
+│   ├── settings-reset.ts
+│   ├── settings-set.ts
 │   ├── show-agent.ts
-│   └── show-playbook.ts
+│   ├── show-playbook.ts
+│   └── status.ts
 ├── services/             # Business logic
 │   ├── agent-sessions.ts  # Read Claude Code session files
 │   ├── agent-spawner.ts   # Spawn agent CLIs
 │   ├── batch-processor.ts # Playbook execution engine
+│   ├── maestro-client.ts  # IPC client to running Maestro desktop app
 │   ├── playbooks.ts       # Playbook file management
 │   └── storage.ts         # Electron Store file reader
 └── output/               # Output formatting
     ├── formatter.ts       # Human-readable terminal output
     └── jsonl.ts           # Machine-parseable JSON Lines
 ```
+
+Note: `run-playbook.ts` is the file name, but the command is registered under the `playbook` verb (see entry point). Additional commands (`auto-run`, `open-file`, `refresh-*`, `settings-*`, `status`) are lightweight wrappers over `maestro-client.ts` for talking to a running desktop app.
 
 ### Shared Code with Desktop
 
@@ -518,6 +533,7 @@ Machine-parseable output format. Each line is a complete JSON object. Used when 
 | Batch processor     | `src/cli/services/batch-processor.ts` |
 | Playbook management | `src/cli/services/playbooks.ts`       |
 | Agent sessions      | `src/cli/services/agent-sessions.ts`  |
+| Desktop IPC client  | `src/cli/services/maestro-client.ts`  |
 | Human output        | `src/cli/output/formatter.ts`         |
 | JSONL output        | `src/cli/output/jsonl.ts`             |
 | Send command        | `src/cli/commands/send.ts`            |

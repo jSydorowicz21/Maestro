@@ -1,3 +1,5 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # UI Patterns
 
 Shared UI patterns, component library, and design system conventions for the Maestro renderer.

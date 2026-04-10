@@ -27,7 +27,7 @@ src/renderer/components/CueModal/cueModalUtils.ts:25         export function for
 src/renderer/components/FirstRunCelebration.tsx:64           function formatDuration(ms: number): string
 src/renderer/components/SymphonyModal.tsx:128                function formatDurationMs(ms: number): string
 src/renderer/components/Toast.tsx:11                         function formatDuration(ms: number): string
-src/renderer/components/DirectorNotes/AIOverviewTab.tsx:62   const formatDurationMs = (ms: number): string =>
+src/renderer/components/DirectorNotes/AIOverviewTab.tsx:78   const formatDurationMs = (ms: number): string =>
 src/renderer/hooks/symphony/useContributorStats.ts:147       function formatDuration(ms: number): string
 src/renderer/utils/groupChatExport.ts:41                     function formatDuration(messages): string
 src/renderer/utils/tabExport.ts:42                           function formatDuration(logs): string

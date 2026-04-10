@@ -1,3 +1,5 @@
+<!-- Verified 2026-04-10 against origin/rc (06e5a2eb3) -->
+
 # Main Process Lifecycle
 
 This guide documents the Electron main process lifecycle in Maestro: startup sequence, window management, store initialization, auto-updater, power management, WakaTime integration, history manager, IPC handler registration, and shutdown sequence.
@@ -546,7 +548,7 @@ Logger event forwarding is also set up to stream logs to the renderer.
 
 ## Process Listeners
 
-Set up in `setupProcessListeners()`, delegating to `src/main/process-listeners/setupProcessListeners.ts`:
+Set up in `setupProcessListeners()`, delegating to `src/main/process-listeners/index.ts`:
 
 The process manager emits events for:
 
