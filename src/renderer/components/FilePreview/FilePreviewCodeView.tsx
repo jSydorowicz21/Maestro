@@ -9,7 +9,6 @@ interface FilePreviewCodeViewProps {
 	displayContent: string;
 	isContentTruncated: boolean;
 	fullContentLength: number;
-	showFullContent: boolean;
 	setShowFullContent: (v: boolean) => void;
 	theme: any;
 	codeContainerRef: React.RefObject<HTMLDivElement>;
@@ -21,7 +20,6 @@ export const FilePreviewCodeView = React.memo(function FilePreviewCodeView({
 	displayContent,
 	isContentTruncated,
 	fullContentLength,
-	showFullContent,
 	setShowFullContent,
 	theme,
 	codeContainerRef,

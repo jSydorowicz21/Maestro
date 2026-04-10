@@ -1,12 +1,5 @@
 import { useCallback, useRef } from 'react';
-import type {
-	Session,
-	SessionState,
-	LogEntry,
-	QueuedItem,
-	CustomAICommand,
-	BatchRunState,
-} from '../../types';
+import type { Session, LogEntry, QueuedItem, CustomAICommand, BatchRunState } from '../../types';
 import { getActiveTab, extractQuickTabName } from '../../utils/tabHelpers';
 import { generateId } from '../../utils/ids';
 import { hasCapabilityCached } from '../agent/useAgentCapabilities';

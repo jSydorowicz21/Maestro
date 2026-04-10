@@ -14,7 +14,7 @@
  */
 
 import { create } from 'zustand';
-import type { Session, Group, LogEntry } from '../types';
+import type { Session, Group, LogEntry, AITab } from '../types';
 import { generateId } from '../utils/ids';
 import { getActiveTab } from '../utils/tabHelpers';
 
@@ -150,6 +150,68 @@ export type SessionStore = SessionStoreState & SessionStoreActions;
  */
 function resolve<T>(valOrFn: T | ((prev: T) => T), prev: T): T {
 	return typeof valOrFn === 'function' ? (valOrFn as (prev: T) => T)(prev) : valOrFn;
+}
+
+export function updateSessionWith(
+	id: string | null | undefined,
+	updater: (session: Session) => Session
+): void {
+	if (!id) return;
+
+	useSessionStore.getState().setSessions((prev) => {
+		let matched = false;
+		let changed = false;
+		const next = prev.map((session) => {
+			if (session.id !== id) return session;
+			matched = true;
+			const updated = updater(session);
+			if (updated !== session) {
+				changed = true;
+			}
+			return updated;
+		});
+
+		return matched && changed ? next : prev;
+	});
+}
+
+export function updateAiTab(
+	sessionId: string | null | undefined,
+	tabId: string | null | undefined,
+	updater: (tab: AITab) => AITab
+): void {
+	if (!sessionId || !tabId) return;
+
+	updateSessionWith(sessionId, (session) => {
+		let found = false;
+		const aiTabs = session.aiTabs.map((tab) => {
+			if (tab.id !== tabId) return tab;
+			found = true;
+			return updater(tab);
+		});
+
+		return found ? { ...session, aiTabs } : session;
+	});
+}
+
+export function updateActiveAiTab(
+	sessionId: string | null | undefined,
+	updater: (tab: AITab) => AITab
+): void {
+	if (!sessionId) return;
+
+	updateSessionWith(sessionId, (session) => {
+		if (!session.aiTabs.length) return session;
+
+		const targetTabId = session.aiTabs.some((tab) => tab.id === session.activeTabId)
+			? session.activeTabId
+			: session.aiTabs[0].id;
+
+		return {
+			...session,
+			aiTabs: session.aiTabs.map((tab) => (tab.id === targetTabId ? updater(tab) : tab)),
+		};
+	});
 }
 
 // ============================================================================

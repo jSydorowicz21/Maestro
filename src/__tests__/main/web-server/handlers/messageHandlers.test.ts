@@ -589,9 +589,9 @@ describe('WebSocketMessageHandler', () => {
 			});
 
 			await vi.waitFor(() => {
-				expect(callbacks.openFileTab).toHaveBeenCalledWith(
-					'session-1',
-					'/home/user/project/src/index.ts'
+				expect(callbacks.openFileTab).toHaveBeenCalledWith('session-1', expect.any(String));
+				expect((callbacks.openFileTab as any).mock.calls[0][1].replace(/\\/g, '/')).toMatch(
+					/^(?:[A-Z]:)?\/home\/user\/project\/src\/index\.ts$/i
 				);
 			});
 
@@ -599,7 +599,9 @@ describe('WebSocketMessageHandler', () => {
 			expect(response.type).toBe('open_file_tab_result');
 			expect(response.success).toBe(true);
 			expect(response.sessionId).toBe('session-1');
-			expect(response.filePath).toBe('/home/user/project/src/index.ts');
+			expect(response.filePath.replace(/\\/g, '/')).toMatch(
+				/^(?:[A-Z]:)?\/home\/user\/project\/src\/index\.ts$/i
+			);
 		});
 
 		it('should reject open file tab with missing sessionId', () => {

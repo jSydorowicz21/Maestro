@@ -33,6 +33,8 @@ vi.mock('fs', () => ({
 import { loadCueConfig, watchCueYaml, validateCueConfig } from '../../../main/cue/cue-yaml-loader';
 import * as chokidar from 'chokidar';
 
+const normalizePath = (p: unknown) => String(p).replace(/\\/g, '/');
+
 describe('cue-yaml-loader', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -52,7 +54,9 @@ describe('cue-yaml-loader', () => {
 
 		it('loads from canonical .maestro/cue.yaml path first', () => {
 			// Canonical path exists
-			mockExistsSync.mockImplementation((p: string) => String(p).includes('.maestro/cue.yaml'));
+			mockExistsSync.mockImplementation((p: string) =>
+				normalizePath(p).includes('.maestro/cue.yaml')
+			);
 			mockReadFileSync.mockReturnValue(`
 subscriptions:
   - name: canonical-sub
@@ -69,7 +73,8 @@ subscriptions:
 		it('falls back to legacy maestro-cue.yaml when canonical does not exist', () => {
 			// Only legacy path exists
 			mockExistsSync.mockImplementation(
-				(p: string) => String(p).includes('maestro-cue.yaml') && !String(p).includes('.maestro/')
+				(p: string) =>
+					normalizePath(p).includes('maestro-cue.yaml') && !normalizePath(p).includes('.maestro/')
 			);
 			mockReadFileSync.mockReturnValue(`
 subscriptions:
@@ -181,7 +186,7 @@ subscriptions:
 			mockExistsSync.mockReturnValue(true);
 			mockReadFileSync.mockImplementation((p: string) => {
 				readCallCount++;
-				if (String(p).endsWith('.maestro/prompts/worker-pipeline.md')) {
+				if (normalizePath(p).endsWith('.maestro/prompts/worker-pipeline.md')) {
 					return 'Prompt from external file';
 				}
 				return `
@@ -217,7 +222,7 @@ subscriptions:
 		it('resolves output_prompt_file to output_prompt content', () => {
 			mockExistsSync.mockReturnValue(true);
 			mockReadFileSync.mockImplementation((p: string) => {
-				if (String(p).endsWith('.maestro/prompts/format-output.md')) {
+				if (normalizePath(p).endsWith('.maestro/prompts/format-output.md')) {
 					return 'Format the output as markdown';
 				}
 				return `
@@ -255,7 +260,7 @@ subscriptions:
 		it('sets output_prompt to undefined when output_prompt_file is missing', () => {
 			mockExistsSync.mockReturnValue(true);
 			mockReadFileSync.mockImplementation((p: string) => {
-				if (String(p).endsWith('.maestro/prompts/missing.md')) {
+				if (normalizePath(p).endsWith('.maestro/prompts/missing.md')) {
 					throw new Error('ENOENT: no such file or directory');
 				}
 				return `
@@ -294,13 +299,14 @@ subscriptions:
 		it('watches both canonical and legacy file paths', () => {
 			watchCueYaml('/projects/test', vi.fn());
 			// Should watch both .maestro/cue.yaml (canonical) and maestro-cue.yaml (legacy)
-			expect(chokidar.watch).toHaveBeenCalledWith(
+			const [watchedPaths, options] = vi.mocked(chokidar.watch).mock.calls[0];
+			expect((watchedPaths as string[]).map(normalizePath)).toEqual(
 				expect.arrayContaining([
 					expect.stringContaining('.maestro/cue.yaml'),
 					expect.stringContaining('maestro-cue.yaml'),
-				]),
-				expect.objectContaining({ persistent: true, ignoreInitial: true })
+				])
 			);
+			expect(options).toEqual(expect.objectContaining({ persistent: true, ignoreInitial: true }));
 		});
 
 		it('calls onChange with debounce on file change', () => {

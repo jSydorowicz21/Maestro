@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../../../shared/platformDetection', () => ({
+	isWindows: () => false,
+}));
+
 import { buildInteractiveShellArgs } from '../../../../main/process-manager/utils/pathResolver';
 
 describe('pathResolver', () => {

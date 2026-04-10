@@ -1480,7 +1480,7 @@ Some text with [x] in it that's not a checkbox
 				const pathEnv = mockSpawn.mock.calls[0][2].env.PATH;
 
 				// Count occurrences of /opt/homebrew/bin
-				const parts = pathEnv.split(path.delimiter);
+				const parts = pathEnv.split(delimiter);
 				const homebrewCount = parts.filter((p: string) => p === '/opt/homebrew/bin').length;
 
 				// Should only appear once

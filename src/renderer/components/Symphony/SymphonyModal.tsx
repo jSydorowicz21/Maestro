@@ -27,7 +27,6 @@ import {
 	HelpCircle,
 	Github,
 } from 'lucide-react';
-import type { Session } from '../../types';
 import { SYMPHONY_CATEGORIES } from '../../../shared/symphony-constants';
 import { formatShortcutKeys } from '../../utils/shortcutFormatter';
 import { buildMaestroUrl } from '../../utils/buildMaestroUrl';

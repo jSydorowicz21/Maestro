@@ -1130,7 +1130,8 @@ describe('agents IPC handlers', () => {
 			const enoent = Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
 			// Project commands dir has custom .md files
 			vi.mocked(fs.promises.readdir).mockImplementation(async (dir) => {
-				if (String(dir).includes('/test/.opencode/commands')) {
+				const normalizedDir = String(dir).replace(/\\/g, '/');
+				if (normalizedDir.includes('/test/.opencode/commands')) {
 					return ['deploy.md', 'lint.md', 'README.txt'] as any;
 				}
 				throw enoent;
@@ -1167,7 +1168,9 @@ describe('agents IPC handlers', () => {
 			const enoent = Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
 			const homeDir = require('os').homedir();
 			vi.mocked(fs.promises.readdir).mockImplementation(async (dir) => {
-				if (String(dir) === `${homeDir}/.opencode/commands`) {
+				if (
+					String(dir).replace(/\\/g, '/') === `${homeDir}/.opencode/commands`.replace(/\\/g, '/')
+				) {
 					return ['octest.md'] as any;
 				}
 				throw enoent;
@@ -1198,7 +1201,8 @@ describe('agents IPC handlers', () => {
 
 			const enoent = Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
 			vi.mocked(fs.promises.readdir).mockImplementation(async (dir) => {
-				if (String(dir).includes('/test/.opencode/commands')) {
+				const normalizedDir = String(dir).replace(/\\/g, '/');
+				if (normalizedDir.includes('/test/.opencode/commands')) {
 					return ['deploy.md'] as any;
 				}
 				throw enoent;
@@ -1229,7 +1233,8 @@ describe('agents IPC handlers', () => {
 			const enoent = Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
 			vi.mocked(fs.promises.readdir).mockRejectedValue(enoent);
 			vi.mocked(fs.promises.readFile).mockImplementation(async (filePath) => {
-				if (String(filePath).includes('/test/opencode.json')) {
+				const normalizedPath = String(filePath).replace(/\\/g, '/');
+				if (normalizedPath.includes('/test/opencode.json')) {
 					return JSON.stringify({ command: { 'my-cmd': { prompt: 'Do the thing' } } });
 				}
 				throw enoent;

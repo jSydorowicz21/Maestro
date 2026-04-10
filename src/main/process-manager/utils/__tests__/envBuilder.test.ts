@@ -319,13 +319,13 @@ describe('envBuilder - Global Environment Variables', () => {
 
 			try {
 				const env = buildChildProcessEnv();
-				const pathParts = env.PATH?.split(path.delimiter) || [];
+				const pathEnv = env.PATH || '';
 				const currentBin = path.join(tempNvmDir, 'current', 'bin');
 				const versionedBin = path.join(tempNvmDir, 'versions', 'node', 'v22.10.0', 'bin');
 
-				expect(pathParts[0]).toBe(currentBin);
-				expect(pathParts).toContain(versionedBin);
-				expect(pathParts.indexOf(currentBin)).toBeLessThan(pathParts.indexOf(versionedBin));
+				expect(pathEnv.startsWith(currentBin)).toBe(true);
+				expect(pathEnv).toContain(versionedBin);
+				expect(pathEnv.indexOf(currentBin)).toBeLessThan(pathEnv.indexOf(versionedBin));
 			} finally {
 				Object.defineProperty(process, 'platform', { value: originalPlatform });
 				if (originalNvmDir === undefined) {

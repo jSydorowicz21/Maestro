@@ -268,7 +268,10 @@ describe('cue-executor', () => {
 			// Let spawn happen
 			await vi.advanceTimersByTimeAsync(0);
 
-			expect(mockReadFileSync).toHaveBeenCalledWith('/projects/test/prompts/check.md', 'utf-8');
+			expect(mockReadFileSync).toHaveBeenCalledWith(
+				expect.stringMatching(/[\\/]projects[\\/]test[\\/]prompts[\\/]check\.md$/),
+				'utf-8'
+			);
 
 			// Close the process to resolve
 			mockChild.emit('close', 0);

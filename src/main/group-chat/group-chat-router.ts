@@ -137,6 +137,15 @@ const PARTICIPANT_RESPONSE_TIMEOUT_MS = 10 * 60 * 1000;
 /** How long to wait for the moderator process before treating it as timed-out (10 minutes). */
 const MODERATOR_RESPONSE_TIMEOUT_MS = 10 * 60 * 1000;
 
+function assertSpawnSucceeded(
+	spawnResult: { pid: number; success: boolean },
+	description: string
+): void {
+	if (!spawnResult.success) {
+		throw new Error(`Failed to spawn ${description} process`);
+	}
+}
+
 /**
  * Tracks per-group-chat moderator timeout handles.
  * Maps groupChatId -> NodeJS.Timeout
@@ -911,6 +920,7 @@ ${readOnly ? 'READ-ONLY MODE is active. You and all participants can only inspec
 				});
 
 				console.log(`[GroupChat:Debug] Spawn result: ${JSON.stringify(spawnResult)}`);
+				assertSpawnSucceeded(spawnResult, 'moderator');
 				console.log(`[GroupChat:Debug] Moderator process spawned successfully`);
 				console.log(`[GroupChat:Debug] promptArgs: ${agent.promptArgs ? 'defined' : 'undefined'}`);
 				console.log(`[GroupChat:Debug] noPromptSeparator: ${agent.noPromptSeparator ?? false}`);
@@ -1407,6 +1417,7 @@ export async function routeModeratorResponse(
 				console.log(
 					`[GroupChat:Debug] Spawn result for ${participantName}: ${JSON.stringify(spawnResult)}`
 				);
+				assertSpawnSucceeded(spawnResult, `participant ${participantName}`);
 				console.log(`[GroupChat:Debug] promptArgs: ${agent.promptArgs ? 'defined' : 'undefined'}`);
 				console.log(`[GroupChat:Debug] noPromptSeparator: ${agent.noPromptSeparator ?? false}`);
 				setActiveParticipantSession(groupChatId, participantName, sessionId);
@@ -1432,6 +1443,7 @@ export async function routeModeratorResponse(
 					`[GroupChat:Debug] Spawned batch process for participant @${participantName} (session ${sessionId}, readOnly=${readOnly ?? false})`
 				);
 			} catch (error) {
+				groupChatEmitters.emitParticipantState?.(groupChatId, participantName, 'idle');
 				logger.error(`Failed to spawn participant ${participantName}`, LOG_CONTEXT, {
 					error,
 					groupChatId,
@@ -1830,6 +1842,7 @@ Review the agent responses above. Either:
 		});
 
 		console.log(`[GroupChat:Debug] Synthesis spawn result: ${JSON.stringify(spawnResult)}`);
+		assertSpawnSucceeded(spawnResult, 'moderator synthesis');
 		console.log(`[GroupChat:Debug] Synthesis moderator process spawned successfully`);
 		console.log(`[GroupChat:Debug] promptArgs: ${agent.promptArgs ? 'defined' : 'undefined'}`);
 		console.log(`[GroupChat:Debug] noPromptSeparator: ${agent.noPromptSeparator ?? false}`);
@@ -2031,6 +2044,10 @@ export async function respawnParticipantWithRecovery(
 	});
 
 	console.log(`[GroupChat:Debug] Recovery spawn result: ${JSON.stringify(spawnResult)}`);
+	if (!spawnResult.success) {
+		groupChatEmitters.emitParticipantState?.(groupChatId, participantName, 'idle');
+		assertSpawnSucceeded(spawnResult, `participant ${participantName} recovery`);
+	}
 	console.log(`[GroupChat:Debug] promptArgs: ${agent.promptArgs ? 'defined' : 'undefined'}`);
 	setActiveParticipantSession(groupChatId, participantName, sessionId);
 	console.log(`[GroupChat:Debug] =============================================`);

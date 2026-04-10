@@ -409,14 +409,15 @@ describe('filesystem handlers', () => {
 
 			// Root has: src/ (dir), .git/ (dir), file.txt (file)
 			vi.mocked(mockFs.readdir).mockImplementation(async (dirPath: any) => {
-				if (dirPath === '/project') {
+				const normalizedDir = String(dirPath).replace(/\\/g, '/');
+				if (normalizedDir === '/project') {
 					return [
 						{ name: 'src', isDirectory: () => true, isFile: () => false },
 						{ name: '.git', isDirectory: () => true, isFile: () => false },
 						{ name: 'file.txt', isDirectory: () => false, isFile: () => true },
 					] as any;
 				}
-				if (dirPath.includes('/src')) {
+				if (normalizedDir.includes('/src')) {
 					return [{ name: 'index.ts', isDirectory: () => false, isFile: () => true }] as any;
 				}
 				return [];
@@ -433,14 +434,15 @@ describe('filesystem handlers', () => {
 
 			// With .git in ignore patterns — .git is excluded
 			vi.mocked(mockFs.readdir).mockImplementation(async (dirPath: any) => {
-				if (dirPath === '/project') {
+				const normalizedDir = String(dirPath).replace(/\\/g, '/');
+				if (normalizedDir === '/project') {
 					return [
 						{ name: 'src', isDirectory: () => true, isFile: () => false },
 						{ name: '.git', isDirectory: () => true, isFile: () => false },
 						{ name: 'file.txt', isDirectory: () => false, isFile: () => true },
 					] as any;
 				}
-				if (dirPath.includes('/src')) {
+				if (normalizedDir.includes('/src')) {
 					return [{ name: 'index.ts', isDirectory: () => false, isFile: () => true }] as any;
 				}
 				return [];
@@ -469,7 +471,8 @@ describe('filesystem handlers', () => {
 			});
 
 			vi.mocked(mockFs.readdir).mockImplementation(async (dirPath: any) => {
-				if (dirPath === '/project') {
+				const normalizedDir = String(dirPath).replace(/\\/g, '/');
+				if (normalizedDir === '/project') {
 					return [
 						{ name: 'src', isDirectory: () => true, isFile: () => false },
 						{ name: 'dist', isDirectory: () => true, isFile: () => false },
@@ -477,7 +480,7 @@ describe('filesystem handlers', () => {
 						{ name: 'debug.log', isDirectory: () => false, isFile: () => true },
 					] as any;
 				}
-				if (dirPath.includes('/src')) {
+				if (normalizedDir.includes('/src')) {
 					return [{ name: 'index.ts', isDirectory: () => false, isFile: () => true }] as any;
 				}
 				return [];

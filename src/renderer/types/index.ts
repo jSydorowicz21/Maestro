@@ -853,6 +853,13 @@ export interface CustomAICommand {
 	isBuiltIn?: boolean; // If true, cannot be deleted (only edited)
 }
 
+export interface EditingCommand {
+	id: string;
+	prompt: string;
+	command?: string;
+	description?: string;
+}
+
 // Spec Kit command definition (bundled from github/spec-kit)
 export interface SpecKitCommand {
 	id: string; // e.g., 'constitution'

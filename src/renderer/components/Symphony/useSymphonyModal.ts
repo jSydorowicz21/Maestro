@@ -17,7 +17,6 @@ export function useSymphonyModal({
 	isOpen,
 	onClose,
 	onStartContribution,
-	onSelectSession,
 }: {
 	isOpen: boolean;
 	onClose: () => void;

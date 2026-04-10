@@ -461,7 +461,8 @@ export function NewInstanceModal({
 		const agentCustomProviderPath = agentConfigs[selectedAgent]?.providerPath?.trim() || undefined;
 
 		// Get SSH remote configuration for this session (stored per-session, not per-agent)
-		const sshRemoteConfig = agentSshRemoteConfigs[selectedAgent];
+		const sshRemoteConfig =
+			agentSshRemoteConfigs[selectedAgent] || agentSshRemoteConfigs['_pending_'];
 		// Convert to session-level format: ALWAYS pass explicitly to override any agent-level config
 		// For new sessions, this ensures consistent behavior with the UI selection
 		const sessionSshRemoteConfig =
@@ -1108,7 +1109,9 @@ export function NewInstanceModal({
 							) : remotePathValidation.valid ? (
 								<>
 									<Check className="w-3.5 h-3.5" style={{ color: theme.colors.success }} />
-									<span style={{ color: theme.colors.success }}>Remote directory found</span>
+									<span style={{ color: theme.colors.success }}>
+										Directory found on {sshRemoteHost || 'remote'}
+									</span>
 								</>
 							) : remotePathValidation.error ? (
 								<>

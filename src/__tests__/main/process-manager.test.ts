@@ -443,6 +443,7 @@ describe('process-manager.ts', () => {
 
 		describe('kill() PTY signal handling', () => {
 			it('should send SIGTERM (not default SIGHUP) to PTY processes', () => {
+				mockIsWindows.mockReturnValue(false);
 				const mockPtyKill = vi.fn();
 				const mockOnExit = vi.fn();
 				const processes = (processManager as any).processes as Map<string, any>;
@@ -469,6 +470,7 @@ describe('process-manager.ts', () => {
 			});
 
 			it('should schedule SIGKILL escalation for PTY processes', () => {
+				mockIsWindows.mockReturnValue(false);
 				vi.useFakeTimers();
 				const mockPtyKill = vi.fn();
 				const mockOnExit = vi.fn();
@@ -507,6 +509,7 @@ describe('process-manager.ts', () => {
 			});
 
 			it('should cancel SIGKILL escalation if PTY exits on its own', () => {
+				mockIsWindows.mockReturnValue(false);
 				vi.useFakeTimers();
 				const mockPtyKill = vi.fn();
 				let exitCallback: (() => void) | undefined;
@@ -651,6 +654,7 @@ describe('process-manager.ts', () => {
 
 		describe('spawn() kill-before-spawn guard', () => {
 			it('should kill existing process before spawning with same sessionId', () => {
+				mockIsWindows.mockReturnValue(false);
 				const mockPtyKill = vi.fn();
 				const mockOnExit = vi.fn();
 				const processes = (processManager as any).processes as Map<string, any>;

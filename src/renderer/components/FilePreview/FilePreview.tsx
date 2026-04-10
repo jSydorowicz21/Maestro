@@ -726,7 +726,6 @@ export const FilePreview = React.memo(
 							displayContent={displayContent}
 							isContentTruncated={isContentTruncated}
 							fullContentLength={file.content.length}
-							showFullContent={showFullContent}
 							setShowFullContent={setShowFullContent}
 							theme={theme}
 							codeContainerRef={codeContainerRef}

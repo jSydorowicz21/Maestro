@@ -12,7 +12,6 @@ import {
 	GitPullRequest,
 	GitMerge,
 	Clock,
-	Play,
 	RefreshCw,
 	CheckCircle,
 	FileText,
@@ -21,7 +20,6 @@ import {
 	Star,
 	Terminal,
 	X,
-	Loader2,
 } from 'lucide-react';
 import type { Theme } from '../../types';
 import type {

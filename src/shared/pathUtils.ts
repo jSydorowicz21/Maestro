@@ -300,7 +300,8 @@ export function detectNodeVersionManagerBinPaths(): string[] {
  * ```
  */
 export function buildExpandedPath(customPaths?: string[]): string {
-	const delimiter = path.delimiter;
+	const windows = isWindows();
+	const delimiter = windows ? ';' : ':';
 	const home = os.homedir();
 	const versionManagerPaths = detectNodeVersionManagerBinPaths();
 
@@ -311,7 +312,7 @@ export function buildExpandedPath(customPaths?: string[]): string {
 	// Platform-specific additional paths
 	let additionalPaths: string[];
 
-	if (isWindows()) {
+	if (windows) {
 		const appData = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
 		const localAppData = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
 		const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
