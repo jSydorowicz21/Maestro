@@ -1,6 +1,7 @@
 # SCAN-MOCKS.md - Test Mock Duplicates
 
 **Refreshed 2026-04-10 against origin/rc (06e5a2eb3)**: `src/__tests__/helpers/` directory still does NOT exist. Re-counted defining files in rc:
+
 - `createMockSession`: **69 defining files** (was 66, +3)
 - `createMockTheme`: **35 defining files** (unchanged)
 - Files with `const mockTheme =` / `const mockTheme:`: **86** (previous scan reported 119 occurrences; likely the earlier count included object re-use, not defining files)

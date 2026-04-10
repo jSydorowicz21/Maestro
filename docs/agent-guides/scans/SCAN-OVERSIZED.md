@@ -9,106 +9,106 @@ Methodology: `wc -l` across `src/` excluding `node_modules`. Tests and sources c
 
 ## Source Files Over 800 Lines (excluding tests)
 
-| Lines | File                                                          | Delta since 2026-03-20                                 |
-| ----- | ------------------------------------------------------------- | ------------------------------------------------------ |
-| 3350  | `web/mobile/App.tsx`                                          | +2020 **REGRESSION to critical tier** (was 1330)       |
-| 3318  | `main/ipc/handlers/symphony.ts`                               | unchanged                                              |
-| 3093  | `renderer/App.tsx`                                            | **-941 (partial decomp in rc)**, still 3x target       |
-| 3057  | `renderer/global.d.ts`                                        | **NEW critical**, not previously flagged               |
-| 2620  | `renderer/components/SymphonyModal.tsx`                       | +10                                                    |
-| 2448  | `main/web-server/handlers/messageHandlers.ts`                 | +1497 **REGRESSION to critical tier** (was 951)        |
-| 2300  | `generated/prompts.ts`                                        | +325 (generated file, exclude from dedup)              |
-| 2136  | `renderer/components/DocumentGraph/DocumentGraphView.tsx`     | -6                                                     |
-| 2107  | `renderer/utils/tabHelpers.ts`                                | +179                                                   |
-| 2092  | `renderer/hooks/batch/useBatchProcessor.ts`                   | +45                                                    |
-| 2037  | `main/group-chat/group-chat-router.ts`                        | +462 **REGRESSION**                                    |
-| 1992  | `renderer/stores/settingsStore.ts`                            | +69                                                    |
-| 1975  | `renderer/components/ProcessMonitor.tsx`                      | +226 **REGRESSION**                                    |
-| 1950  | `renderer/components/QuickActionsModal.tsx`                   | +282 **REGRESSION**                                    |
-| 1908  | `main/ipc/handlers/claude.ts`                                 | unchanged                                              |
-| 1895  | `renderer/components/TerminalOutput.tsx`                      | +110                                                   |
-| 1815  | `main/web-server/web-server-factory.ts`                       | **NEW** (not previously flagged)                       |
-| 1759  | `main/storage/opencode-session-storage.ts`                    | unchanged                                              |
-| 1650  | `renderer/hooks/tabs/useTabHandlers.ts`                       | +25                                                    |
-| 1626  | `renderer/components/FileExplorerPanel.tsx`                   | +87                                                    |
-| 1614  | `renderer/hooks/agent/useAgentListeners.ts`                   | +36                                                    |
-| 1614  | `main/storage/codex-session-storage.ts`                       | +222                                                   |
-| 1608  | `renderer/components/PlaygroundPanel.tsx`                     | unchanged                                              |
-| 1575  | `web/mobile/AllSessionsView.tsx`                              | **NEW**                                                |
-| 1538  | `renderer/components/AgentSessionsBrowser.tsx`                | +4                                                     |
-| 1479  | `renderer/components/Wizard/screens/ConversationScreen.tsx`   | -42                                                    |
-| 1468  | `renderer/hooks/batch/useInlineWizard.ts`                     | **NEW**                                                |
-| 1441  | `renderer/components/MarketplaceModal.tsx`                    | +7                                                     |
-| 1437  | `main/ipc/handlers/git.ts`                                    | -23                                                    |
-| 1411  | `web/mobile/MobileHistoryPanel.tsx`                           | unchanged                                              |
-| 1377  | `renderer/components/SessionList/SessionList.tsx`             | +38                                                    |
-| 1375  | `renderer/components/LeaderboardRegistrationModal.tsx`        | unchanged                                              |
-| 1368  | `renderer/components/Wizard/services/phaseGenerator.ts`       | +15                                                    |
-| 1366  | `renderer/components/DocumentGraph/MindMap.tsx`               | unchanged                                              |
-| 1358  | `renderer/components/Wizard/screens/AgentSelectionScreen.tsx` | -67                                                    |
-| 1354  | `web/mobile/LeftPanel.tsx`                                    | **NEW**                                                |
-| 1341  | `renderer/hooks/wizard/useWizardHandlers.ts`                  | +12                                                    |
-| 1334  | `renderer/components/InputArea.tsx`                           | +162                                                   |
-| 1322  | `renderer/components/FilePreview/FilePreview.tsx`             | +2 (already decomposed)                                |
-| 1318  | `main/ipc/handlers/agents.ts`                                 | +233                                                   |
-| 1313  | `renderer/services/inlineWizardDocumentGeneration.ts`         | +19                                                    |
-| 1307  | `renderer/components/DocumentsPanel.tsx`                      | unchanged                                              |
-| 1302  | `renderer/components/AchievementCard.tsx`                     | **NEW**                                                |
-| 1289  | `web/mobile/SessionPillBar.tsx`                               | +122                                                   |
-| 1286  | `main/ipc/handlers/autorun.ts`                                | unchanged                                              |
-| 1254  | `web/hooks/useWebSocket.ts`                                   | +320                                                   |
-| 1241  | `renderer/hooks/input/useInputProcessing.ts`                  | +45                                                    |
-| 1234  | `renderer/components/InlineWizard/DocumentGenerationView.tsx` | unchanged                                              |
-| 1228  | `renderer/components/UsageDashboard/UsageDashboardModal.tsx`  | unchanged                                              |
-| 1200  | `renderer/components/DocumentGraph/graphDataBuilder.ts`       | unchanged                                              |
-| 1161  | `main/storage/claude-session-storage.ts`                      | +19                                                    |
-| 1156  | `renderer/components/FeedbackChatView.tsx`                    | **NEW**                                                |
-| 1129  | `main/preload/process.ts`                                     | **NEW**                                                |
-| 1105  | `renderer/components/Settings/tabs/GeneralTab.tsx`            | +43                                                    |
-| 1094  | `renderer/components/AppModals/AppModals.tsx`                 | +38                                                    |
-| 1088  | `renderer/stores/modalStore.ts`                               | +22                                                    |
-| 1070  | `web/mobile/ResponseViewer.tsx`                               | unchanged                                              |
-| 1060  | `main/ipc/handlers/groupChat.ts`                              | +160                                                   |
-| 1055  | `renderer/components/MergeSessionModal.tsx`                   | -10                                                    |
-| 1040  | `renderer/components/Wizard/services/conversationManager.ts`  | -9                                                     |
-| 1038  | `main/ipc/handlers/feedback.ts`                               | **NEW**                                                |
-| 1033  | `renderer/hooks/keyboard/useMainKeyboardHandler.ts`           | +96                                                    |
-| 1033  | `renderer/components/TabSwitcherModal.tsx`                    | -13                                                    |
-| 1020  | `renderer/components/Wizard/WizardContext.tsx`                | unchanged                                              |
-| 1015  | `main/index.ts`                                               | +88                                                    |
-| 1011  | `main/ipc/handlers/process.ts`                                | +137                                                   |
-| 1006  | `main/parsers/error-patterns.ts`                              | +5                                                     |
-| 1000  | `main/ipc/handlers/marketplace.ts`                            | unchanged                                              |
-| 999   | `renderer/types/index.ts`                                     | +25                                                    |
-| 999   | `renderer/components/Settings/tabs/EncoreTab.tsx`             | **NEW**                                                |
-| 989   | `renderer/hooks/modal/useModalHandlers.ts`                    | +24                                                    |
-| 975   | `renderer/components/UsageDashboard/ActivityHeatmap.tsx`      | unchanged                                              |
-| 971   | `main/ipc/handlers/agentSessions.ts`                          | unchanged                                              |
-| 967   | `renderer/components/CueHelpModal.tsx`                        | +24                                                    |
-| 962   | `renderer/components/DocumentGraph/mindMapLayouts.ts`         | unchanged                                              |
-| 960   | `web/mobile/RightDrawer.tsx`                                  | **NEW**                                                |
-| 952   | `main/web-server/WebServer.ts`                                | +1 (new - tracked as factory earlier)                  |
-| 951   | `main/parsers/codex-output-parser.ts`                         | **NEW**                                                |
-| 949   | `renderer/components/BatchRunnerModal.tsx`                    | unchanged                                              |
-| 929   | `web/mobile/TabBar.tsx`                                       | **NEW**                                                |
-| 913   | `renderer/components/Wizard/screens/PreparingPlanScreen.tsx`  | -1                                                     |
-| 908   | `web/mobile/CommandInputBar.tsx`                              | -27                                                    |
-| 885   | `renderer/components/LogViewer.tsx`                           | **NEW**                                                |
-| 884   | `renderer/hooks/remote/useRemoteIntegration.ts`               | **NEW**                                                |
-| 879   | `renderer/utils/markdownConfig.ts`                            | **NEW**                                                |
-| 868   | `renderer/services/inlineWizardConversation.ts`               | -4                                                     |
-| 860   | `renderer/components/Wizard/screens/DirectorySelectionScreen.tsx` | unchanged                                          |
-| 845   | `renderer/hooks/worktree/useWorktreeHandlers.ts`              | unchanged                                              |
-| 844   | `renderer/components/AutoRun/AutoRun.tsx`                     | (decomposed from AutoRun.tsx, was 2287)                |
-| 844   | `renderer/hooks/groupChat/useGroupChatHandlers.ts`            | **NEW**                                                |
-| 843   | `renderer/components/NewInstanceModal/NewInstanceModal.tsx`   | (decomposed from NewInstanceModal.tsx, was 1845; main child still just over 800) |
-| 840   | `renderer/components/RightPanel.tsx`                          | +9                                                     |
-| 839   | `main/utils/remote-fs.ts`                                     | unchanged                                              |
-| 832   | `main/stats/stats-db.ts`                                      | unchanged                                              |
-| 827   | `renderer/components/Settings/SshRemoteModal.tsx`             | unchanged                                              |
-| 826   | `renderer/hooks/agent/useMergeSession.ts`                     | unchanged                                              |
-| 814   | `web/hooks/useMobileSessionManagement.ts`                     | **NEW**                                                |
-| 808   | `renderer/components/DocumentGraph/layoutAlgorithms.ts`       | unchanged                                              |
+| Lines | File                                                              | Delta since 2026-03-20                                                           |
+| ----- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 3350  | `web/mobile/App.tsx`                                              | +2020 **REGRESSION to critical tier** (was 1330)                                 |
+| 3318  | `main/ipc/handlers/symphony.ts`                                   | unchanged                                                                        |
+| 3093  | `renderer/App.tsx`                                                | **-941 (partial decomp in rc)**, still 3x target                                 |
+| 3057  | `renderer/global.d.ts`                                            | **NEW critical**, not previously flagged                                         |
+| 2620  | `renderer/components/SymphonyModal.tsx`                           | +10                                                                              |
+| 2448  | `main/web-server/handlers/messageHandlers.ts`                     | +1497 **REGRESSION to critical tier** (was 951)                                  |
+| 2300  | `generated/prompts.ts`                                            | +325 (generated file, exclude from dedup)                                        |
+| 2136  | `renderer/components/DocumentGraph/DocumentGraphView.tsx`         | -6                                                                               |
+| 2107  | `renderer/utils/tabHelpers.ts`                                    | +179                                                                             |
+| 2092  | `renderer/hooks/batch/useBatchProcessor.ts`                       | +45                                                                              |
+| 2037  | `main/group-chat/group-chat-router.ts`                            | +462 **REGRESSION**                                                              |
+| 1992  | `renderer/stores/settingsStore.ts`                                | +69                                                                              |
+| 1975  | `renderer/components/ProcessMonitor.tsx`                          | +226 **REGRESSION**                                                              |
+| 1950  | `renderer/components/QuickActionsModal.tsx`                       | +282 **REGRESSION**                                                              |
+| 1908  | `main/ipc/handlers/claude.ts`                                     | unchanged                                                                        |
+| 1895  | `renderer/components/TerminalOutput.tsx`                          | +110                                                                             |
+| 1815  | `main/web-server/web-server-factory.ts`                           | **NEW** (not previously flagged)                                                 |
+| 1759  | `main/storage/opencode-session-storage.ts`                        | unchanged                                                                        |
+| 1650  | `renderer/hooks/tabs/useTabHandlers.ts`                           | +25                                                                              |
+| 1626  | `renderer/components/FileExplorerPanel.tsx`                       | +87                                                                              |
+| 1614  | `renderer/hooks/agent/useAgentListeners.ts`                       | +36                                                                              |
+| 1614  | `main/storage/codex-session-storage.ts`                           | +222                                                                             |
+| 1608  | `renderer/components/PlaygroundPanel.tsx`                         | unchanged                                                                        |
+| 1575  | `web/mobile/AllSessionsView.tsx`                                  | **NEW**                                                                          |
+| 1538  | `renderer/components/AgentSessionsBrowser.tsx`                    | +4                                                                               |
+| 1479  | `renderer/components/Wizard/screens/ConversationScreen.tsx`       | -42                                                                              |
+| 1468  | `renderer/hooks/batch/useInlineWizard.ts`                         | **NEW**                                                                          |
+| 1441  | `renderer/components/MarketplaceModal.tsx`                        | +7                                                                               |
+| 1437  | `main/ipc/handlers/git.ts`                                        | -23                                                                              |
+| 1411  | `web/mobile/MobileHistoryPanel.tsx`                               | unchanged                                                                        |
+| 1377  | `renderer/components/SessionList/SessionList.tsx`                 | +38                                                                              |
+| 1375  | `renderer/components/LeaderboardRegistrationModal.tsx`            | unchanged                                                                        |
+| 1368  | `renderer/components/Wizard/services/phaseGenerator.ts`           | +15                                                                              |
+| 1366  | `renderer/components/DocumentGraph/MindMap.tsx`                   | unchanged                                                                        |
+| 1358  | `renderer/components/Wizard/screens/AgentSelectionScreen.tsx`     | -67                                                                              |
+| 1354  | `web/mobile/LeftPanel.tsx`                                        | **NEW**                                                                          |
+| 1341  | `renderer/hooks/wizard/useWizardHandlers.ts`                      | +12                                                                              |
+| 1334  | `renderer/components/InputArea.tsx`                               | +162                                                                             |
+| 1322  | `renderer/components/FilePreview/FilePreview.tsx`                 | +2 (already decomposed)                                                          |
+| 1318  | `main/ipc/handlers/agents.ts`                                     | +233                                                                             |
+| 1313  | `renderer/services/inlineWizardDocumentGeneration.ts`             | +19                                                                              |
+| 1307  | `renderer/components/DocumentsPanel.tsx`                          | unchanged                                                                        |
+| 1302  | `renderer/components/AchievementCard.tsx`                         | **NEW**                                                                          |
+| 1289  | `web/mobile/SessionPillBar.tsx`                                   | +122                                                                             |
+| 1286  | `main/ipc/handlers/autorun.ts`                                    | unchanged                                                                        |
+| 1254  | `web/hooks/useWebSocket.ts`                                       | +320                                                                             |
+| 1241  | `renderer/hooks/input/useInputProcessing.ts`                      | +45                                                                              |
+| 1234  | `renderer/components/InlineWizard/DocumentGenerationView.tsx`     | unchanged                                                                        |
+| 1228  | `renderer/components/UsageDashboard/UsageDashboardModal.tsx`      | unchanged                                                                        |
+| 1200  | `renderer/components/DocumentGraph/graphDataBuilder.ts`           | unchanged                                                                        |
+| 1161  | `main/storage/claude-session-storage.ts`                          | +19                                                                              |
+| 1156  | `renderer/components/FeedbackChatView.tsx`                        | **NEW**                                                                          |
+| 1129  | `main/preload/process.ts`                                         | **NEW**                                                                          |
+| 1105  | `renderer/components/Settings/tabs/GeneralTab.tsx`                | +43                                                                              |
+| 1094  | `renderer/components/AppModals/AppModals.tsx`                     | +38                                                                              |
+| 1088  | `renderer/stores/modalStore.ts`                                   | +22                                                                              |
+| 1070  | `web/mobile/ResponseViewer.tsx`                                   | unchanged                                                                        |
+| 1060  | `main/ipc/handlers/groupChat.ts`                                  | +160                                                                             |
+| 1055  | `renderer/components/MergeSessionModal.tsx`                       | -10                                                                              |
+| 1040  | `renderer/components/Wizard/services/conversationManager.ts`      | -9                                                                               |
+| 1038  | `main/ipc/handlers/feedback.ts`                                   | **NEW**                                                                          |
+| 1033  | `renderer/hooks/keyboard/useMainKeyboardHandler.ts`               | +96                                                                              |
+| 1033  | `renderer/components/TabSwitcherModal.tsx`                        | -13                                                                              |
+| 1020  | `renderer/components/Wizard/WizardContext.tsx`                    | unchanged                                                                        |
+| 1015  | `main/index.ts`                                                   | +88                                                                              |
+| 1011  | `main/ipc/handlers/process.ts`                                    | +137                                                                             |
+| 1006  | `main/parsers/error-patterns.ts`                                  | +5                                                                               |
+| 1000  | `main/ipc/handlers/marketplace.ts`                                | unchanged                                                                        |
+| 999   | `renderer/types/index.ts`                                         | +25                                                                              |
+| 999   | `renderer/components/Settings/tabs/EncoreTab.tsx`                 | **NEW**                                                                          |
+| 989   | `renderer/hooks/modal/useModalHandlers.ts`                        | +24                                                                              |
+| 975   | `renderer/components/UsageDashboard/ActivityHeatmap.tsx`          | unchanged                                                                        |
+| 971   | `main/ipc/handlers/agentSessions.ts`                              | unchanged                                                                        |
+| 967   | `renderer/components/CueHelpModal.tsx`                            | +24                                                                              |
+| 962   | `renderer/components/DocumentGraph/mindMapLayouts.ts`             | unchanged                                                                        |
+| 960   | `web/mobile/RightDrawer.tsx`                                      | **NEW**                                                                          |
+| 952   | `main/web-server/WebServer.ts`                                    | +1 (new - tracked as factory earlier)                                            |
+| 951   | `main/parsers/codex-output-parser.ts`                             | **NEW**                                                                          |
+| 949   | `renderer/components/BatchRunnerModal.tsx`                        | unchanged                                                                        |
+| 929   | `web/mobile/TabBar.tsx`                                           | **NEW**                                                                          |
+| 913   | `renderer/components/Wizard/screens/PreparingPlanScreen.tsx`      | -1                                                                               |
+| 908   | `web/mobile/CommandInputBar.tsx`                                  | -27                                                                              |
+| 885   | `renderer/components/LogViewer.tsx`                               | **NEW**                                                                          |
+| 884   | `renderer/hooks/remote/useRemoteIntegration.ts`                   | **NEW**                                                                          |
+| 879   | `renderer/utils/markdownConfig.ts`                                | **NEW**                                                                          |
+| 868   | `renderer/services/inlineWizardConversation.ts`                   | -4                                                                               |
+| 860   | `renderer/components/Wizard/screens/DirectorySelectionScreen.tsx` | unchanged                                                                        |
+| 845   | `renderer/hooks/worktree/useWorktreeHandlers.ts`                  | unchanged                                                                        |
+| 844   | `renderer/components/AutoRun/AutoRun.tsx`                         | (decomposed from AutoRun.tsx, was 2287)                                          |
+| 844   | `renderer/hooks/groupChat/useGroupChatHandlers.ts`                | **NEW**                                                                          |
+| 843   | `renderer/components/NewInstanceModal/NewInstanceModal.tsx`       | (decomposed from NewInstanceModal.tsx, was 1845; main child still just over 800) |
+| 840   | `renderer/components/RightPanel.tsx`                              | +9                                                                               |
+| 839   | `main/utils/remote-fs.ts`                                         | unchanged                                                                        |
+| 832   | `main/stats/stats-db.ts`                                          | unchanged                                                                        |
+| 827   | `renderer/components/Settings/SshRemoteModal.tsx`                 | unchanged                                                                        |
+| 826   | `renderer/hooks/agent/useMergeSession.ts`                         | unchanged                                                                        |
+| 814   | `web/hooks/useMobileSessionManagement.ts`                         | **NEW**                                                                          |
+| 808   | `renderer/components/DocumentGraph/layoutAlgorithms.ts`           | unchanged                                                                        |
 
 **Total: 98 source files exceed 800-line limit (was 82).**
 
