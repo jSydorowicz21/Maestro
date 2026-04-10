@@ -36,6 +36,25 @@ import type { AgentSpawnResult } from '../agent/useAgentExecution';
 import * as Sentry from '@sentry/electron/renderer';
 
 /**
+ * Resolve the effective group name for a session, falling back to the parent's group
+ * for worktree children whose groupId may not be in sync.
+ */
+function resolveGroupName(
+	sessionId: string,
+	sessions: { id: string; groupId?: string; parentSessionId?: string }[],
+	groups: { id: string; name: string }[]
+): string {
+	const session = sessions.find((s) => s.id === sessionId);
+	const effectiveGroupId =
+		session?.groupId ||
+		(session?.parentSessionId
+			? sessions.find((s) => s.id === session.parentSessionId)?.groupId
+			: undefined);
+	const group = effectiveGroupId ? groups.find((g) => g.id === effectiveGroupId) : null;
+	return group?.name || 'Ungrouped';
+}
+
+/**
  * Find the session that is actually paused on error.
  * Prefer the active session when it is paused; otherwise pick the first errorPaused session.
  * Returns undefined when nothing is error-paused — callers bail via the existing guard.
@@ -213,12 +232,8 @@ export function useBatchHandlers(deps: UseBatchHandlersDeps): UseBatchHandlersRe
 			} = settingsState;
 			const isLbRegistered = selectIsLeaderboardRegistered(settingsState);
 
-			// Find group name for the session
 			const session = currentSessions.find((s) => s.id === info.sessionId);
-			const sessionGroup = session?.groupId
-				? currentGroups.find((g) => g.id === session.groupId)
-				: null;
-			const groupName = sessionGroup?.name || 'Ungrouped';
+			const groupName = resolveGroupName(info.sessionId, currentSessions, currentGroups);
 
 			// Determine toast type and message based on completion status
 			const toastType = info.wasStopped
@@ -508,11 +523,7 @@ export function useBatchHandlers(deps: UseBatchHandlersDeps): UseBatchHandlersRe
 			const currentSessions = useSessionStore.getState().sessions;
 			const currentGroups = useSessionStore.getState().groups;
 
-			const session = currentSessions.find((s) => s.id === info.sessionId);
-			const sessionGroup = session?.groupId
-				? currentGroups.find((g) => g.id === session.groupId)
-				: null;
-			const groupName = sessionGroup?.name || 'Ungrouped';
+			const groupName = resolveGroupName(info.sessionId, currentSessions, currentGroups);
 
 			if (info.success) {
 				notifyToast({
@@ -727,7 +738,7 @@ export function useBatchHandlers(deps: UseBatchHandlersDeps): UseBatchHandlersRe
 		if (!window.maestro?.app?.onQuitConfirmationRequest) {
 			return;
 		}
-		const unsubscribe = window.maestro.app.onQuitConfirmationRequest(() => {
+		const unsubscribe = window.maestro.app.onQuitConfirmationRequest(async () => {
 			// Get all busy AI sessions (agents that are actively thinking)
 			const currentSessions = useSessionStore.getState().sessions;
 			const busyAgents = currentSessions.filter(
@@ -740,10 +751,28 @@ export function useBatchHandlers(deps: UseBatchHandlersDeps): UseBatchHandlersRe
 				return batchState?.isRunning;
 			});
 
-			if (busyAgents.length === 0 && !hasActiveAutoRuns) {
+			// Check for terminal processes with active child tasks (e.g., long-running builds, tests)
+			let activeTerminalTasks: string[] = [];
+			try {
+				const activeProcesses = await window.maestro.process.getActiveProcesses();
+				activeTerminalTasks = activeProcesses
+					.filter((p) => p.isTerminal && p.childProcesses && p.childProcesses.length > 0)
+					.flatMap((p) => {
+						const session = currentSessions.find((s) => p.sessionId.startsWith(s.id));
+						const agentName = session?.name ?? 'Terminal';
+						return p.childProcesses!.map((child) => {
+							const cmdBasename = child.command.split('/').pop() || child.command;
+							return `${agentName}: ${cmdBasename}`;
+						});
+					});
+			} catch {
+				// If we can't fetch processes, proceed without terminal task info
+			}
+
+			if (busyAgents.length === 0 && !hasActiveAutoRuns && activeTerminalTasks.length === 0) {
 				window.maestro.app.confirmQuit();
 			} else {
-				getModalActions().setQuitConfirmModalOpen(true);
+				getModalActions().setQuitConfirmModalOpen(true, { activeTerminalTasks });
 			}
 		});
 

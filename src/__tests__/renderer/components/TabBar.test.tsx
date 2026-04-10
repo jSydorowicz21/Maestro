@@ -37,6 +37,11 @@ vi.mock('lucide-react', () => ({
 			🔔
 		</span>
 	),
+	Globe: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
+		<span data-testid="globe-icon" className={className} style={style}>
+			🌐
+		</span>
+	),
 	Pencil: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
 		<span data-testid="pencil-icon" className={className} style={style}>
 			✏
@@ -77,6 +82,11 @@ vi.mock('lucide-react', () => ({
 			⬆
 		</span>
 	),
+	Terminal: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
+		<span data-testid="terminal-icon" className={className} style={style}>
+			⌨
+		</span>
+	),
 	ChevronsLeft: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
 		<span data-testid="chevrons-left-icon" className={className} style={style}>
 			«
@@ -110,6 +120,11 @@ vi.mock('lucide-react', () => ({
 	Mail: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
 		<span data-testid="mail-icon" className={className} style={style}>
 			✉
+		</span>
+	),
+	Clock: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
+		<span data-testid="clock-icon" className={className} style={style}>
+			🕐
 		</span>
 	),
 }));
@@ -170,6 +185,9 @@ describe('TabBar', () => {
 	const mockOnTabMarkUnread = vi.fn();
 	const mockOnToggleUnreadFilter = vi.fn();
 	const mockOnOpenTabSearch = vi.fn();
+	const mockOnBrowserTabSelect = vi.fn();
+	const mockOnBrowserTabClose = vi.fn();
+	const mockOnNewBrowserTab = vi.fn();
 
 	// Mock timers for hover delays
 	beforeEach(() => {
@@ -240,7 +258,155 @@ describe('TabBar', () => {
 			expect(screen.getByTitle(/Filter unread tabs/)).toBeInTheDocument();
 		});
 
-		it('renders tab search button when onOpenTabSearch provided', () => {
+		it('renders browser tab entries in unified mode and wires select/close handlers', () => {
+			render(
+				<TabBar
+					tabs={[createTab({ id: 'tab-1', name: 'Chat' })]}
+					activeTabId="tab-1"
+					theme={mockTheme}
+					onTabSelect={mockOnTabSelect}
+					onTabClose={mockOnTabClose}
+					onNewTab={mockOnNewTab}
+					unifiedTabs={[
+						{ type: 'ai', id: 'tab-1', data: createTab({ id: 'tab-1', name: 'Chat' }) },
+						{
+							type: 'browser',
+							id: 'browser-1',
+							data: {
+								id: 'browser-1',
+								url: 'https://example.com',
+								title: 'Example',
+								createdAt: 1,
+								canGoBack: false,
+								canGoForward: false,
+								isLoading: false,
+							} as any,
+						},
+					]}
+					activeBrowserTabId="browser-1"
+					onBrowserTabSelect={mockOnBrowserTabSelect}
+					onBrowserTabClose={mockOnBrowserTabClose}
+				/>
+			);
+
+			fireEvent.click(screen.getByText('Example'));
+			expect(mockOnBrowserTabSelect).toHaveBeenCalledWith('browser-1');
+
+			fireEvent.click(screen.getByTitle('Close tab'));
+			expect(mockOnBrowserTabClose).toHaveBeenCalledWith('browser-1');
+		});
+
+		it('renders browser tabs with keyboard affordances and favicon fallback content', () => {
+			render(
+				<TabBar
+					tabs={[createTab({ id: 'tab-1', name: 'Chat' })]}
+					activeTabId="tab-1"
+					theme={mockTheme}
+					onTabSelect={mockOnTabSelect}
+					onTabClose={mockOnTabClose}
+					onNewTab={mockOnNewTab}
+					unifiedTabs={[
+						{
+							type: 'browser',
+							id: 'browser-1',
+							data: {
+								id: 'browser-1',
+								url: 'https://example.com/path',
+								title: 'Example',
+								createdAt: 1,
+								canGoBack: false,
+								canGoForward: false,
+								isLoading: false,
+								favicon: 'https://example.com/favicon.ico',
+							} as any,
+						},
+					]}
+					activeBrowserTabId="browser-1"
+					onBrowserTabSelect={mockOnBrowserTabSelect}
+					onBrowserTabClose={mockOnBrowserTabClose}
+				/>
+			);
+
+			const browserTab = screen.getByText('Example').closest('[data-tab-id]')!;
+			expect(browserTab).toHaveAttribute('role', 'tab');
+			expect(browserTab).toHaveAttribute('aria-selected', 'true');
+			expect(browserTab.querySelector('img')).toHaveAttribute(
+				'src',
+				'https://example.com/favicon.ico'
+			);
+
+			fireEvent.keyDown(browserTab, { key: 'Enter' });
+			expect(mockOnBrowserTabSelect).toHaveBeenCalledWith('browser-1');
+		});
+
+		it('shows browser tab hover actions for unified reorder', async () => {
+			render(
+				<TabBar
+					tabs={[createTab({ id: 'tab-1', name: 'Chat' })]}
+					activeTabId="tab-1"
+					theme={mockTheme}
+					onTabSelect={mockOnTabSelect}
+					onTabClose={mockOnTabClose}
+					onNewTab={mockOnNewTab}
+					onUnifiedTabReorder={mockOnTabReorder}
+					onCloseOtherTabs={vi.fn()}
+					onCloseTabsLeft={vi.fn()}
+					onCloseTabsRight={vi.fn()}
+					unifiedTabs={[
+						{ type: 'ai', id: 'tab-1', data: createTab({ id: 'tab-1', name: 'Chat' }) },
+						{
+							type: 'browser',
+							id: 'browser-1',
+							data: {
+								id: 'browser-1',
+								url: 'https://example.com',
+								title: 'Example',
+								createdAt: 1,
+								canGoBack: false,
+								canGoForward: false,
+								isLoading: false,
+							} as any,
+						},
+					]}
+					activeBrowserTabId="browser-1"
+					onBrowserTabSelect={mockOnBrowserTabSelect}
+					onBrowserTabClose={mockOnBrowserTabClose}
+				/>
+			);
+
+			const browserTab = screen.getByText('Example').closest('[data-tab-id]')!;
+
+			await act(async () => {
+				fireEvent.mouseEnter(browserTab);
+				vi.advanceTimersByTime(450);
+			});
+
+			fireEvent.click(screen.getByText('Move to First Position'));
+			expect(mockOnTabReorder).toHaveBeenCalledWith(1, 0);
+		});
+
+		it('shows a browser entry in the new-tab popover', async () => {
+			render(
+				<TabBar
+					tabs={[createTab()]}
+					activeTabId="tab-1"
+					theme={mockTheme}
+					onTabSelect={mockOnTabSelect}
+					onTabClose={mockOnTabClose}
+					onNewTab={mockOnNewTab}
+					onNewBrowserTab={mockOnNewBrowserTab}
+					onNewTerminalTab={vi.fn()}
+				/>
+			);
+
+			fireEvent.click(screen.getByTitle('New tab…'));
+			expect(screen.getByText('New Browser Tab')).toBeInTheDocument();
+
+			fireEvent.click(screen.getByText('New Browser Tab'));
+			expect(mockOnNewBrowserTab).toHaveBeenCalled();
+		});
+
+		it('renders search popover button when onOpenTabSearch provided', () => {
 			render(
 				<TabBar
 					tabs={[createTab()]}
@@ -253,12 +419,10 @@ describe('TabBar', () => {
 				/>
 			);
 
-			expect(
-				screen.getByTitle(`Search tabs (${formatShortcutKeys(['Alt', 'Meta', 't'])})`)
-			).toBeInTheDocument();
+			expect(screen.getByTitle('Search…')).toBeInTheDocument();
 		});
 
-		it('does not render tab search button when onOpenTabSearch not provided', () => {
+		it('does not render search popover button when onOpenTabSearch not provided', () => {
 			render(
 				<TabBar
 					tabs={[createTab()]}
@@ -270,9 +434,7 @@ describe('TabBar', () => {
 				/>
 			);
 
-			expect(
-				screen.queryByTitle(`Search tabs (${formatShortcutKeys(['Alt', 'Meta', 't'])})`)
-			).not.toBeInTheDocument();
+			expect(screen.queryByTitle('Search…')).not.toBeInTheDocument();
 		});
 	});
 
@@ -317,7 +479,7 @@ describe('TabBar', () => {
 			expect(screen.getByText('ABCD1234')).toBeInTheDocument();
 		});
 
-		it('displays "New Session" when no name and no agentSessionId', () => {
+		it('displays tab UUID marker when no name and no agentSessionId', () => {
 			const tabs = [
 				createTab({
 					id: 'tab-1',
@@ -337,6 +499,7 @@ describe('TabBar', () => {
 				/>
 			);
 
+			// No name or agentSessionId yet — shows "New Session"
 			expect(screen.getByText('New Session')).toBeInTheDocument();
 		});
 	});
@@ -772,7 +935,7 @@ describe('TabBar', () => {
 				/>
 			);
 
-			expect(screen.getByText('No unread tabs')).toBeInTheDocument();
+			expect(screen.getByText('No unread or draft tabs')).toBeInTheDocument();
 		});
 
 		it('includes tabs with drafts in filtered view', () => {
@@ -836,7 +999,7 @@ describe('TabBar', () => {
 	});
 
 	describe('tab search', () => {
-		it('calls onOpenTabSearch when search button clicked', () => {
+		it('opens search popover and calls onOpenTabSearch when Search Tabs clicked', () => {
 			render(
 				<TabBar
 					tabs={[createTab()]}
@@ -849,10 +1012,33 @@ describe('TabBar', () => {
 				/>
 			);
 
-			fireEvent.click(
-				screen.getByTitle(`Search tabs (${formatShortcutKeys(['Alt', 'Meta', 't'])})`)
-			);
+			// Click the search button to open the popover
+			fireEvent.click(screen.getByTitle('Search…'));
+			// Click "Search Tabs" in the popover
+			fireEvent.click(screen.getByText('Search Tabs'));
 			expect(mockOnOpenTabSearch).toHaveBeenCalled();
+		});
+
+		it('opens search popover and calls onOpenOutputSearch when Search Message History clicked', () => {
+			const mockOnOpenOutputSearch = vi.fn();
+			render(
+				<TabBar
+					tabs={[createTab()]}
+					activeTabId="tab-1"
+					theme={mockTheme}
+					onTabSelect={mockOnTabSelect}
+					onTabClose={mockOnTabClose}
+					onNewTab={mockOnNewTab}
+					onOpenTabSearch={mockOnOpenTabSearch}
+					onOpenOutputSearch={mockOnOpenOutputSearch}
+				/>
+			);
+
+			// Click the search button to open the popover
+			fireEvent.click(screen.getByTitle('Search…'));
+			// Click "Search Message History" in the popover
+			fireEvent.click(screen.getByText('Search Message History'));
+			expect(mockOnOpenOutputSearch).toHaveBeenCalled();
 		});
 	});
 
@@ -4289,6 +4475,126 @@ describe('Unified tabs drag and drop', () => {
 		// Should call the AI tab close handler, not file tab close handler
 		expect(mockOnAiTabClose).toHaveBeenCalledWith('ai-tab-1');
 		expect(mockOnFileTabClose).not.toHaveBeenCalled();
+	});
+
+	it('calls onUnifiedTabReorder when Move to First is clicked on terminal tab', async () => {
+		const terminalTab1 = {
+			id: 'term-1',
+			name: null,
+			shellType: 'zsh',
+			pid: 100,
+			cwd: '/test',
+			createdAt: Date.now(),
+			state: 'idle' as const,
+		};
+		const terminalTab2 = {
+			id: 'term-2',
+			name: null,
+			shellType: 'zsh',
+			pid: 200,
+			cwd: '/test',
+			createdAt: Date.now() + 1,
+			state: 'idle' as const,
+		};
+
+		const unifiedTabsWithTerminal = [
+			{ type: 'ai' as const, id: 'ai-tab-1', data: aiTab1 },
+			{ type: 'terminal' as const, id: 'term-1', data: terminalTab1 },
+			{ type: 'terminal' as const, id: 'term-2', data: terminalTab2 },
+		];
+
+		render(
+			<TabBar
+				tabs={aiTabs}
+				activeTabId="ai-tab-1"
+				theme={mockTheme}
+				onTabSelect={vi.fn()}
+				onTabClose={vi.fn()}
+				onNewTab={vi.fn()}
+				onUnifiedTabReorder={mockOnUnifiedTabReorder}
+				unifiedTabs={unifiedTabsWithTerminal}
+				activeFileTabId={null}
+				onFileTabSelect={mockOnFileTabSelect}
+				onFileTabClose={mockOnFileTabClose}
+				onTerminalTabSelect={vi.fn()}
+				onTerminalTabClose={vi.fn()}
+			/>
+		);
+
+		// Hover over term-2 (index 2 — last tab, so Move to First should show)
+		const termTabElement = screen.getByText('Terminal 2').closest('[data-tab-id]')!;
+
+		await act(async () => {
+			fireEvent.mouseEnter(termTabElement);
+			vi.advanceTimersByTime(450);
+		});
+
+		// Click Move to First
+		const moveButton = screen.getByText('Move to First Position');
+		fireEvent.click(moveButton);
+
+		// Should call onUnifiedTabReorder with index 2 -> 0
+		expect(mockOnUnifiedTabReorder).toHaveBeenCalledWith(2, 0);
+	});
+
+	it('calls onUnifiedTabReorder when Move to Last is clicked on terminal tab', async () => {
+		const terminalTab1 = {
+			id: 'term-1',
+			name: null,
+			shellType: 'zsh',
+			pid: 100,
+			cwd: '/test',
+			createdAt: Date.now(),
+			state: 'idle' as const,
+		};
+		const terminalTab2 = {
+			id: 'term-2',
+			name: null,
+			shellType: 'zsh',
+			pid: 200,
+			cwd: '/test',
+			createdAt: Date.now() + 1,
+			state: 'idle' as const,
+		};
+
+		const unifiedTabsWithTerminal = [
+			{ type: 'ai' as const, id: 'ai-tab-1', data: aiTab1 },
+			{ type: 'terminal' as const, id: 'term-1', data: terminalTab1 },
+			{ type: 'terminal' as const, id: 'term-2', data: terminalTab2 },
+		];
+
+		render(
+			<TabBar
+				tabs={aiTabs}
+				activeTabId="ai-tab-1"
+				theme={mockTheme}
+				onTabSelect={vi.fn()}
+				onTabClose={vi.fn()}
+				onNewTab={vi.fn()}
+				onUnifiedTabReorder={mockOnUnifiedTabReorder}
+				unifiedTabs={unifiedTabsWithTerminal}
+				activeFileTabId={null}
+				onFileTabSelect={mockOnFileTabSelect}
+				onFileTabClose={mockOnFileTabClose}
+				onTerminalTabSelect={vi.fn()}
+				onTerminalTabClose={vi.fn()}
+			/>
+		);
+
+		// Hover over term-1 (index 1 — middle tab, so both should show)
+		const termTabElement = screen.getByText('Terminal 1').closest('[data-tab-id]')!;
+
+		await act(async () => {
+			fireEvent.mouseEnter(termTabElement);
+			vi.advanceTimersByTime(450);
+		});
+
+		// Click Move to Last
+		const moveButton = screen.getByText('Move to Last Position');
+		fireEvent.click(moveButton);
+
+		// Should call onUnifiedTabReorder with index 1 -> 2 (last index)
+		expect(mockOnUnifiedTabReorder).toHaveBeenCalledWith(1, 2);
 	});
 });
 

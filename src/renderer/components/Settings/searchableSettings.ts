@@ -78,7 +78,7 @@ export const GENERAL_SETTINGS: SearchableSetting[] = [
 		tab: 'general',
 		tabLabel: 'General',
 		label: 'Input Send Behavior',
-		description: 'Configure how to send messages — Enter or Cmd+Enter for AI and terminal modes',
+		description: 'Configure how to send messages — Enter or Cmd+Enter',
 		keywords: ['enter', 'send', 'input', 'submit', 'keyboard', 'newline'],
 	},
 	{
@@ -105,14 +105,6 @@ export const GENERAL_SETTINGS: SearchableSetting[] = [
 		label: 'Automatic Tab Naming',
 		description: 'Automatically name tabs based on first message',
 		keywords: ['tab', 'name', 'auto', 'rename', 'title'],
-	},
-	{
-		id: 'general-auto-scroll',
-		tab: 'general',
-		tabLabel: 'General',
-		label: 'Auto-scroll AI Output',
-		description: 'Automatically scroll to the bottom when new AI output arrives',
-		keywords: ['scroll', 'auto scroll', 'output', 'follow'],
 	},
 	{
 		id: 'general-power',

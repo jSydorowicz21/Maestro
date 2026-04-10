@@ -92,10 +92,8 @@ const mockSetShellArgs = vi.fn();
 const mockSetShellEnvVars = vi.fn();
 const mockSetGhPath = vi.fn();
 const mockSetEnterToSendAI = vi.fn();
-const mockSetEnterToSendTerminal = vi.fn();
 const mockSetDefaultSaveToHistory = vi.fn();
 const mockSetDefaultShowThinking = vi.fn();
-const mockSetAutoScrollAiMode = vi.fn();
 const mockSetUserMessageAlignment = vi.fn();
 const mockSetOsNotificationsEnabled = vi.fn();
 const mockSetAudioFeedbackEnabled = vi.fn();
@@ -174,14 +172,10 @@ vi.mock('../../../renderer/hooks/settings/useSettings', () => ({
 		// Input settings
 		enterToSendAI: true,
 		setEnterToSendAI: mockSetEnterToSendAI,
-		enterToSendTerminal: true,
-		setEnterToSendTerminal: mockSetEnterToSendTerminal,
 		defaultSaveToHistory: true,
 		setDefaultSaveToHistory: mockSetDefaultSaveToHistory,
 		defaultShowThinking: 'off',
 		setDefaultShowThinking: mockSetDefaultShowThinking,
-		autoScrollAiMode: true,
-		setAutoScrollAiMode: mockSetAutoScrollAiMode,
 		userMessageAlignment: 'left',
 		setUserMessageAlignment: mockSetUserMessageAlignment,
 		// Notification settings
@@ -895,27 +889,6 @@ describe('SettingsModal', () => {
 			fireEvent.click(toggleButton!);
 
 			expect(mockSetEnterToSendAI).toHaveBeenCalledWith(false);
-		});
-
-		it('should call setEnterToSendTerminal when toggled', async () => {
-			const setEnterToSendTerminal = vi.fn();
-			render(
-				<SettingsModal
-					{...createDefaultProps({ setEnterToSendTerminal, enterToSendTerminal: true })}
-				/>
-			);
-
-			await act(async () => {
-				await vi.advanceTimersByTimeAsync(100);
-			});
-
-			// Find the Terminal Mode section and click its toggle button
-			const terminalModeLabel = screen.getByText('Terminal Mode');
-			const terminalModeSection = terminalModeLabel.closest('.p-3');
-			const toggleButton = terminalModeSection?.querySelector('button');
-			fireEvent.click(toggleButton!);
-
-			expect(mockSetEnterToSendTerminal).toHaveBeenCalledWith(false);
 		});
 
 		it('should display Cmd+Enter (or Ctrl+Enter on non-Mac) when enter-to-send is false', async () => {

@@ -137,7 +137,6 @@ export const MainPanel = React.memo(
 		const contextWarningRedThreshold = useSettingsStore(
 			(s) => s.contextManagementSettings.contextWarningRedThreshold ?? 80
 		);
-		const activeFocus = useUIStore((s) => s.activeFocus);
 		const showUnreadOnly = useUIStore((s) => s.showUnreadOnly);
 
 		// isCurrentSessionAutoMode: THIS session has active batch run (for all UI indicators)
@@ -167,6 +166,7 @@ export const MainPanel = React.memo(
 			onTabMarkUnread,
 			onToggleUnreadFilter,
 			onOpenTabSearch,
+			onOpenOutputSearch,
 			onCloseAllTabs,
 			onCloseOtherTabs,
 			onCloseTabsLeft,
@@ -175,8 +175,14 @@ export const MainPanel = React.memo(
 			unifiedTabs,
 			activeFileTabId,
 			activeFileTab,
+			activeBrowserTabId,
+			activeBrowserTab,
 			onFileTabSelect,
 			onFileTabClose,
+			onNewBrowserTab,
+			onBrowserTabSelect,
+			onBrowserTabClose,
+			onBrowserTabUpdate,
 			onFileTabEditModeChange,
 			onFileTabEditContentChange,
 			// Terminal tab callbacks (Phase 8)
@@ -456,14 +462,11 @@ export const MainPanel = React.memo(
 			<>
 				<ErrorBoundary>
 					<div
-						className={`flex-1 flex flex-col relative ${activeFocus === 'main' ? 'ring-1 ring-inset' : ''}`}
-						style={
-							{
-								minWidth: '400px',
-								backgroundColor: theme.colors.bgMain,
-								'--tw-ring-color': theme.colors.accent,
-							} as React.CSSProperties
-						}
+						className="flex-1 flex flex-col relative"
+						style={{
+							minWidth: '400px',
+							backgroundColor: theme.colors.bgMain,
+						}}
 						onClick={() => useUIStore.getState().setActiveFocus('main')}
 					>
 						{/* Top Bar (hidden in mobile landscape for focused reading) */}
@@ -525,6 +528,7 @@ export const MainPanel = React.memo(
 									showUnreadOnly={showUnreadOnly}
 									onToggleUnreadFilter={onToggleUnreadFilter}
 									onOpenTabSearch={onOpenTabSearch}
+									onOpenOutputSearch={onOpenOutputSearch}
 									onCloseAllTabs={onCloseAllTabs}
 									onCloseOtherTabs={onCloseOtherTabs}
 									onCloseTabsLeft={onCloseTabsLeft}
@@ -532,8 +536,12 @@ export const MainPanel = React.memo(
 									// Unified tab system props (Phase 4)
 									unifiedTabs={unifiedTabs}
 									activeFileTabId={activeFileTabId}
+									activeBrowserTabId={activeBrowserTabId}
 									onFileTabSelect={onFileTabSelect}
 									onFileTabClose={onFileTabClose}
+									onNewBrowserTab={onNewBrowserTab}
+									onBrowserTabSelect={onBrowserTabSelect}
+									onBrowserTabClose={onBrowserTabClose}
 									// Terminal tab props (Phase 8)
 									onNewTerminalTab={onNewTerminalTab}
 									activeTerminalTabId={activeSession.activeTerminalTabId}
@@ -566,6 +574,8 @@ export const MainPanel = React.memo(
 							filePreviewLoading={filePreviewLoading}
 							activeFileTabId={activeFileTabId}
 							activeFileTab={activeFileTab}
+							activeBrowserTabId={activeBrowserTabId}
+							activeBrowserTab={activeBrowserTab}
 							memoizedFilePreviewFile={memoizedFilePreviewFile}
 							filePreviewCwd={filePreviewCwd}
 							filePreviewSshRemoteId={filePreviewSshRemoteId}
@@ -578,6 +588,7 @@ export const MainPanel = React.memo(
 							handleFilePreviewScrollPositionChange={handleFilePreviewScrollPositionChange}
 							handleFilePreviewSearchQueryChange={handleFilePreviewSearchQueryChange}
 							handleFilePreviewReload={handleFilePreviewReload}
+							handleBrowserTabUpdate={onBrowserTabUpdate}
 							terminalViewRefs={terminalViewRefs}
 							mountedTerminalSessionIds={mountedTerminalSessionIds}
 							mountedTerminalSessionsRef={mountedTerminalSessionsRef}

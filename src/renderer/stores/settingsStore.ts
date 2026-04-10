@@ -196,7 +196,6 @@ export interface SettingsStoreState {
 	customThemeColors: ThemeColors;
 	customThemeBaseId: ThemeId;
 	enterToSendAI: boolean;
-	enterToSendTerminal: boolean;
 	forcedParallelExecution: boolean;
 	forcedParallelAcknowledged: boolean;
 	defaultSaveToHistory: boolean;
@@ -254,7 +253,6 @@ export interface SettingsStoreState {
 	automaticTabNamingEnabled: boolean;
 	fileTabAutoRefreshEnabled: boolean;
 	suppressWindowsWarning: boolean;
-	autoScrollAiMode: boolean;
 	userMessageAlignment: 'left' | 'right';
 	encoreFeatures: EncoreFeatureFlags;
 	symphonyRegistryUrls: string[];
@@ -284,7 +282,6 @@ export interface SettingsStoreActions {
 	setCustomThemeColors: (value: ThemeColors) => void;
 	setCustomThemeBaseId: (value: ThemeId) => void;
 	setEnterToSendAI: (value: boolean) => void;
-	setEnterToSendTerminal: (value: boolean) => void;
 	setForcedParallelExecution: (value: boolean) => void;
 	setForcedParallelAcknowledged: (value: boolean) => void;
 	setDefaultSaveToHistory: (value: boolean) => void;
@@ -333,7 +330,6 @@ export interface SettingsStoreActions {
 	setAutomaticTabNamingEnabled: (value: boolean) => void;
 	setFileTabAutoRefreshEnabled: (value: boolean) => void;
 	setSuppressWindowsWarning: (value: boolean) => void;
-	setAutoScrollAiMode: (value: boolean) => void;
 	setUserMessageAlignment: (value: 'left' | 'right') => void;
 	setEncoreFeatures: (value: EncoreFeatureFlags) => void;
 	setSymphonyRegistryUrls: (value: string[]) => void;
@@ -434,7 +430,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		customThemeColors: DEFAULT_CUSTOM_THEME_COLORS,
 		customThemeBaseId: 'dracula',
 		enterToSendAI: false,
-		enterToSendTerminal: true,
 		forcedParallelExecution: false,
 		forcedParallelAcknowledged: false,
 		defaultSaveToHistory: true,
@@ -492,7 +487,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		automaticTabNamingEnabled: true,
 		fileTabAutoRefreshEnabled: false,
 		suppressWindowsWarning: false,
-		autoScrollAiMode: false,
 		userMessageAlignment: 'right',
 		encoreFeatures: DEFAULT_ENCORE_FEATURES,
 		symphonyRegistryUrls: [],
@@ -582,11 +576,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		setEnterToSendAI: (value) => {
 			set({ enterToSendAI: value });
 			window.maestro.settings.set('enterToSendAI', value);
-		},
-
-		setEnterToSendTerminal: (value) => {
-			set({ enterToSendTerminal: value });
-			window.maestro.settings.set('enterToSendTerminal', value);
 		},
 
 		setForcedParallelExecution: (value) => {
@@ -893,11 +882,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		setSuppressWindowsWarning: (value) => {
 			set({ suppressWindowsWarning: value });
 			window.maestro.settings.set('suppressWindowsWarning', value);
-		},
-
-		setAutoScrollAiMode: (value) => {
-			set({ autoScrollAiMode: value });
-			window.maestro.settings.set('autoScrollAiMode', value);
 		},
 
 		setUserMessageAlignment: (value) => {
@@ -1505,9 +1489,6 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['enterToSendAI'] !== undefined)
 			patch.enterToSendAI = allSettings['enterToSendAI'] as boolean;
 
-		if (allSettings['enterToSendTerminal'] !== undefined)
-			patch.enterToSendTerminal = allSettings['enterToSendTerminal'] as boolean;
-
 		if (allSettings['forcedParallelExecution'] !== undefined)
 			patch.forcedParallelExecution = allSettings['forcedParallelExecution'] as boolean;
 		if (allSettings['forcedParallelAcknowledged'] !== undefined)
@@ -1843,9 +1824,6 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['suppressWindowsWarning'] !== undefined)
 			patch.suppressWindowsWarning = allSettings['suppressWindowsWarning'] as boolean;
 
-		if (allSettings['autoScrollAiMode'] !== undefined)
-			patch.autoScrollAiMode = allSettings['autoScrollAiMode'] as boolean;
-
 		if (allSettings['userMessageAlignment'] !== undefined)
 			patch.userMessageAlignment = allSettings['userMessageAlignment'] as 'left' | 'right';
 
@@ -1926,7 +1904,6 @@ export function getSettingsActions() {
 		setCustomThemeColors: state.setCustomThemeColors,
 		setCustomThemeBaseId: state.setCustomThemeBaseId,
 		setEnterToSendAI: state.setEnterToSendAI,
-		setEnterToSendTerminal: state.setEnterToSendTerminal,
 		setForcedParallelExecution: state.setForcedParallelExecution,
 		setForcedParallelAcknowledged: state.setForcedParallelAcknowledged,
 		setDefaultSaveToHistory: state.setDefaultSaveToHistory,
@@ -2002,7 +1979,6 @@ export function getSettingsActions() {
 		setAutomaticTabNamingEnabled: state.setAutomaticTabNamingEnabled,
 		setFileTabAutoRefreshEnabled: state.setFileTabAutoRefreshEnabled,
 		setSuppressWindowsWarning: state.setSuppressWindowsWarning,
-		setAutoScrollAiMode: state.setAutoScrollAiMode,
 		setEncoreFeatures: state.setEncoreFeatures,
 		setSymphonyRegistryUrls: state.setSymphonyRegistryUrls,
 		setDirectorNotesSettings: state.setDirectorNotesSettings,

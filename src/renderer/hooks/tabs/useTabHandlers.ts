@@ -2,6 +2,7 @@ import { useMemo, useCallback } from 'react';
 import type {
 	Session,
 	AITab,
+	BrowserTab,
 	FilePreviewTab,
 	UnifiedTab,
 	UnifiedTabRef,
@@ -12,6 +13,7 @@ import {
 	setActiveTab,
 	createTab,
 	closeTab,
+	closeBrowserTab as closeBrowserTabHelper,
 	closeFileTab as closeFileTabHelper,
 	addAiTabToUnifiedHistory,
 	getActiveTab,
@@ -21,6 +23,14 @@ import {
 	buildUnifiedTabs,
 	ensureInUnifiedTabOrder,
 } from '../../utils/tabHelpers';
+import { closeTerminalTab as closeTerminalTabHelper } from '../../utils/terminalTabHelpers';
+import {
+	DEFAULT_BROWSER_TAB_TITLE,
+	DEFAULT_BROWSER_TAB_URL,
+	getBrowserTabPartition,
+	getBrowserTabTitle,
+	normalizeBrowserTabUrl,
+} from '../../utils/browserTabPersistence';
 import { generateId } from '../../utils/ids';
 import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
 import { useModalStore } from '../../stores/modalStore';
@@ -28,11 +38,32 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useTabStore } from '../../stores/tabStore';
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+/** Resolve the active tab's unified ref, accounting for terminal, file, and AI tabs. */
+function getActiveUnifiedRef(s: Session): { type: UnifiedTabRef['type']; id: string } | null {
+	if (s.inputMode === 'terminal' && s.activeTerminalTabId) {
+		return { type: 'terminal', id: s.activeTerminalTabId };
+	}
+	if (s.activeFileTabId) {
+		return { type: 'file', id: s.activeFileTabId };
+	}
+	if (s.activeBrowserTabId) {
+		return { type: 'browser', id: s.activeBrowserTabId };
+	}
+	if (s.activeTabId) {
+		return { type: 'ai', id: s.activeTabId };
+	}
+	return null;
+}
+
+// ============================================================================
 // Types
 // ============================================================================
 
 export interface CloseCurrentTabResult {
-	type: 'file' | 'ai' | 'terminal' | 'prevented' | 'none';
+	type: 'file' | 'browser' | 'ai' | 'terminal' | 'prevented' | 'none';
 	tabId?: string;
 	isWizardTab?: boolean;
 	hasDraft?: boolean;
@@ -51,6 +82,7 @@ export interface TabHandlersReturn {
 	activeTab: AITab | undefined;
 	unifiedTabs: UnifiedTab[];
 	activeFileTab: FilePreviewTab | null;
+	activeBrowserTab: BrowserTab | null;
 	isResumingSession: boolean;
 	fileTabBackHistory: FilePreviewHistoryEntry[];
 	fileTabForwardHistory: FilePreviewHistoryEntry[];
@@ -104,6 +136,12 @@ export interface TabHandlersReturn {
 	handleFileTabNavigateForward: () => Promise<void>;
 	handleFileTabNavigateToIndex: (index: number) => Promise<void>;
 	handleClearFilePreviewHistory: () => void;
+
+	// Browser Tab handlers
+	handleNewBrowserTab: () => void;
+	handleSelectBrowserTab: (tabId: string) => void;
+	handleCloseBrowserTab: (tabId: string) => void;
+	handleUpdateBrowserTab: (sessionId: string, tabId: string, updates: Partial<BrowserTab>) => void;
 
 	// Scroll/log handlers
 	handleScrollPositionChange: (scrollTop: number) => void;
@@ -172,6 +210,13 @@ export function useTabHandlers(): TabHandlersReturn {
 			activeSession.filePreviewTabs.find((tab) => tab.id === activeSession.activeFileTabId) ?? null
 		);
 	}, [activeSession?.activeFileTabId, activeSession?.filePreviewTabs]);
+
+	const activeBrowserTab = useMemo((): BrowserTab | null => {
+		if (!activeSession?.activeBrowserTabId) return null;
+		return (
+			activeSession.browserTabs?.find((tab) => tab.id === activeSession.activeBrowserTabId) ?? null
+		);
+	}, [activeSession?.activeBrowserTabId, activeSession?.browserTabs]);
 
 	const isResumingSession = !!activeTab?.agentSessionId;
 
@@ -580,7 +625,13 @@ export function useTabHandlers(): TabHandlersReturn {
 		setSessions((prev: Session[]) =>
 			prev.map((s) => {
 				if (s.id !== activeSessionId) return s;
-				return { ...s, activeFileTabId: tabId, activeTerminalTabId: null, inputMode: 'ai' };
+				return {
+					...s,
+					activeFileTabId: tabId,
+					activeBrowserTabId: null,
+					activeTerminalTabId: null,
+					inputMode: 'ai',
+				};
 			})
 		);
 
@@ -613,6 +664,104 @@ export function useTabHandlers(): TabHandlersReturn {
 			}
 		}
 	}, []);
+
+	const handleNewBrowserTab = useCallback(() => {
+		const { setSessions, activeSessionId } = useSessionStore.getState();
+		setSessions((prev: Session[]) =>
+			prev.map((s) => {
+				if (s.id !== activeSessionId) return s;
+
+				const url = DEFAULT_BROWSER_TAB_URL;
+				const newBrowserTab: BrowserTab = {
+					id: generateId(),
+					url,
+					title: DEFAULT_BROWSER_TAB_TITLE,
+					createdAt: Date.now(),
+					partition: getBrowserTabPartition(s.id),
+					canGoBack: false,
+					canGoForward: false,
+					isLoading: false,
+					favicon: null,
+				};
+
+				return {
+					...s,
+					browserTabs: [...(s.browserTabs || []), newBrowserTab],
+					activeFileTabId: null,
+					activeBrowserTabId: newBrowserTab.id,
+					activeTerminalTabId: null,
+					inputMode: 'ai',
+					unifiedTabOrder: ensureInUnifiedTabOrder(
+						s.unifiedTabOrder || [],
+						'browser',
+						newBrowserTab.id
+					),
+				};
+			})
+		);
+	}, []);
+
+	const handleSelectBrowserTab = useCallback((tabId: string) => {
+		const { setSessions, activeSessionId } = useSessionStore.getState();
+		setSessions((prev: Session[]) =>
+			prev.map((s) => {
+				if (s.id !== activeSessionId) return s;
+				if (!(s.browserTabs || []).some((tab) => tab.id === tabId)) return s;
+				return {
+					...s,
+					activeFileTabId: null,
+					activeBrowserTabId: tabId,
+					activeTerminalTabId: null,
+					inputMode: 'ai',
+					unifiedTabOrder: ensureInUnifiedTabOrder(s.unifiedTabOrder || [], 'browser', tabId),
+				};
+			})
+		);
+	}, []);
+
+	const forceCloseBrowserTab = useCallback((tabId: string) => {
+		const { setSessions, activeSessionId } = useSessionStore.getState();
+		setSessions((prev: Session[]) =>
+			prev.map((s) => {
+				if (s.id !== activeSessionId) return s;
+				const result = closeBrowserTabHelper(s, tabId);
+				return result ? result.session : s;
+			})
+		);
+	}, []);
+
+	const handleCloseBrowserTab = useCallback(
+		(tabId: string) => {
+			forceCloseBrowserTab(tabId);
+		},
+		[forceCloseBrowserTab]
+	);
+
+	const handleUpdateBrowserTab = useCallback(
+		(sessionId: string, tabId: string, updates: Partial<BrowserTab>) => {
+			const { setSessions } = useSessionStore.getState();
+			setSessions((prev: Session[]) =>
+				prev.map((s) => {
+					if (s.id !== sessionId) return s;
+					return {
+						...s,
+						browserTabs: (s.browserTabs || []).map((tab) => {
+							if (tab.id !== tabId) return tab;
+							const nextUrl =
+								typeof updates.url === 'string' ? normalizeBrowserTabUrl(updates.url) : tab.url;
+							return {
+								...tab,
+								...updates,
+								url: nextUrl,
+								title: getBrowserTabTitle(nextUrl, updates.title ?? tab.title),
+							};
+						}),
+					};
+				})
+			);
+		},
+		[]
+	);
 
 	const handleUnifiedTabReorder = useCallback((fromIndex: number, toIndex: number) => {
 		const { setSessions, activeSessionId } = useSessionStore.getState();
@@ -758,11 +907,11 @@ export function useTabHandlers(): TabHandlersReturn {
 			prev.map((s) => {
 				if (s.id !== activeSessionId) return s;
 
-				const activeUnifiedId = s.activeFileTabId ?? s.activeTabId;
-				const activeUnifiedType = s.activeFileTabId ? 'file' : 'ai';
+				const activeRef = getActiveUnifiedRef(s);
+				if (!activeRef) return s;
 
 				const tabsToClose = s.unifiedTabOrder.filter(
-					(ref) => !(ref.type === activeUnifiedType && ref.id === activeUnifiedId)
+					(ref) => !(ref.type === activeRef.type && ref.id === activeRef.id)
 				);
 
 				let updatedSession = s;
@@ -777,6 +926,13 @@ export function useTabHandlers(): TabHandlersReturn {
 							if (result) {
 								updatedSession = result.session;
 							}
+						}
+					} else if (tabRef.type === 'terminal') {
+						updatedSession = closeTerminalTabHelper(updatedSession, tabRef.id);
+					} else if (tabRef.type === 'browser') {
+						const result = closeBrowserTabHelper(updatedSession, tabRef.id);
+						if (result) {
+							updatedSession = result.session;
 						}
 					} else {
 						updatedSession = {
@@ -818,11 +974,11 @@ export function useTabHandlers(): TabHandlersReturn {
 			prev.map((s) => {
 				if (s.id !== activeSessionId) return s;
 
-				const activeUnifiedId = s.activeFileTabId ?? s.activeTabId;
-				const activeUnifiedType = s.activeFileTabId ? 'file' : 'ai';
+				const activeRef = getActiveUnifiedRef(s);
+				if (!activeRef) return s;
 
 				const activeIndex = s.unifiedTabOrder.findIndex(
-					(ref) => ref.type === activeUnifiedType && ref.id === activeUnifiedId
+					(ref) => ref.type === activeRef.type && ref.id === activeRef.id
 				);
 				if (activeIndex <= 0) return s;
 
@@ -840,6 +996,13 @@ export function useTabHandlers(): TabHandlersReturn {
 							if (result) {
 								updatedSession = result.session;
 							}
+						}
+					} else if (tabRef.type === 'terminal') {
+						updatedSession = closeTerminalTabHelper(updatedSession, tabRef.id);
+					} else if (tabRef.type === 'browser') {
+						const result = closeBrowserTabHelper(updatedSession, tabRef.id);
+						if (result) {
+							updatedSession = result.session;
 						}
 					} else {
 						updatedSession = {
@@ -862,10 +1025,10 @@ export function useTabHandlers(): TabHandlersReturn {
 		const session = sessions.find((s) => s.id === activeSessionId);
 		if (!session) return;
 
-		const activeUnifiedId = session.activeFileTabId ?? session.activeTabId;
-		const activeUnifiedType = session.activeFileTabId ? 'file' : 'ai';
+		const activeRef = getActiveUnifiedRef(session);
+		if (!activeRef) return;
 		const activeIndex = session.unifiedTabOrder.findIndex(
-			(ref) => ref.type === activeUnifiedType && ref.id === activeUnifiedId
+			(ref) => ref.type === activeRef.type && ref.id === activeRef.id
 		);
 		if (activeIndex <= 0) return;
 
@@ -890,11 +1053,11 @@ export function useTabHandlers(): TabHandlersReturn {
 			prev.map((s) => {
 				if (s.id !== activeSessionId) return s;
 
-				const activeUnifiedId = s.activeFileTabId ?? s.activeTabId;
-				const activeUnifiedType = s.activeFileTabId ? 'file' : 'ai';
+				const activeRef = getActiveUnifiedRef(s);
+				if (!activeRef) return s;
 
 				const activeIndex = s.unifiedTabOrder.findIndex(
-					(ref) => ref.type === activeUnifiedType && ref.id === activeUnifiedId
+					(ref) => ref.type === activeRef.type && ref.id === activeRef.id
 				);
 				if (activeIndex < 0 || activeIndex >= s.unifiedTabOrder.length - 1) return s;
 
@@ -912,6 +1075,13 @@ export function useTabHandlers(): TabHandlersReturn {
 							if (result) {
 								updatedSession = result.session;
 							}
+						}
+					} else if (tabRef.type === 'terminal') {
+						updatedSession = closeTerminalTabHelper(updatedSession, tabRef.id);
+					} else if (tabRef.type === 'browser') {
+						const result = closeBrowserTabHelper(updatedSession, tabRef.id);
+						if (result) {
+							updatedSession = result.session;
 						}
 					} else {
 						updatedSession = {
@@ -934,10 +1104,10 @@ export function useTabHandlers(): TabHandlersReturn {
 		const session = sessions.find((s) => s.id === activeSessionId);
 		if (!session) return;
 
-		const activeUnifiedId = session.activeFileTabId ?? session.activeTabId;
-		const activeUnifiedType = session.activeFileTabId ? 'file' : 'ai';
+		const activeRef = getActiveUnifiedRef(session);
+		if (!activeRef) return;
 		const activeIndex = session.unifiedTabOrder.findIndex(
-			(ref) => ref.type === activeUnifiedType && ref.id === activeUnifiedId
+			(ref) => ref.type === activeRef.type && ref.id === activeRef.id
 		);
 		if (activeIndex < 0 || activeIndex >= session.unifiedTabOrder.length - 1) return;
 
@@ -969,6 +1139,7 @@ export function useTabHandlers(): TabHandlersReturn {
 			const totalTabs =
 				(session.aiTabs?.length || 0) +
 				(session.filePreviewTabs?.length || 0) +
+				(session.browserTabs?.length || 0) +
 				(session.terminalTabs?.length || 0);
 			if (totalTabs <= 1) {
 				return { type: 'prevented' };
@@ -988,6 +1159,18 @@ export function useTabHandlers(): TabHandlersReturn {
 				})
 			);
 			return { type: 'file', tabId };
+		}
+
+		if (session.activeBrowserTabId) {
+			const tabId = session.activeBrowserTabId;
+			setSessions((prev: Session[]) =>
+				prev.map((s) => {
+					if (s.id !== activeSessionId) return s;
+					const result = closeBrowserTabHelper(s, tabId);
+					return result ? result.session : s;
+				})
+			);
+			return { type: 'browser', tabId };
 		}
 
 		// AI tab is active
@@ -1517,6 +1700,7 @@ export function useTabHandlers(): TabHandlersReturn {
 		activeTab,
 		unifiedTabs,
 		activeFileTab,
+		activeBrowserTab,
 		isResumingSession,
 		fileTabBackHistory,
 		fileTabForwardHistory,
@@ -1560,6 +1744,12 @@ export function useTabHandlers(): TabHandlersReturn {
 		handleFileTabNavigateForward,
 		handleFileTabNavigateToIndex,
 		handleClearFilePreviewHistory,
+
+		// Browser Tab handlers
+		handleNewBrowserTab,
+		handleSelectBrowserTab,
+		handleCloseBrowserTab,
+		handleUpdateBrowserTab,
 
 		// Scroll/log handlers
 		handleScrollPositionChange,

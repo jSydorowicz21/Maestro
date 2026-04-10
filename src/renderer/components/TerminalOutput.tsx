@@ -5,13 +5,14 @@ import {
 	Trash2,
 	Copy,
 	Check,
+	ArrowDown,
 	Eye,
 	FileText,
 	RotateCcw,
 	AlertCircle,
 	Save,
 	Share2,
-	Zap,
+	Hammer,
 } from 'lucide-react';
 import type { Session, Theme, LogEntry, FocusArea, AgentError } from '../types';
 import type { FileNode } from '../types/fileTree';
@@ -981,7 +982,7 @@ const LogItemComponent = memo(
 								title="Sent via forced parallel execution (bypassed queue)"
 								className="flex items-center"
 							>
-								<Zap
+								<Hammer
 									className="w-3.5 h-3.5"
 									style={{ color: theme.colors.warning, opacity: 0.7 }}
 								/>
@@ -1062,7 +1063,6 @@ interface TerminalOutputProps {
 	onFileClick?: (path: string) => void; // Callback when a file link is clicked
 	onShowErrorDetails?: (error: AgentError) => void; // Callback to show the error modal (for error log entries)
 	onFileSaved?: () => void; // Callback when markdown content is saved to file (e.g., to refresh file list)
-	autoScrollAiMode?: boolean; // Whether to auto-scroll in AI mode (like terminal mode)
 	userMessageAlignment?: 'left' | 'right'; // User message bubble alignment (default: right)
 	ghCliAvailable?: boolean; // Whether gh CLI is available for gist publishing
 	onPublishMessageGist?: (text: string) => void; // Callback to publish a single message as a gist
@@ -1108,7 +1108,6 @@ export const TerminalOutput = memo(
 			onFileClick,
 			onShowErrorDetails,
 			onFileSaved,
-			autoScrollAiMode,
 			userMessageAlignment = 'right',
 			onOpenInTab,
 			ghCliAvailable,
@@ -1163,6 +1162,8 @@ export const TerminalOutput = memo(
 
 		// New message indicator state
 		const [isAtBottom, setIsAtBottom] = useState(true);
+		const [hasNewMessages, setHasNewMessages] = useState(false);
+		const [newMessageCount, setNewMessageCount] = useState(0);
 		const lastLogCountRef = useRef(0);
 		// Track previous isAtBottom to detect changes for callback
 		const prevIsAtBottomRef = useRef(true);
@@ -1424,13 +1425,15 @@ export const TerminalOutput = memo(
 
 			// Clear new message indicator when user scrolls to bottom
 			if (atBottom) {
+				setHasNewMessages(false);
+				setNewMessageCount(0);
 				// Resume auto-scroll when user scrolls back to bottom
 				setAutoScrollPaused(false);
 				// Save read state for current tab
 				if (activeTabId) {
 					tabReadStateRef.current.set(activeTabId, filteredLogs.length);
 				}
-			} else if (autoScrollAiMode) {
+			} else {
 				if (isProgrammaticScrollRef.current) {
 					// This scroll event was triggered by our own scrollTo() call —
 					// consume the guard flag here inside the throttled handler to avoid
@@ -1453,13 +1456,7 @@ export const TerminalOutput = memo(
 					scrollSaveTimerRef.current = null;
 				}, 200);
 			}
-		}, [
-			activeTabId,
-			filteredLogs.length,
-			onScrollPositionChange,
-			onAtBottomChange,
-			autoScrollAiMode,
-		]);
+		}, [activeTabId, filteredLogs.length, onScrollPositionChange, onAtBottomChange]);
 
 		// PERF: Throttle at 16ms (60fps) instead of 4ms to reduce state updates during scroll
 		const handleScroll = useThrottledCallback(handleScrollInner, 16);
@@ -1467,6 +1464,9 @@ export const TerminalOutput = memo(
 		// Restore read state when switching tabs
 		useEffect(() => {
 			if (!activeTabId) {
+				// Terminal mode - just reset
+				setHasNewMessages(false);
+				setNewMessageCount(0);
 				setIsAtBottom(true);
 				lastLogCountRef.current = filteredLogs.length;
 				return;
@@ -1480,13 +1480,19 @@ export const TerminalOutput = memo(
 				// Tab was visited before - check for new messages since last read
 				const unreadCount = currentCount - savedReadCount;
 				if (unreadCount > 0) {
+					setHasNewMessages(true);
+					setNewMessageCount(unreadCount);
 					setIsAtBottom(false);
 				} else {
+					setHasNewMessages(false);
+					setNewMessageCount(0);
 					setIsAtBottom(true);
 				}
 			} else {
 				// First visit to this tab - mark all as read
 				tabReadStateRef.current.set(activeTabId, currentCount);
+				setHasNewMessages(false);
+				setNewMessageCount(0);
 				setIsAtBottom(true);
 			}
 
@@ -1510,6 +1516,9 @@ export const TerminalOutput = memo(
 				}
 
 				if (!actuallyAtBottom) {
+					const newCount = currentCount - lastLogCountRef.current;
+					setHasNewMessages(true);
+					setNewMessageCount((prev) => prev + newCount);
 					// Update isAtBottom state to match reality
 					setIsAtBottom(false);
 				} else {
@@ -1522,13 +1531,6 @@ export const TerminalOutput = memo(
 			lastLogCountRef.current = currentCount;
 		}, [filteredLogs.length, isAtBottom, activeTabId]);
 
-		// Reset auto-scroll pause when user explicitly re-enables auto-scroll (button or shortcut)
-		useEffect(() => {
-			if (autoScrollAiMode) {
-				setAutoScrollPaused(false);
-			}
-		}, [autoScrollAiMode]);
-
 		// Auto-scroll to bottom when DOM content changes in the scroll container.
 		// Uses MutationObserver to detect ALL content mutations — new nodes (log entries),
 		// text changes (thinking stream growth), and attribute changes (tool status updates).
@@ -1538,8 +1540,7 @@ export const TerminalOutput = memo(
 			const container = scrollContainerRef.current;
 			if (!container) return;
 
-			const shouldAutoScroll = () =>
-				(autoScrollAiMode && !autoScrollPaused) || isAtBottomRef.current;
+			const shouldAutoScroll = () => !autoScrollPaused || isAtBottomRef.current;
 
 			const scrollToBottom = () => {
 				if (!scrollContainerRef.current) return;
@@ -1583,7 +1584,7 @@ export const TerminalOutput = memo(
 			});
 
 			return () => observer.disconnect();
-		}, [autoScrollAiMode, autoScrollPaused]);
+		}, [autoScrollPaused]);
 
 		// Restore scroll position when component mounts or initialScrollTop changes
 		// Uses requestAnimationFrame to ensure DOM is ready
@@ -1640,6 +1641,8 @@ export const TerminalOutput = memo(
 			() => generateTerminalProseStyles(theme, '.terminal-output'),
 			[theme]
 		);
+
+		const isAutoScrollActive = !autoScrollPaused;
 
 		return (
 			<div
@@ -1739,10 +1742,7 @@ export const TerminalOutput = memo(
 					ref={scrollContainerRef}
 					className="flex-1 overflow-y-auto scrollbar-thin"
 					style={{
-						overflowAnchor:
-							session.inputMode === 'ai' && (!autoScrollAiMode || autoScrollPaused)
-								? 'none'
-								: undefined,
+						overflowAnchor: session.inputMode === 'ai' && autoScrollPaused ? 'none' : undefined,
 					}}
 					onScroll={handleScroll}
 				>
@@ -1805,6 +1805,54 @@ export const TerminalOutput = memo(
 					{/* End ref for scrolling - always rendered so Cmd+Shift+J works even when busy */}
 					<div ref={logsEndRef} />
 				</div>
+
+				{/* Scroll-to-bottom / auto-scroll resume (AI mode only) */}
+				{session.inputMode === 'ai' && filteredLogs.length > 0 && !isAtBottom && (
+					<button
+						onClick={() => {
+							// Jump to bottom and resume auto-scroll
+							setAutoScrollPaused(false);
+							setHasNewMessages(false);
+							setNewMessageCount(0);
+							if (scrollContainerRef.current) {
+								scrollContainerRef.current.scrollTo({
+									top: scrollContainerRef.current.scrollHeight,
+									behavior: 'smooth',
+								});
+							}
+						}}
+						className={`absolute bottom-4 ${userMessageAlignment === 'right' ? 'left-6' : 'right-6'} flex items-center gap-2 px-3 py-2 rounded-full shadow-lg transition-all hover:scale-105 z-20 outline-none`}
+						style={{
+							backgroundColor: isAutoScrollActive
+								? theme.colors.accent
+								: hasNewMessages
+									? theme.colors.accent
+									: theme.colors.bgSidebar,
+							color: isAutoScrollActive
+								? theme.colors.accentForeground
+								: hasNewMessages
+									? theme.colors.accentForeground
+									: theme.colors.textDim,
+							border: `1px solid ${isAutoScrollActive || hasNewMessages ? 'transparent' : theme.colors.border}`,
+							animation:
+								hasNewMessages && !isAutoScrollActive
+									? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+									: undefined,
+						}}
+						title={
+							hasNewMessages
+								? 'New messages (click to pin to bottom)'
+								: 'Scroll to bottom (click to pin)'
+						}
+					>
+						<ArrowDown className="w-4 h-4" />
+						{newMessageCount > 0 && !isAutoScrollActive && (
+							<span className="text-xs font-bold">
+								{newMessageCount > 99 ? '99+' : newMessageCount}
+							</span>
+						)}
+					</button>
+				)}
 
 				{/* Copied to Clipboard Notification */}
 				{showCopiedNotification && (

@@ -236,7 +236,8 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				const agentSlashCommands = await window.maestro.agents.discoverSlashCommands(
 					currentSession.toolType,
 					currentSession.cwd,
-					currentSession.customPath
+					currentSession.customPath,
+					currentSession.sshRemote?.id
 				);
 				if (cancelled) return;
 
@@ -576,7 +577,17 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				}
 
 				const currentGroups = useSessionStore.getState().groups;
-				const group = currentGroups.find((g) => g.id === currentSession.groupId);
+				// Worktree children inherit group from parent
+				const effectiveGroupId =
+					currentSession.groupId ||
+					(currentSession.parentSessionId
+						? useSessionStore
+								.getState()
+								.sessions.find((s) => s.id === currentSession.parentSessionId)?.groupId
+						: undefined);
+				const group = effectiveGroupId
+					? currentGroups.find((g) => g.id === effectiveGroupId)
+					: null;
 				const groupName = group?.name || 'Ungrouped';
 
 				const elapsedTimeMs = activeTab.lastSynopsisTime
@@ -1137,6 +1148,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				cwd: directoryPath,
 				fullPath: directoryPath,
 				projectRoot: directoryPath,
+				createdAt: Date.now(),
 				isGitRepo,
 				gitBranches,
 				gitTags,
@@ -1172,6 +1184,8 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				closedTabHistory: [],
 				filePreviewTabs: [],
 				activeFileTabId: null,
+				browserTabs: [],
+				activeBrowserTabId: null,
 				terminalTabs: [],
 				activeTerminalTabId: null,
 				unifiedTabOrder: [{ type: 'ai' as const, id: initialTabId }],

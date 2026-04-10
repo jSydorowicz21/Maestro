@@ -160,12 +160,6 @@ export const SETTINGS_METADATA: Record<string, SettingMetadata> = {
 		default: false,
 		category: 'editor',
 	},
-	enterToSendTerminal: {
-		description: 'When true, pressing Enter sends commands in terminal mode.',
-		type: 'boolean',
-		default: true,
-		category: 'editor',
-	},
 	defaultSaveToHistory: {
 		description: 'Whether completed tasks are saved to history by default.',
 		type: 'boolean',
@@ -212,12 +206,6 @@ export const SETTINGS_METADATA: Record<string, SettingMetadata> = {
 		description: 'Terminal column width for command output formatting.',
 		type: 'number',
 		default: 100,
-		category: 'editor',
-	},
-	autoScrollAiMode: {
-		description: 'Automatically scroll to the bottom when new AI output arrives.',
-		type: 'boolean',
-		default: false,
 		category: 'editor',
 	},
 	automaticTabNamingEnabled: {

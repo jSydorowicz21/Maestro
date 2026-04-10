@@ -26,7 +26,6 @@ import {
 	PartyPopper,
 	Tag,
 	User,
-	ArrowDownToLine,
 	ExternalLink,
 	Keyboard,
 	AlertTriangle,
@@ -69,14 +68,10 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 		// Input settings
 		enterToSendAI,
 		setEnterToSendAI,
-		enterToSendTerminal,
-		setEnterToSendTerminal,
 		defaultSaveToHistory,
 		setDefaultSaveToHistory,
 		defaultShowThinking,
 		setDefaultShowThinking,
-		autoScrollAiMode,
-		setAutoScrollAiMode,
 		// Tab naming
 		automaticTabNamingEnabled,
 		setAutomaticTabNamingEnabled,
@@ -220,9 +215,10 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 						maxLength={1000}
 					/>
 					<div
-						className="absolute bottom-2 right-2 text-xs"
+						className="absolute bottom-2 right-2 text-xs px-1 rounded"
 						style={{
 							color: conductorProfile.length > 900 ? theme.colors.warning : theme.colors.textDim,
+							backgroundColor: theme.colors.bgSidebar,
 						}}
 					>
 						{conductorProfile.length}/1000
@@ -518,8 +514,8 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 					Input Send Behavior
 				</div>
 				<p className="text-xs opacity-50 mb-3">
-					Configure how to send messages in each mode. Choose between Enter or {formatMetaKey()}
-					+Enter for each input type.
+					Configure how to send messages. Choose between Enter or {formatMetaKey()}
+					+Enter.
 				</p>
 
 				{/* AI Mode Setting */}
@@ -543,34 +539,6 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 					</div>
 					<p className="text-xs opacity-50">
 						{enterToSendAI
-							? 'Press Enter to send. Use Shift+Enter for new line.'
-							: `Press ${formatMetaKey()}+Enter to send. Enter creates new line.`}
-					</p>
-				</div>
-
-				{/* Terminal Mode Setting */}
-				<div
-					className="p-3 rounded border"
-					style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}
-				>
-					<div className="flex items-center justify-between mb-2">
-						<div className="text-sm font-medium">Terminal Mode</div>
-						<button
-							onClick={() => setEnterToSendTerminal(!enterToSendTerminal)}
-							className="px-3 py-1.5 rounded text-xs font-mono transition-all"
-							style={{
-								backgroundColor: enterToSendTerminal
-									? theme.colors.accentDim
-									: theme.colors.bgActivity,
-								color: theme.colors.textMain,
-								border: `1px solid ${theme.colors.border}`,
-							}}
-						>
-							{formatEnterToSend(enterToSendTerminal)}
-						</button>
-					</div>
-					<p className="text-xs opacity-50">
-						{enterToSendTerminal
 							? 'Press Enter to send. Use Shift+Enter for new line.'
 							: `Press ${formatMetaKey()}+Enter to send. Enter creates new line.`}
 					</p>
@@ -704,19 +672,6 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 					description="When you send your first message to a new tab, an AI will analyze it and generate a descriptive tab name. The naming request runs in parallel and leaves no history."
 					checked={automaticTabNamingEnabled}
 					onChange={setAutomaticTabNamingEnabled}
-					theme={theme}
-				/>
-			</div>
-
-			{/* Auto-scroll AI Output */}
-			<div data-setting-id="general-auto-scroll">
-				<SettingCheckbox
-					icon={ArrowDownToLine}
-					sectionLabel="Auto-scroll AI Output"
-					title="Auto-scroll AI output"
-					description="Automatically scroll to the bottom when new AI output arrives. When disabled, a floating button appears for new messages."
-					checked={autoScrollAiMode}
-					onChange={setAutoScrollAiMode}
 					theme={theme}
 				/>
 			</div>

@@ -212,6 +212,7 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 					cwd: workingDir,
 					fullPath: workingDir,
 					projectRoot: workingDir,
+					createdAt: Date.now(),
 					isGitRepo,
 					gitBranches,
 					gitTags,
@@ -247,6 +248,8 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 					closedTabHistory: [],
 					filePreviewTabs: [],
 					activeFileTabId: null,
+					browserTabs: [],
+					activeBrowserTabId: null,
 					terminalTabs: [],
 					activeTerminalTabId: null,
 					unifiedTabOrder: [{ type: 'ai' as const, id: initialTabId }],
@@ -465,7 +468,12 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 		(groupId: string) => {
 			if (pendingMoveToGroupSessionId) {
 				setSessions((prev) =>
-					prev.map((s) => (s.id === pendingMoveToGroupSessionId ? { ...s, groupId } : s))
+					prev.map((s) => {
+						if (s.id === pendingMoveToGroupSessionId) return { ...s, groupId };
+						// Also update worktree children to keep groupId in sync
+						if (s.parentSessionId === pendingMoveToGroupSessionId) return { ...s, groupId };
+						return s;
+					})
 				);
 				setPendingMoveToGroupSessionId(null);
 			}

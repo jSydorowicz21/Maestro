@@ -5,6 +5,7 @@ import type {
 	BatchRunState,
 	UnifiedTab,
 	FilePreviewTab,
+	BrowserTab,
 	ThinkingItem,
 	AgentError,
 } from '../../types';
@@ -143,6 +144,8 @@ export interface MainPanelProps {
 	onToggleTabShowThinking?: () => void;
 	onToggleUnreadFilter?: () => void;
 	onOpenTabSearch?: () => void;
+	/** Handler to open output/message search (Cmd+F) */
+	onOpenOutputSearch?: () => void;
 	// Bulk tab close operations
 	onCloseAllTabs?: () => void;
 	onCloseOtherTabs?: () => void;
@@ -153,8 +156,14 @@ export interface MainPanelProps {
 	unifiedTabs?: UnifiedTab[];
 	activeFileTabId?: string | null;
 	activeFileTab?: FilePreviewTab | null;
+	activeBrowserTabId?: string | null;
+	activeBrowserTab?: BrowserTab | null;
 	onFileTabSelect?: (tabId: string) => void;
 	onFileTabClose?: (tabId: string) => void;
+	onNewBrowserTab?: () => void;
+	onBrowserTabSelect?: (tabId: string) => void;
+	onBrowserTabClose?: (tabId: string) => void;
+	onBrowserTabUpdate?: (sessionId: string, tabId: string, updates: Partial<BrowserTab>) => void;
 
 	// Terminal tab callbacks (Phase 8)
 	onNewTerminalTab?: () => void;

@@ -267,6 +267,7 @@ describe('SessionList', () => {
 			isCloudflaredInstalled: vi.fn().mockResolvedValue(true),
 			start: vi.fn().mockResolvedValue({ success: true, url: 'https://tunnel.example.com' }),
 			stop: vi.fn().mockResolvedValue(undefined),
+			getStatus: vi.fn().mockResolvedValue({ isRunning: false, url: null, error: null }),
 		};
 	});
 
@@ -1945,7 +1946,9 @@ describe('SessionList', () => {
 			const props = createDefaultProps({});
 			const { container } = render(<SessionList {...props} />);
 
-			expect(container.firstChild).toHaveClass('ring-1');
+			// Focus ring is applied via boxShadow inline style instead of ring-1 class
+			const panel = container.firstChild as HTMLElement;
+			expect(panel.style.boxShadow).toBeTruthy();
 		});
 	});
 
@@ -2161,6 +2164,7 @@ describe('SessionList', () => {
 				isCloudflaredInstalled: mockIsInstalled,
 				start: vi.fn().mockResolvedValue({ success: true, url: 'https://tunnel.example.com' }),
 				stop: vi.fn().mockResolvedValue(undefined),
+				getStatus: vi.fn().mockResolvedValue({ isRunning: false, url: null, error: null }),
 			};
 
 			useUIStore.setState({ leftSidebarOpen: true });
@@ -2184,6 +2188,7 @@ describe('SessionList', () => {
 				isCloudflaredInstalled: mockIsInstalled,
 				start: vi.fn(),
 				stop: vi.fn(),
+				getStatus: vi.fn().mockResolvedValue({ isRunning: false, url: null, error: null }),
 			};
 
 			useUIStore.setState({ leftSidebarOpen: true });
@@ -2208,6 +2213,11 @@ describe('SessionList', () => {
 				isCloudflaredInstalled: vi.fn().mockResolvedValue(true),
 				start: mockStart,
 				stop: vi.fn(),
+				getStatus: vi.fn().mockResolvedValue({
+					isRunning: true,
+					url: 'https://tunnel.example.com',
+					error: null,
+				}),
 			};
 
 			useUIStore.setState({ leftSidebarOpen: true });
@@ -2243,6 +2253,11 @@ describe('SessionList', () => {
 				isCloudflaredInstalled: vi.fn().mockResolvedValue(true),
 				start: mockStart,
 				stop: mockStop,
+				getStatus: vi.fn().mockResolvedValue({
+					isRunning: true,
+					url: 'https://tunnel.example.com',
+					error: null,
+				}),
 			};
 
 			useUIStore.setState({ leftSidebarOpen: true });
@@ -2280,6 +2295,11 @@ describe('SessionList', () => {
 				isCloudflaredInstalled: vi.fn().mockResolvedValue(true),
 				start: mockStart,
 				stop: vi.fn(),
+				getStatus: vi.fn().mockResolvedValue({
+					isRunning: false,
+					url: null,
+					error: 'Connection failed',
+				}),
 			};
 
 			useUIStore.setState({ leftSidebarOpen: true });
@@ -2307,6 +2327,7 @@ describe('SessionList', () => {
 				isCloudflaredInstalled: vi.fn().mockResolvedValue(true),
 				start: mockStart,
 				stop: vi.fn(),
+				getStatus: vi.fn().mockRejectedValue(new Error('Network error')),
 			};
 
 			useUIStore.setState({ leftSidebarOpen: true });
@@ -2336,6 +2357,11 @@ describe('SessionList', () => {
 				isCloudflaredInstalled: vi.fn().mockResolvedValue(true),
 				start: mockStart,
 				stop: vi.fn(),
+				getStatus: vi.fn().mockResolvedValue({
+					isRunning: true,
+					url: 'https://tunnel.example.com',
+					error: null,
+				}),
 			};
 
 			useUIStore.setState({ leftSidebarOpen: true });
@@ -2365,6 +2391,11 @@ describe('SessionList', () => {
 				isCloudflaredInstalled: vi.fn().mockResolvedValue(true),
 				start: mockStart,
 				stop: vi.fn(),
+				getStatus: vi.fn().mockResolvedValue({
+					isRunning: true,
+					url: 'https://tunnel.example.com',
+					error: null,
+				}),
 			};
 
 			useUIStore.setState({ leftSidebarOpen: true });
@@ -2402,6 +2433,11 @@ describe('SessionList', () => {
 				isCloudflaredInstalled: vi.fn().mockResolvedValue(true),
 				start: mockStart,
 				stop: vi.fn(),
+				getStatus: vi.fn().mockResolvedValue({
+					isRunning: true,
+					url: 'https://tunnel.example.com',
+					error: null,
+				}),
 			};
 
 			useUIStore.setState({ leftSidebarOpen: true });
@@ -2436,6 +2472,11 @@ describe('SessionList', () => {
 				isCloudflaredInstalled: vi.fn().mockResolvedValue(true),
 				start: mockStart,
 				stop: vi.fn(),
+				getStatus: vi.fn().mockResolvedValue({
+					isRunning: true,
+					url: 'https://tunnel.example.com',
+					error: null,
+				}),
 			};
 
 			useUIStore.setState({ leftSidebarOpen: true });
@@ -3088,6 +3129,7 @@ describe('SessionList', () => {
 				isCloudflaredInstalled: vi.fn().mockResolvedValue(true),
 				start: vi.fn(),
 				stop: vi.fn(),
+				getStatus: vi.fn().mockResolvedValue({ isRunning: false, url: null, error: null }),
 			};
 
 			useUIStore.setState({ leftSidebarOpen: true });
@@ -3114,6 +3156,11 @@ describe('SessionList', () => {
 				isCloudflaredInstalled: vi.fn().mockResolvedValue(true),
 				start: mockStart,
 				stop: vi.fn(),
+				getStatus: vi.fn().mockResolvedValue({
+					isRunning: true,
+					url: 'https://tunnel.example.com',
+					error: null,
+				}),
 			};
 
 			useUIStore.setState({ leftSidebarOpen: true });

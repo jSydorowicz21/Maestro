@@ -10,6 +10,12 @@ import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import { formatTokensCompact, formatRelativeTime, formatCost } from '../utils/formatters';
 import { calculateContextDisplay } from '../utils/contextUsage';
 import { getExtensionColor } from '../utils/extensionColors';
+import { getTabDisplayName } from '../utils/tabHelpers';
+
+/** Normalize a project path for comparison (strip trailing slashes) */
+function normalizePath(p: string): string {
+	return p.replace(/\/+$/, '');
+}
 
 /** Named session from the store (not currently open) */
 interface NamedSession {
@@ -88,20 +94,6 @@ function getContextPercentage(tab: AITab, agentId?: ToolType): number {
 		contextWindow,
 		agentId
 	).percentage;
-}
-
-/**
- * Get the display name for a tab.
- * Priority: name > first UUID octet > "New Session"
- */
-function getTabDisplayName(tab: AITab): string {
-	if (tab.name) {
-		return tab.name;
-	}
-	if (tab.agentSessionId) {
-		return tab.agentSessionId.split('-')[0].toUpperCase();
-	}
-	return 'New Session';
 }
 
 /**
@@ -370,7 +362,7 @@ export function TabSwitcherModal({
 			for (const session of namedSessions) {
 				if (
 					session.starred &&
-					session.projectPath === projectRoot &&
+					normalizePath(session.projectPath) === normalizePath(projectRoot) &&
 					!openTabSessionIds.has(session.agentSessionId)
 				) {
 					items.push({ type: 'named' as const, session });
@@ -410,7 +402,10 @@ export function TabSwitcherModal({
 			// Add closed named sessions from the SAME PROJECT (not currently open)
 			// Only include sessions with actual custom names (not UUID-based names)
 			for (const session of namedSessions) {
-				if (session.projectPath === projectRoot && !openTabSessionIds.has(session.agentSessionId)) {
+				if (
+					normalizePath(session.projectPath) === normalizePath(projectRoot) &&
+					!openTabSessionIds.has(session.agentSessionId)
+				) {
 					// Skip sessions where the name is just the UUID or first octet of the UUID
 					const firstOctet = session.agentSessionId.split('-')[0].toUpperCase();
 					const isUuidBasedName =
@@ -635,7 +630,10 @@ export function TabSwitcherModal({
 						All Named (
 						{tabs.filter((t) => t.agentSessionId && t.name).length +
 							namedSessions.filter((s) => {
-								if (s.projectPath !== projectRoot || openTabSessionIds.has(s.agentSessionId))
+								if (
+									normalizePath(s.projectPath) !== normalizePath(projectRoot) ||
+									openTabSessionIds.has(s.agentSessionId)
+								)
 									return false;
 								const firstOctet = s.agentSessionId.split('-')[0].toUpperCase();
 								return (

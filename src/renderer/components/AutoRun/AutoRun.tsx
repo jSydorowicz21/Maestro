@@ -28,7 +28,7 @@ import { useAutoRunSearch } from '../../hooks/batch/useAutoRunSearch';
 import { useAutoRunKeyboard } from '../../hooks/batch/useAutoRunKeyboard';
 import { useAutoRunMarkdown } from '../../hooks/batch/useAutoRunMarkdown';
 import { useAutoRunScrollSync } from '../../hooks/batch/useAutoRunScrollSync';
-import { Maximize2, Edit as EditIcon, Eye } from 'lucide-react';
+import { Maximize2, Edit as EditIcon, Eye, Search } from 'lucide-react';
 import { formatShortcutKeys } from '../../utils/shortcutFormatter';
 
 // Inner implementation component
@@ -568,20 +568,6 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
 				/>
 			)}
 
-			{/* Search Bar */}
-			{searchOpen && (
-				<AutoRunSearchBar
-					theme={theme}
-					searchQuery={searchQuery}
-					onSearchQueryChange={setSearchQuery}
-					currentMatchIndex={currentMatchIndex}
-					totalMatches={totalMatches}
-					onNextMatch={goToNextMatchWithFlag}
-					onPrevMatch={goToPrevMatchWithFlag}
-					onClose={closeSearch}
-				/>
-			)}
-
 			{/* Content Area - only shown when folder is selected */}
 			{folderPath && (
 				<div
@@ -683,6 +669,20 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
 				</div>
 			)}
 
+			{/* Search Bar - between content and button bar */}
+			{searchOpen && (
+				<AutoRunSearchBar
+					theme={theme}
+					searchQuery={searchQuery}
+					onSearchQueryChange={setSearchQuery}
+					currentMatchIndex={currentMatchIndex}
+					totalMatches={totalMatches}
+					onNextMatch={goToNextMatchWithFlag}
+					onPrevMatch={goToPrevMatchWithFlag}
+					onClose={closeSearch}
+				/>
+			)}
+
 			{/* Editor Mode Bar - Expand, Edit/Preview toggle below content area */}
 			{folderPath && documentList.length > 0 && (
 				<div className="flex mx-2 mt-1 mb-1 gap-1 shrink-0">
@@ -690,7 +690,7 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
 					{onExpand && !hideTopControls && (
 						<button
 							onClick={onExpand}
-							className="flex items-center justify-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors hover:bg-white/10"
+							className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors hover:bg-white/10"
 							style={{
 								color: theme.colors.accent,
 								border: `1px solid ${theme.colors.accent}40`,
@@ -702,7 +702,21 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
 							Expand
 						</button>
 					)}
-					{/* Edit / Preview toggle - fills remaining space */}
+					{/* Search button */}
+					<button
+						onClick={openSearch}
+						className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors hover:bg-white/10"
+						style={{
+							color: theme.colors.accent,
+							border: `1px solid ${theme.colors.accent}40`,
+							backgroundColor: `${theme.colors.accent}15`,
+						}}
+						title={`Search (${formatShortcutKeys(['Meta', 'f'])})`}
+					>
+						<Search className="w-3 h-3" />
+						Search
+					</button>
+					{/* Edit / Preview toggle */}
 					<button
 						onClick={() => {
 							if (mode === 'edit') {
@@ -712,7 +726,7 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
 							}
 						}}
 						disabled={mode === 'preview' && isLocked}
-						className={`flex-1 flex items-center justify-center gap-1.5 py-1 rounded text-xs font-medium transition-colors ${mode === 'preview' && isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10'}`}
+						className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors ${mode === 'preview' && isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10'}`}
 						style={{
 							color: theme.colors.accent,
 							border: `1px solid ${theme.colors.accent}40`,

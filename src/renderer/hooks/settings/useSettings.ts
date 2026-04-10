@@ -80,8 +80,6 @@ export interface UseSettingsReturn {
 	setCustomThemeBaseId: (value: ThemeId) => void;
 	enterToSendAI: boolean;
 	setEnterToSendAI: (value: boolean) => void;
-	enterToSendTerminal: boolean;
-	setEnterToSendTerminal: (value: boolean) => void;
 	defaultSaveToHistory: boolean;
 	setDefaultSaveToHistory: (value: boolean) => void;
 
@@ -283,10 +281,6 @@ export interface UseSettingsReturn {
 	// Windows warning suppression
 	suppressWindowsWarning: boolean;
 	setSuppressWindowsWarning: (value: boolean) => void;
-
-	// Auto-scroll in AI mode
-	autoScrollAiMode: boolean;
-	setAutoScrollAiMode: (value: boolean) => void;
 
 	// Message alignment
 	userMessageAlignment: 'left' | 'right';

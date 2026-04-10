@@ -238,6 +238,13 @@ export interface AppModalsProps {
 	autoRunCompletedTaskCount: number;
 	onAutoRunResetTasks: () => void;
 	onClearActiveTerminal?: () => void;
+	// Tab-level actions
+	onCloseCurrentTab?: () => void;
+	onMoveTabToFirst?: () => void;
+	onMoveTabToLast?: () => void;
+	onCopyTabContext?: (tabId: string) => void;
+	onExportTabHtml?: (tabId: string) => void;
+	onPublishTabGist?: (tabId: string) => void;
 	// Gist publishing
 	isFilePreviewOpen: boolean;
 	ghCliAvailable: boolean;
@@ -278,9 +285,6 @@ export interface AppModalsProps {
 	// Maestro Cue
 	onOpenMaestroCue?: () => void;
 	onConfigureCue?: (session: Session) => void;
-	// Auto-scroll
-	autoScrollAiMode?: boolean;
-	setAutoScrollAiMode?: (value: boolean) => void;
 	onCloseTabSwitcher: () => void;
 	onTabSelect: (tabId: string) => void;
 	onFileTabSelect?: (tabId: string) => void;
@@ -399,17 +403,25 @@ export interface AppModalsProps {
  */
 export const AppModals = memo(function AppModals(props: AppModalsProps) {
 	// Self-source data from stores (Tier 1B)
-	const sessions = useSessionStore((s) => s.sessions);
-	const activeSessionId = useSessionStore((s) => s.activeSessionId);
-	const groups = useSessionStore((s) => s.groups);
-	const setSessions = useSessionStore((s) => s.setSessions);
-	const setGroups = useSessionStore((s) => s.setGroups);
+	const { sessions, activeSessionId, groups, setSessions, setGroups } = useSessionStore(
+		useShallow((s) => ({
+			sessions: s.sessions,
+			activeSessionId: s.activeSessionId,
+			groups: s.groups,
+			setSessions: s.setSessions,
+			setGroups: s.setGroups,
+		}))
+	);
 	const activeSession = useMemo(
 		() => sessions.find((s) => s.id === activeSessionId) ?? null,
 		[sessions, activeSessionId]
 	);
-	const groupChats = useGroupChatStore((s) => s.groupChats);
-	const activeGroupChatId = useGroupChatStore((s) => s.activeGroupChatId);
+	const { groupChats, activeGroupChatId } = useGroupChatStore(
+		useShallow((s) => ({
+			groupChats: s.groupChats,
+			activeGroupChatId: s.activeGroupChatId,
+		}))
+	);
 
 	// Self-source modal boolean states from modalStore (Tier 1B)
 	const {
@@ -420,6 +432,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		usageDashboardOpen,
 		confirmModalOpen,
 		quitConfirmModalOpen,
+		activeTerminalTasks,
 		newInstanceModalOpen,
 		editAgentModalOpen,
 		renameSessionModalOpen,
@@ -451,6 +464,9 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 			usageDashboardOpen: s.modals.get('usageDashboard')?.open ?? false,
 			confirmModalOpen: s.modals.get('confirm')?.open ?? false,
 			quitConfirmModalOpen: s.modals.get('quitConfirm')?.open ?? false,
+			activeTerminalTasks: (
+				s.modals.get('quitConfirm')?.data as { activeTerminalTasks?: string[] } | undefined
+			)?.activeTerminalTasks,
 			newInstanceModalOpen: s.modals.get('newInstance')?.open ?? false,
 			editAgentModalOpen: s.modals.get('editAgent')?.open ?? false,
 			renameSessionModalOpen: s.modals.get('renameInstance')?.open ?? false,
@@ -622,6 +638,13 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		autoRunCompletedTaskCount,
 		onAutoRunResetTasks,
 		onClearActiveTerminal,
+		// Tab-level actions
+		onCloseCurrentTab,
+		onMoveTabToFirst,
+		onMoveTabToLast,
+		onCopyTabContext,
+		onExportTabHtml,
+		onPublishTabGist,
 		// Gist publishing
 		isFilePreviewOpen,
 		ghCliAvailable,
@@ -657,9 +680,6 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		// Maestro Cue
 		onOpenMaestroCue,
 		onConfigureCue,
-		// Auto-scroll
-		autoScrollAiMode,
-		setAutoScrollAiMode,
 		onCloseTabSwitcher,
 		onTabSelect,
 		onFileTabSelect,
@@ -788,6 +808,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				onConfirmQuit={onConfirmQuit}
 				onCancelQuit={onCancelQuit}
 				activeBatchSessionIds={activeBatchSessionIds}
+				activeTerminalTasks={activeTerminalTasks ?? []}
 			/>
 
 			{/* Session Management Modals */}
@@ -946,6 +967,12 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				autoRunCompletedTaskCount={autoRunCompletedTaskCount}
 				onAutoRunResetTasks={onAutoRunResetTasks}
 				onClearActiveTerminal={onClearActiveTerminal}
+				onCloseCurrentTab={onCloseCurrentTab}
+				onMoveTabToFirst={onMoveTabToFirst}
+				onMoveTabToLast={onMoveTabToLast}
+				onCopyTabContext={onCopyTabContext}
+				onExportTabHtml={onExportTabHtml}
+				onPublishTabGist={onPublishTabGist}
 				isFilePreviewOpen={isFilePreviewOpen}
 				ghCliAvailable={ghCliAvailable}
 				onPublishGist={onPublishGist}
@@ -955,8 +982,6 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				onOpenDirectorNotes={onOpenDirectorNotes}
 				onOpenMaestroCue={onOpenMaestroCue}
 				onConfigureCue={onConfigureCue}
-				autoScrollAiMode={autoScrollAiMode}
-				setAutoScrollAiMode={setAutoScrollAiMode}
 				lightboxImage={lightboxImage}
 				lightboxImages={lightboxImages}
 				stagedImages={stagedImages}

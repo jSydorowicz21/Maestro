@@ -110,7 +110,6 @@ interface RightPanelProps {
 
 	// Document Graph handlers
 	onFocusFileInGraph?: (relativePath: string) => void;
-	onOpenLastDocumentGraph?: () => void;
 }
 
 export const RightPanel = memo(
@@ -138,7 +137,6 @@ export const RightPanel = memo(
 		const fileTreeFilterOpen = useFileExplorerStore((s) => s.fileTreeFilterOpen);
 		const filteredFileTree = useFileExplorerStore((s) => s.filteredFileTree);
 		const selectedFileIndex = useFileExplorerStore((s) => s.selectedFileIndex);
-		const lastGraphFocusFile = useFileExplorerStore((s) => s.lastGraphFocusFilePath);
 		const setFileTreeFilter = useFileExplorerStore((s) => s.setFileTreeFilter);
 		const setFileTreeFilterOpen = useFileExplorerStore((s) => s.setFileTreeFilterOpen);
 		const setSelectedFileIndex = useFileExplorerStore((s) => s.setSelectedFileIndex);
@@ -194,7 +192,6 @@ export const RightPanel = memo(
 			onOpenMarketplace,
 			onLaunchWizard,
 			onFocusFileInGraph,
-			onOpenLastDocumentGraph,
 		} = props;
 
 		// === Values derived from session ===
@@ -408,13 +405,16 @@ export const RightPanel = memo(
 			<div
 				ref={panelRef}
 				tabIndex={0}
-				className={`border-l flex flex-col ${rightPanelTransitionClass} outline-none relative ${rightPanelOpen ? '' : 'w-0 overflow-hidden opacity-0'} ${activeFocus === 'right' ? 'ring-1 ring-inset' : ''}`}
+				className={`border-l flex flex-col ${rightPanelTransitionClass} outline-none relative ${rightPanelOpen ? '' : 'w-0 overflow-hidden opacity-0'}`}
 				style={
 					{
 						width: rightPanelOpen ? `${rightPanelWidth}px` : '0',
 						backgroundColor: theme.colors.bgSidebar,
 						borderColor: theme.colors.border,
-						'--tw-ring-color': theme.colors.accent,
+						boxShadow:
+							activeFocus === 'right'
+								? `inset 1px 0 0 ${theme.colors.accent}, inset -1px 0 0 ${theme.colors.accent}, inset 0 -1px 0 ${theme.colors.accent}`
+								: undefined,
 					} as React.CSSProperties
 				}
 				onClick={() => setActiveFocus('right')}
@@ -524,8 +524,6 @@ export const RightPanel = memo(
 							fileExplorerIconTheme={fileExplorerIconTheme}
 							setShowHiddenFiles={setShowHiddenFiles}
 							onFocusFileInGraph={onFocusFileInGraph}
-							lastGraphFocusFile={lastGraphFocusFile}
-							onOpenLastDocumentGraph={onOpenLastDocumentGraph}
 						/>
 					</div>
 
@@ -591,7 +589,7 @@ export const RightPanel = memo(
 										className="text-xs font-bold uppercase"
 										style={{ color: theme.colors.textMain }}
 									>
-										{currentSessionBatchState.isStopping ? 'Stopping...' : 'Auto Run Active'}
+										{currentSessionBatchState.isStopping ? 'Stopping' : 'Auto Run Active'}
 									</span>
 								)}
 								{currentSessionBatchState.worktreeActive && (

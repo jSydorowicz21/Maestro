@@ -332,8 +332,14 @@ function SessionListInner(props: SessionListProps) {
 
 	const handleMoveToGroup = useCallback(
 		(sessionId: string, groupId: string) => {
+			const normalizedGroupId = groupId || undefined;
 			setSessions((prev) =>
-				prev.map((s) => (s.id === sessionId ? { ...s, groupId: groupId || undefined } : s))
+				prev.map((s) => {
+					if (s.id === sessionId) return { ...s, groupId: normalizedGroupId };
+					// Also update worktree children to keep groupId in sync
+					if (s.parentSessionId === sessionId) return { ...s, groupId: normalizedGroupId };
+					return s;
+				})
 			);
 		},
 		[setSessions]
@@ -688,13 +694,16 @@ function SessionListInner(props: SessionListProps) {
 		<div
 			ref={sidebarContainerRef}
 			tabIndex={0}
-			className={`border-r flex flex-col shrink-0 ${sidebarTransitionClass} outline-none relative z-20 ${activeFocus === 'sidebar' && !activeGroupChatId ? 'ring-1 ring-inset' : ''}`}
+			className={`border-r flex flex-col shrink-0 ${sidebarTransitionClass} outline-none relative z-20`}
 			style={
 				{
 					width: leftSidebarOpen ? `${leftSidebarWidthState}px` : '64px',
 					backgroundColor: theme.colors.bgSidebar,
 					borderColor: theme.colors.border,
-					'--tw-ring-color': theme.colors.accent,
+					boxShadow:
+						activeFocus === 'sidebar' && !activeGroupChatId
+							? `inset -1px 0 0 ${theme.colors.accent}, inset 1px 0 0 ${theme.colors.accent}, inset 0 -1px 0 ${theme.colors.accent}`
+							: undefined,
 				} as React.CSSProperties
 			}
 			onClick={() => setActiveFocus('sidebar')}
@@ -810,40 +819,42 @@ function SessionListInner(props: SessionListProps) {
 								)}
 							</div>
 						</div>
-						{/* Hamburger Menu */}
-						<div className="relative z-10" ref={menuRef} data-tour="hamburger-menu">
-							<button
-								onClick={() => setMenuOpen(!menuOpen)}
-								className="p-2 rounded hover:bg-white/10 transition-colors"
-								style={{ color: theme.colors.textDim }}
-								title="Menu"
-							>
-								<Menu className="w-4 h-4" />
-							</button>
-							{/* Menu Overlay */}
-							{menuOpen && (
-								<div
-									className="absolute top-full left-0 mt-2 w-72 rounded-lg shadow-2xl z-50 overflow-y-auto scrollbar-thin"
-									data-tour="hamburger-menu-contents"
-									style={{
-										backgroundColor: theme.colors.bgSidebar,
-										border: `1px solid ${theme.colors.border}`,
-										maxHeight: 'calc(100vh - 120px)',
-									}}
+						<div className="flex items-center">
+							{/* Hamburger Menu */}
+							<div className="relative z-30" ref={menuRef} data-tour="hamburger-menu">
+								<button
+									onClick={() => setMenuOpen(!menuOpen)}
+									className="p-2 rounded hover:bg-white/10 transition-colors"
+									style={{ color: theme.colors.textDim }}
+									title="Menu"
 								>
-									<HamburgerMenuContent
-										theme={theme}
-										onNewAgentSession={onNewAgentSession}
-										openWizard={openWizard}
-										startTour={startTour}
-										setMenuOpen={setMenuOpen}
-									/>
-								</div>
-							)}
+									<Menu className="w-4 h-4" />
+								</button>
+								{/* Menu Overlay */}
+								{menuOpen && (
+									<div
+										className="absolute top-full left-0 -mt-px w-72 rounded-lg shadow-2xl z-[100] overflow-y-auto scrollbar-thin"
+										data-tour="hamburger-menu-contents"
+										style={{
+											backgroundColor: theme.colors.bgSidebar,
+											border: `1px solid ${theme.colors.border}`,
+											maxHeight: 'calc(100vh - 120px)',
+										}}
+									>
+										<HamburgerMenuContent
+											theme={theme}
+											onNewAgentSession={onNewAgentSession}
+											openWizard={openWizard}
+											startTour={startTour}
+											setMenuOpen={setMenuOpen}
+										/>
+									</div>
+								)}
+							</div>
 						</div>
 					</>
 				) : (
-					<div className="w-full flex flex-col items-center gap-2 relative" ref={menuRef}>
+					<div className="w-full flex flex-col items-center gap-2 relative z-30" ref={menuRef}>
 						<button
 							onClick={() => setMenuOpen(!menuOpen)}
 							className="p-2 rounded hover:bg-white/10 transition-colors"
@@ -857,7 +868,7 @@ function SessionListInner(props: SessionListProps) {
 						{/* Menu Overlay for Collapsed Sidebar */}
 						{menuOpen && (
 							<div
-								className="absolute top-full left-0 mt-2 w-72 rounded-lg shadow-2xl z-50 overflow-y-auto scrollbar-thin"
+								className="absolute top-full left-0 -mt-px w-72 rounded-lg shadow-2xl z-[100] overflow-y-auto scrollbar-thin"
 								style={{
 									backgroundColor: theme.colors.bgSidebar,
 									border: `1px solid ${theme.colors.border}`,

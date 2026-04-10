@@ -394,8 +394,8 @@ describe('RightPanel', () => {
 			const { container } = render(<RightPanel {...props} />);
 
 			const panel = container.firstChild as HTMLElement;
-			expect(panel.classList.contains('ring-1')).toBe(true);
-			expect(panel.classList.contains('ring-inset')).toBe(true);
+			// Focus ring is applied via boxShadow inline style instead of ring-1/ring-inset classes
+			expect(panel.style.boxShadow).toBeTruthy();
 		});
 
 		it('should not show focus ring when activeFocus is not right', () => {
@@ -578,7 +578,7 @@ describe('RightPanel', () => {
 			expect(screen.getByText('Auto Run Active')).toBeInTheDocument();
 		});
 
-		it('should show "Stopping..." when isStopping is true', () => {
+		it('should show "Stopping" when isStopping is true', () => {
 			const currentSessionBatchState: BatchRunState = {
 				isRunning: true,
 				isStopping: true,
@@ -596,7 +596,7 @@ describe('RightPanel', () => {
 			const props = createDefaultProps({ currentSessionBatchState });
 			render(<RightPanel {...props} />);
 
-			expect(screen.getByText('Stopping...')).toBeInTheDocument();
+			expect(screen.getByText('Stopping')).toBeInTheDocument();
 			expect(screen.getByText(/waiting for current task/i)).toBeInTheDocument();
 		});
 
@@ -1304,8 +1304,8 @@ describe('RightPanel', () => {
 			const { container } = render(<RightPanel {...props} />);
 
 			const panel = container.firstChild as HTMLElement;
-			// --tw-ring-color is a CSS custom property for Tailwind ring utility
-			expect(panel.style.getPropertyValue('--tw-ring-color')).toBe('#bd93f9');
+			// Focus ring is applied via boxShadow using the theme accent color
+			expect(panel.style.boxShadow).toContain('#bd93f9');
 		});
 
 		it('should apply correct width based on rightPanelWidth', () => {

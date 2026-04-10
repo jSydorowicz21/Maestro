@@ -155,6 +155,19 @@ textarea::placeholder {
 	scrollbar-width: none;
 }
 
+/* Hide xterm scrollbar when terminal container is not visible — prevents
+   the xterm-viewport scrollbar from bleeding through behind the AI tab.
+   Both overflow and scrollbar-width are needed because Chromium's compositor
+   can paint native scrollbars even on visibility:hidden elements. */
+.terminal-hidden .xterm-viewport {
+	overflow-y: hidden !important;
+	scrollbar-width: none !important;
+}
+
+.terminal-hidden .xterm-viewport::-webkit-scrollbar {
+	display: none !important;
+}
+
 /* xterm.js viewport scrollbar — match Maestro's thin scrollbar style */
 .xterm-viewport::-webkit-scrollbar {
 	width: 6px;

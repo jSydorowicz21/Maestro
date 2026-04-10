@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Global type declarations for the renderer process.
  * This file makes the window.maestro API available throughout the renderer.
@@ -7,6 +8,32 @@
 declare module '*.md?raw' {
 	const content: string;
 	export default content;
+}
+
+interface HTMLWebViewElement extends HTMLElement {
+	src: string;
+	partition: string;
+	canGoBack: () => boolean;
+	canGoForward: () => boolean;
+	goBack: () => void;
+	goForward: () => void;
+	reload: () => void;
+	stop: () => void;
+	getURL: () => string;
+	getTitle: () => string;
+	isLoading: () => boolean;
+	getWebContentsId?: () => number;
+}
+
+declare namespace JSX {
+	interface IntrinsicElements {
+		webview: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+			allowpopups?: boolean | 'true' | 'false';
+			partition?: string;
+			src?: string;
+			useragent?: string;
+		};
+	}
 }
 
 type AutoRunTreeNode = {
@@ -215,6 +242,8 @@ type GroupChatData = {
 	archived?: boolean;
 };
 
+import type { CueGraphSession, CueRunResult, CueSessionStatus, CueSettings } from '../shared/cue';
+
 interface MaestroAPI {
 	// Context merging API (for session context transfer and grooming)
 	context: {
@@ -315,6 +344,7 @@ interface MaestroAPI {
 				cueSessionName?: string;
 				cueSubscriptionName?: string;
 				cueEventType?: string;
+				childProcesses?: Array<{ pid: number; command: string }>;
 			}>
 		>;
 		onData: (callback: (sessionId: string, data: string) => void) => () => void;
@@ -553,6 +583,7 @@ interface MaestroAPI {
 				createdAt: number;
 				state: 'idle' | 'busy';
 				thinkingStartTime?: number | null;
+				hasUnread?: boolean;
 			}>,
 			activeTabId: string
 		) => Promise<void>;
@@ -897,7 +928,8 @@ interface MaestroAPI {
 		discoverSlashCommands: (
 			agentId: string,
 			cwd: string,
-			customPath?: string
+			customPath?: string,
+			sshRemoteId?: string
 		) => Promise<{ name: string; prompt?: string }[] | null>;
 	};
 	// Agent Sessions API - all methods accept optional sshRemoteId for SSH remote session storage access
@@ -3003,98 +3035,11 @@ interface MaestroAPI {
 
 	// Cue API (event-driven automation)
 	cue: {
-		getSettings: () => Promise<{
-			timeout_minutes: number;
-			timeout_on_fail: 'break' | 'continue';
-			max_concurrent: number;
-			queue_size: number;
-		}>;
-		getStatus: () => Promise<
-			Array<{
-				sessionId: string;
-				sessionName: string;
-				toolType: string;
-				projectRoot: string;
-				enabled: boolean;
-				subscriptionCount: number;
-				activeRuns: number;
-				lastTriggered?: string;
-				nextTrigger?: string;
-			}>
-		>;
-		getGraphData: () => Promise<
-			Array<{
-				sessionId: string;
-				sessionName: string;
-				toolType: string;
-				subscriptions: Array<{
-					name: string;
-					event:
-						| 'time.heartbeat'
-						| 'time.scheduled'
-						| 'file.changed'
-						| 'agent.completed'
-						| 'github.pull_request'
-						| 'github.issue'
-						| 'task.pending';
-					enabled: boolean;
-					prompt: string;
-					interval_minutes?: number;
-					schedule_times?: string[];
-					schedule_days?: string[];
-					watch?: string;
-					source_session?: string | string[];
-					fan_out?: string[];
-					filter?: Record<string, string | number | boolean>;
-					repo?: string;
-					poll_minutes?: number;
-				}>;
-			}>
-		>;
-		getActiveRuns: () => Promise<
-			Array<{
-				runId: string;
-				sessionId: string;
-				sessionName: string;
-				subscriptionName: string;
-				event: {
-					id: string;
-					type: 'time.heartbeat' | 'time.scheduled' | 'file.changed' | 'agent.completed';
-					timestamp: string;
-					triggerName: string;
-					payload: Record<string, unknown>;
-				};
-				status: 'running' | 'completed' | 'failed' | 'timeout' | 'stopped';
-				stdout: string;
-				stderr: string;
-				exitCode: number | null;
-				durationMs: number;
-				startedAt: string;
-				endedAt: string;
-			}>
-		>;
-		getActivityLog: (limit?: number) => Promise<
-			Array<{
-				runId: string;
-				sessionId: string;
-				sessionName: string;
-				subscriptionName: string;
-				event: {
-					id: string;
-					type: 'time.heartbeat' | 'time.scheduled' | 'file.changed' | 'agent.completed';
-					timestamp: string;
-					triggerName: string;
-					payload: Record<string, unknown>;
-				};
-				status: 'running' | 'completed' | 'failed' | 'timeout' | 'stopped';
-				stdout: string;
-				stderr: string;
-				exitCode: number | null;
-				durationMs: number;
-				startedAt: string;
-				endedAt: string;
-			}>
-		>;
+		getSettings: () => Promise<CueSettings>;
+		getStatus: () => Promise<CueSessionStatus[]>;
+		getGraphData: () => Promise<CueGraphSession[]>;
+		getActiveRuns: () => Promise<CueRunResult[]>;
+		getActivityLog: (limit?: number) => Promise<CueRunResult[]>;
 		enable: () => Promise<void>;
 		disable: () => Promise<void>;
 		stopRun: (runId: string) => Promise<boolean>;
@@ -3113,28 +3058,7 @@ interface MaestroAPI {
 		validateYaml: (content: string) => Promise<{ valid: boolean; errors: string[] }>;
 		savePipelineLayout: (layout: Record<string, unknown>) => Promise<void>;
 		loadPipelineLayout: () => Promise<Record<string, unknown> | null>;
-		onActivityUpdate: (
-			callback: (data: {
-				runId: string;
-				sessionId: string;
-				sessionName: string;
-				subscriptionName: string;
-				event: {
-					id: string;
-					type: 'time.heartbeat' | 'time.scheduled' | 'file.changed' | 'agent.completed';
-					timestamp: string;
-					triggerName: string;
-					payload: Record<string, unknown>;
-				};
-				status: 'running' | 'completed' | 'failed' | 'timeout' | 'stopped';
-				stdout: string;
-				stderr: string;
-				exitCode: number | null;
-				durationMs: number;
-				startedAt: string;
-				endedAt: string;
-			}) => void
-		) => () => void;
+		onActivityUpdate: (callback: (data: CueRunResult) => void) => () => void;
 	};
 
 	// WakaTime API (CLI check, API key validation)

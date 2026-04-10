@@ -179,6 +179,7 @@ export interface UseMainPanelPropsDeps {
 	handleToggleTabShowThinking: () => void;
 	toggleUnreadFilter: () => void;
 	handleOpenTabSearch: () => void;
+	handleOpenOutputSearch: () => void;
 	handleCloseAllTabs: () => void;
 	handleCloseOtherTabs: () => void;
 	handleCloseTabsLeft: () => void;
@@ -188,8 +189,18 @@ export interface UseMainPanelPropsDeps {
 	unifiedTabs: UnifiedTab[];
 	activeFileTabId: string | null;
 	activeFileTab: FilePreviewTab | null;
+	activeBrowserTabId: string | null;
+	activeBrowserTab: import('../../types').BrowserTab | null;
 	handleFileTabSelect: (tabId: string) => void;
 	handleFileTabClose: (tabId: string) => void;
+	handleNewBrowserTab: () => void;
+	handleBrowserTabSelect: (tabId: string) => void;
+	handleBrowserTabClose: (tabId: string) => void;
+	handleBrowserTabUpdate: (
+		sessionId: string,
+		tabId: string,
+		updates: Partial<import('../../types').BrowserTab>
+	) => void;
 
 	// Terminal tab callbacks (Phase 8)
 	handleOpenTerminalTab: (options?: { shell?: string; cwd?: string; name?: string | null }) => void;
@@ -364,6 +375,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			onToggleTabReadOnlyMode: deps.handleToggleTabReadOnlyMode,
 			onToggleUnreadFilter: deps.toggleUnreadFilter,
 			onOpenTabSearch: deps.handleOpenTabSearch,
+			onOpenOutputSearch: deps.handleOpenOutputSearch,
 			onCloseAllTabs: deps.handleCloseAllTabs,
 			onCloseOtherTabs: deps.handleCloseOtherTabs,
 			onCloseTabsLeft: deps.handleCloseTabsLeft,
@@ -372,8 +384,14 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			unifiedTabs: deps.unifiedTabs,
 			activeFileTabId: deps.activeFileTabId,
 			activeFileTab: deps.activeFileTab,
+			activeBrowserTabId: deps.activeBrowserTabId,
+			activeBrowserTab: deps.activeBrowserTab,
 			onFileTabSelect: deps.handleFileTabSelect,
 			onFileTabClose: deps.handleFileTabClose,
+			onNewBrowserTab: deps.handleNewBrowserTab,
+			onBrowserTabSelect: deps.handleBrowserTabSelect,
+			onBrowserTabClose: deps.handleBrowserTabClose,
+			onBrowserTabUpdate: deps.handleBrowserTabUpdate,
 			// Terminal tab callbacks (Phase 8)
 			onNewTerminalTab: deps.handleOpenTerminalTab,
 			onTerminalTabSelect: deps.handleTerminalTabSelect,
@@ -577,6 +595,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.handleToggleTabShowThinking,
 			deps.toggleUnreadFilter,
 			deps.handleOpenTabSearch,
+			deps.handleOpenOutputSearch,
 			deps.handleCloseAllTabs,
 			deps.handleCloseOtherTabs,
 			deps.handleCloseTabsLeft,
@@ -585,8 +604,14 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.unifiedTabs,
 			deps.activeFileTabId,
 			deps.activeFileTab,
+			deps.activeBrowserTabId,
+			deps.activeBrowserTab,
 			deps.handleFileTabSelect,
 			deps.handleFileTabClose,
+			deps.handleNewBrowserTab,
+			deps.handleBrowserTabSelect,
+			deps.handleBrowserTabClose,
+			deps.handleBrowserTabUpdate,
 			// Terminal tab (Phase 8)
 			deps.handleOpenTerminalTab,
 			deps.handleTerminalTabSelect,

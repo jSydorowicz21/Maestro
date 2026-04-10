@@ -427,7 +427,7 @@ describe('TabSwitcherModal', () => {
 				expect(screen.getByText('ABC12345')).toBeInTheDocument();
 			});
 
-			it('returns "New Session" if no name or UUID', () => {
+			it('returns tab UUID marker if no name or agentSessionId', () => {
 				const tab = createTestTab({ name: '', agentSessionId: undefined });
 
 				renderWithLayerStack(
@@ -442,6 +442,7 @@ describe('TabSwitcherModal', () => {
 					/>
 				);
 
+				// No name or agentSessionId yet — shows "New Session"
 				expect(screen.getByText('New Session')).toBeInTheDocument();
 			});
 		});

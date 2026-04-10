@@ -27,7 +27,6 @@ import type {
 	UsageStats,
 } from '../../types';
 import { notifyToast } from '../../stores/notificationStore';
-import { useSettingsStore } from '../../stores/settingsStore';
 import type { HistoryEntryInput } from './useAgentSessionManagement';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useModalStore } from '../../stores/modalStore';
@@ -38,6 +37,7 @@ import {
 	parseGroupChatSessionId,
 	isSynopsisSession,
 	isBatchSession,
+	REGEX_AI_TAB,
 } from '../../utils/sessionIdParser';
 import {
 	estimateContextUsage,
@@ -200,7 +200,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 			let tabIdFromSession: string | undefined;
 
 			// Format: sessionId-ai-tabId
-			const aiTabMatch = sessionId.match(/^(.+)-ai-(.+)$/);
+			const aiTabMatch = sessionId.match(REGEX_AI_TAB);
 			if (aiTabMatch) {
 				actualSessionId = aiTabMatch[1];
 				tabIdFromSession = aiTabMatch[2];
@@ -305,7 +305,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 				let isFromAi: boolean;
 				let tabIdFromSession: string | undefined;
 
-				const aiTabMatch = sessionId.match(/^(.+)-ai-(.+)$/);
+				const aiTabMatch = sessionId.match(REGEX_AI_TAB);
 				if (aiTabMatch) {
 					actualSessionId = aiTabMatch[1];
 					tabIdFromSession = aiTabMatch[2];
@@ -415,8 +415,14 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						const sessionSizeBytes = logs.reduce((sum, log) => sum + (log.text?.length || 0), 0);
 						const sessionSizeKB = (sessionSizeBytes / 1024).toFixed(1);
 
-						const sessionGroup = currentSession.groupId
-							? getGroups().find((g) => g.id === currentSession.groupId)
+						// Resolve group: worktree children may inherit group from parent
+						const effectiveGroupId =
+							currentSession.groupId ||
+							(currentSession.parentSessionId
+								? getSessions().find((s) => s.id === currentSession.parentSessionId)?.groupId
+								: undefined);
+						const sessionGroup = effectiveGroupId
+							? getGroups().find((g) => g.id === effectiveGroupId)
 							: null;
 						const groupName = sessionGroup?.name || 'Ungrouped';
 						const projectName =
@@ -520,9 +526,10 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 																...tab,
 																state: 'idle' as const,
 																thinkingStartTime: undefined,
-																// Clear stale agentSessionId so the next spawn
-																// starts a fresh session instead of trying --resume
-																agentSessionId: null,
+																// Preserve agentSessionId — stale IDs are cleared
+																// by onAgentError when session_not_found is detected.
+																// Blanket-clearing here breaks tab identity for
+																// recoverable errors (rate limits, API errors, etc.)
 															}
 														: tab;
 												} else {
@@ -531,7 +538,6 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 																...tab,
 																state: 'idle' as const,
 																thinkingStartTime: undefined,
-																agentSessionId: null,
 															}
 														: tab;
 												}
@@ -577,7 +583,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 										return {
 											...tab,
 											state: 'idle' as const,
-											agentSessionId: null,
+											// Preserve agentSessionId for session resume
 										};
 									}
 									return tab;
@@ -895,17 +901,6 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 									skipCustomNotification: true,
 								});
 
-								// Speak synopsis via TTS if audio feedback is enabled
-								// (mirrors the batch processor pattern in useBatchProcessor.ts)
-								const { audioFeedbackEnabled, audioFeedbackCommand } = useSettingsStore.getState();
-								if (audioFeedbackEnabled && audioFeedbackCommand && parsed.shortSummary) {
-									window.maestro.notification
-										.speak(parsed.shortSummary, audioFeedbackCommand)
-										.catch((err) => {
-											console.error('[onProcessExit] Failed to speak synopsis:', err);
-										});
-								}
-
 								if (deps.rightPanelRef.current) {
 									deps.rightPanelRef.current.refreshHistoryPanel();
 								}
@@ -954,6 +949,18 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						let targetTab;
 						if (tabId) {
 							targetTab = s.aiTabs?.find((tab) => tab.id === tabId);
+							// If the tab ID was explicitly in the session ID but no longer
+							// exists in aiTabs, the tab was closed. Store at session level
+							// only — do NOT fall back to another tab, as that would
+							// cross-contaminate an unrelated tab with the closed tab's
+							// agent session.
+							if (!targetTab) {
+								console.log(
+									'[onSessionId] Tab was closed, storing session ID at session level only:',
+									{ tabId: tabId.substring(0, 8), agentSessionId: agentSessionId.substring(0, 8) }
+								);
+								return { ...s, agentSessionId };
+							}
 						}
 
 						if (!targetTab) {
@@ -1037,7 +1044,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 			let tabIdFromSession: string | undefined;
 			let isFromAi = false;
 
-			const aiTabMatch = sessionId.match(/^(.+)-ai-(.+)$/);
+			const aiTabMatch = sessionId.match(REGEX_AI_TAB);
 			if (aiTabMatch) {
 				actualSessionId = aiTabMatch[1];
 				tabIdFromSession = aiTabMatch[2];
@@ -1350,7 +1357,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 		// ================================================================
 		const unsubscribeThinkingChunk = window.maestro.process.onThinkingChunk?.(
 			(sessionId: string, content: string) => {
-				const aiTabMatch = sessionId.match(/^(.+)-ai-(.+)$/);
+				const aiTabMatch = sessionId.match(REGEX_AI_TAB);
 				if (!aiTabMatch) return;
 
 				const actualSessionId = aiTabMatch[1];
@@ -1470,7 +1477,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 		const unsubscribeSshRemote = window.maestro.process.onSshRemote?.(
 			(sessionId: string, sshRemote: { id: string; name: string; host: string } | null) => {
 				let actualSessionId: string;
-				const aiTabMatch = sessionId.match(/^(.+)-ai-(.+)$/);
+				const aiTabMatch = sessionId.match(REGEX_AI_TAB);
 				if (aiTabMatch) {
 					actualSessionId = aiTabMatch[1];
 				} else if (sessionId.endsWith('-ai') || sessionId.endsWith('-terminal')) {
@@ -1542,7 +1549,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 					timestamp: number;
 				}
 			) => {
-				const aiTabMatch = sessionId.match(/^(.+)-ai-(.+)$/);
+				const aiTabMatch = sessionId.match(REGEX_AI_TAB);
 				if (!aiTabMatch) return;
 
 				const actualSessionId = aiTabMatch[1];

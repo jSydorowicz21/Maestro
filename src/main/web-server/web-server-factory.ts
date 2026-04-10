@@ -140,6 +140,7 @@ export function createWebServerFactory(deps: WebServerFactoryDependencies) {
 						createdAt: tab.createdAt,
 						state: tab.state || 'idle',
 						thinkingStartTime: tab.thinkingStartTime || null,
+						hasUnread: tab.hasUnread ?? false,
 					})) || [];
 
 				return {
@@ -819,10 +820,9 @@ export function createWebServerFactory(deps: WebServerFactoryDependencies) {
 				theme: settingsStore.get('activeThemeId', 'dracula') as string,
 				fontSize: settingsStore.get('fontSize', 14) as number,
 				enterToSendAI: settingsStore.get('enterToSendAI', false) as boolean,
-				enterToSendTerminal: settingsStore.get('enterToSendTerminal', true) as boolean,
 				defaultSaveToHistory: settingsStore.get('defaultSaveToHistory', true) as boolean,
 				defaultShowThinking: settingsStore.get('defaultShowThinking', 'off') as string,
-				autoScroll: settingsStore.get('autoScrollAiMode', false) as boolean,
+				autoScroll: true,
 				notificationsEnabled: settingsStore.get('osNotificationsEnabled', true) as boolean,
 				audioFeedbackEnabled: settingsStore.get('audioFeedbackEnabled', false) as boolean,
 				colorBlindMode: settingsStore.get('colorBlindMode', 'false') as string,
@@ -856,10 +856,9 @@ export function createWebServerFactory(deps: WebServerFactoryDependencies) {
 							theme: settingsStore.get('activeThemeId', 'dracula') as string,
 							fontSize: settingsStore.get('fontSize', 14) as number,
 							enterToSendAI: settingsStore.get('enterToSendAI', false) as boolean,
-							enterToSendTerminal: settingsStore.get('enterToSendTerminal', true) as boolean,
 							defaultSaveToHistory: settingsStore.get('defaultSaveToHistory', true) as boolean,
 							defaultShowThinking: settingsStore.get('defaultShowThinking', 'off') as string,
-							autoScroll: settingsStore.get('autoScrollAiMode', false) as boolean,
+							autoScroll: true,
 							notificationsEnabled: settingsStore.get('osNotificationsEnabled', true) as boolean,
 							audioFeedbackEnabled: settingsStore.get('audioFeedbackEnabled', false) as boolean,
 							colorBlindMode: settingsStore.get('colorBlindMode', 'false') as string,

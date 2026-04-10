@@ -9,6 +9,7 @@ import {
 import { InputArea } from '../InputArea';
 import { FilePreview, type FilePreviewHandle } from '../FilePreview';
 import { WizardConversationView, DocumentGenerationView } from '../InlineWizard';
+import { BrowserTabView } from './BrowserTabView';
 import { useUIStore } from '../../stores/uiStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import type {
@@ -16,6 +17,7 @@ import type {
 	Theme,
 	AITab,
 	BatchRunState,
+	BrowserTab,
 	FilePreviewTab,
 	ThinkingItem,
 } from '../../types';
@@ -39,6 +41,8 @@ export interface MainPanelContentProps {
 	filePreviewLoading?: { name: string; path: string } | null;
 	activeFileTabId?: string | null;
 	activeFileTab?: FilePreviewTab | null;
+	activeBrowserTabId?: string | null;
+	activeBrowserTab?: BrowserTab | null;
 	memoizedFilePreviewFile: { name: string; path: string; content: string } | null;
 	filePreviewCwd: string;
 	filePreviewSshRemoteId: string | undefined;
@@ -51,6 +55,7 @@ export interface MainPanelContentProps {
 	handleFilePreviewScrollPositionChange: (scrollTop: number) => void;
 	handleFilePreviewSearchQueryChange: (searchQuery: string) => void;
 	handleFilePreviewReload: () => void;
+	handleBrowserTabUpdate?: (sessionId: string, tabId: string, updates: Partial<BrowserTab>) => void;
 
 	// Terminal mounting props
 	terminalViewRefs: React.MutableRefObject<
@@ -226,6 +231,8 @@ export const MainPanelContent = React.memo(function MainPanelContent(props: Main
 		filePreviewLoading,
 		activeFileTabId,
 		activeFileTab,
+		activeBrowserTabId,
+		activeBrowserTab,
 		memoizedFilePreviewFile,
 		filePreviewCwd,
 		filePreviewSshRemoteId,
@@ -238,6 +245,7 @@ export const MainPanelContent = React.memo(function MainPanelContent(props: Main
 		handleFilePreviewScrollPositionChange,
 		handleFilePreviewSearchQueryChange,
 		handleFilePreviewReload,
+		handleBrowserTabUpdate,
 		terminalViewRefs,
 		mountedTerminalSessionIds,
 		mountedTerminalSessionsRef,
@@ -365,7 +373,6 @@ export const MainPanelContent = React.memo(function MainPanelContent(props: Main
 	const fontSize = useSettingsStore((s) => s.fontSize);
 	const enterToSendAI = useSettingsStore((s) => s.enterToSendAI);
 	const chatRawTextMode = useSettingsStore((s) => s.chatRawTextMode);
-	const autoScrollAiMode = useSettingsStore((s) => s.autoScrollAiMode);
 	const userMessageAlignment = useSettingsStore((s) => s.userMessageAlignment);
 	const shortcuts = useSettingsStore((s) => s.shortcuts);
 	const maxOutputLines = useSettingsStore((s) => s.maxOutputLines);
@@ -381,8 +388,16 @@ export const MainPanelContent = React.memo(function MainPanelContent(props: Main
 		     file preview, AI output, or terminal is active. */
 		<div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
 			{/* Skip rendering when loading remote file - loading state takes over entire main area */}
-			{activeSession.inputMode === 'ai' &&
-			((filePreviewLoading && !activeFileTabId) || activeFileTab?.isLoading) ? (
+			{activeSession.inputMode === 'ai' && activeBrowserTabId && activeBrowserTab ? (
+				<BrowserTabView
+					tab={activeBrowserTab}
+					theme={theme}
+					onUpdateTab={(tabId, updates) =>
+						handleBrowserTabUpdate?.(activeSession.id, tabId, updates)
+					}
+				/>
+			) : activeSession.inputMode === 'ai' &&
+			  ((filePreviewLoading && !activeFileTabId) || activeFileTab?.isLoading) ? (
 				<div
 					className="flex-1 flex items-center justify-center"
 					style={{ backgroundColor: theme.colors.bgMain }}
@@ -544,7 +559,6 @@ export const MainPanelContent = React.memo(function MainPanelContent(props: Main
 								onFileSaved={
 									refreshFileTree ? () => refreshFileTree?.(activeSession.id) : undefined
 								}
-								autoScrollAiMode={autoScrollAiMode}
 								userMessageAlignment={userMessageAlignment}
 								onOpenInTab={onOpenSavedFileInTab}
 								ghCliAvailable={ghCliAvailable}
@@ -556,6 +570,7 @@ export const MainPanelContent = React.memo(function MainPanelContent(props: Main
 					{/* Input Area (hidden in mobile landscape, during wizard doc generation, and in terminal mode — xterm.js handles its own input) */}
 					{!isMobileLandscape &&
 						!activeTab?.wizardState?.isGeneratingDocs &&
+						!activeBrowserTabId &&
 						activeSession.inputMode !== 'terminal' && (
 							<div data-tour="input-area">
 								<InputArea
@@ -674,10 +689,11 @@ export const MainPanelContent = React.memo(function MainPanelContent(props: Main
 				return (
 					<div
 						key={sessionId}
-						className="absolute inset-0 flex flex-col"
+						className={`absolute inset-0 flex flex-col${isTerminalVisible ? '' : ' terminal-hidden'}`}
 						style={{
 							visibility: isTerminalVisible ? 'visible' : 'hidden',
 							pointerEvents: isTerminalVisible ? 'auto' : 'none',
+							zIndex: isTerminalVisible ? 1 : -1,
 						}}
 					>
 						<TerminalView
