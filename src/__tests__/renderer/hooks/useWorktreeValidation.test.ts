@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useWorktreeValidation } from '../../../renderer/hooks';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // Mock the window.maestro.git object
 const mockGit = {
@@ -22,12 +23,7 @@ const mockGit = {
 // Setup mock before each test
 beforeEach(() => {
 	vi.clearAllMocks();
-
-	// Ensure window.maestro.git is mocked
-	(window as any).maestro = {
-		...(window as any).maestro,
-		git: mockGit,
-	};
+	mockMaestroNamespace('git', mockGit);
 });
 
 afterEach(() => {

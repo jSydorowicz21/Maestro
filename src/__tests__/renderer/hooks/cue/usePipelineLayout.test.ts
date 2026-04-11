@@ -4,6 +4,7 @@ import { usePipelineLayout } from '../../../../renderer/hooks/cue/usePipelineLay
 import type { UsePipelineLayoutParams } from '../../../../renderer/hooks/cue/usePipelineLayout';
 import { graphSessionsToPipelines } from '../../../../renderer/components/CuePipelineEditor/utils/yamlToPipeline';
 import { mergePipelinesWithSavedLayout } from '../../../../renderer/components/CuePipelineEditor/utils/pipelineLayout';
+import { mockMaestroNamespace } from '../../../helpers/mockMaestro';
 
 vi.mock('../../../../renderer/utils/sentry', () => ({
 	captureException: vi.fn(),
@@ -65,12 +66,10 @@ describe('usePipelineLayout', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 		vi.clearAllMocks();
-		(window as any).maestro = {
-			cue: {
-				savePipelineLayout: vi.fn().mockResolvedValue(undefined),
-				loadPipelineLayout: vi.fn().mockResolvedValue(null),
-			},
-		};
+		mockMaestroNamespace('cue', {
+			savePipelineLayout: vi.fn().mockResolvedValue(undefined),
+			loadPipelineLayout: vi.fn().mockResolvedValue(null),
+		});
 		mockGraphSessionsToPipelines.mockReturnValue([]);
 	});
 

@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useAgentConfiguration } from '../../../renderer/hooks/agent/useAgentConfiguration';
 import type { AgentConfig } from '../../../renderer/types';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // Mock window.maestro
 const mockDetect = vi.fn();
@@ -19,18 +20,16 @@ const mockGetModels = vi.fn();
 const mockRefresh = vi.fn();
 const mockGetSshConfigs = vi.fn();
 
-(window as any).maestro = {
-	agents: {
-		detect: mockDetect,
-		getConfig: mockGetConfig,
-		setConfig: mockSetConfig,
-		getModels: mockGetModels,
-		refresh: mockRefresh,
-	},
-	sshRemote: {
-		getConfigs: mockGetSshConfigs,
-	},
-};
+mockMaestroNamespace('agents', {
+	detect: mockDetect,
+	getConfig: mockGetConfig,
+	setConfig: mockSetConfig,
+	getModels: mockGetModels,
+	refresh: mockRefresh,
+});
+mockMaestroNamespace('sshRemote', {
+	getConfigs: mockGetSshConfigs,
+});
 
 function makeAgent(overrides: Partial<AgentConfig> = {}): AgentConfig {
 	return {

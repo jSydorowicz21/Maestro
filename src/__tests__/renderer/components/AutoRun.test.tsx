@@ -11,6 +11,7 @@ import { LayerStackProvider } from '../../../renderer/contexts/LayerStackContext
 import { formatShortcutKeys } from '../../../renderer/utils/shortcutFormatter';
 import type { Theme, BatchRunState, SessionState } from '../../../renderer/types';
 import { useBatchStore } from '../../../renderer/stores/batchStore';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // Helper to seed the Zustand batch store so the component's direct store reads
 // (isErrorPaused, batchError) see the expected state for a given session.
@@ -193,7 +194,9 @@ const setupMaestroMock = () => {
 		},
 	};
 
-	(window as any).maestro = mockMaestro;
+	mockMaestroNamespace('fs', mockMaestro.fs);
+	mockMaestroNamespace('autorun', mockMaestro.autorun);
+	mockMaestroNamespace('settings', mockMaestro.settings);
 	return mockMaestro;
 };
 

@@ -25,6 +25,8 @@ import {
 } from '../../renderer/contexts/InlineWizardContext';
 import { WizardConversationView } from '../../renderer/components/InlineWizard/WizardConversationView';
 import { parseWizardIntent } from '../../renderer/services/wizardIntentParser';
+import type { Theme } from '../../renderer/types';
+import { mockMaestroNamespace } from '../helpers/mockMaestro';
 
 import { createMockTheme } from '../helpers/mockTheme';
 // Mock the maestro API
@@ -47,7 +49,9 @@ const mockMaestro = {
 
 // Setup window.maestro mock before each test
 beforeEach(() => {
-	(window as any).maestro = mockMaestro;
+	mockMaestroNamespace('autorun', mockMaestro.autorun);
+	mockMaestroNamespace('agents', mockMaestro.agents);
+	mockMaestroNamespace('process', mockMaestro.process);
 	vi.clearAllMocks();
 });
 

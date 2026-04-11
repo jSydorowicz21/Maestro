@@ -4,6 +4,7 @@
 
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { getBmadCommands, getBmadMetadata, getBmadCommand } from '../../../renderer/services/bmad';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 const mockBmad = {
 	getPrompts: vi.fn(),
@@ -13,10 +14,7 @@ const mockBmad = {
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	(window as any).maestro = {
-		...(window as any).maestro,
-		bmad: mockBmad,
-	};
+	mockMaestroNamespace('bmad', mockBmad);
 	vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 

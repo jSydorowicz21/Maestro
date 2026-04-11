@@ -9,6 +9,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCue } from '../../../renderer/hooks/useCue';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // Mock Cue API
 const mockGetStatus = vi.fn();
@@ -45,20 +46,17 @@ beforeEach(() => {
 	mockStopAll.mockResolvedValue(undefined);
 	mockOnActivityUpdate.mockReturnValue(mockUnsubscribe);
 
-	(window as any).maestro = {
-		...(window as any).maestro,
-		cue: {
-			getStatus: mockGetStatus,
-			getActiveRuns: mockGetActiveRuns,
-			getActivityLog: mockGetActivityLog,
-			getQueueStatus: mockGetQueueStatus,
-			enable: mockEnable,
-			disable: mockDisable,
-			stopRun: mockStopRun,
-			stopAll: mockStopAll,
-			onActivityUpdate: mockOnActivityUpdate,
-		},
-	};
+	mockMaestroNamespace('cue', {
+		getStatus: mockGetStatus,
+		getActiveRuns: mockGetActiveRuns,
+		getActivityLog: mockGetActivityLog,
+		getQueueStatus: mockGetQueueStatus,
+		enable: mockEnable,
+		disable: mockDisable,
+		stopRun: mockStopRun,
+		stopAll: mockStopAll,
+		onActivityUpdate: mockOnActivityUpdate,
+	});
 });
 
 afterEach(() => {

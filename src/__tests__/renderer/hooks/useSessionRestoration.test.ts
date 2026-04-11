@@ -34,6 +34,7 @@ import { useGroupChatStore } from '../../../renderer/stores/groupChatStore';
 import { gitService } from '../../../renderer/services/git';
 import type { Session } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // Cast to access mock methods
 const mockGitService = gitService as {
@@ -123,19 +124,16 @@ beforeEach(() => {
 	} as any);
 
 	// Setup IPC mocks
-	if (!(window as any).maestro) {
-		(window as any).maestro = {};
-	}
-	(window as any).maestro.sessions = {
+	mockMaestroNamespace('sessions', {
 		getAll: mockGetAll,
 		getActiveSessionId: vi.fn().mockResolvedValue(''),
 		setActiveSessionId: vi.fn(),
-	};
-	(window as any).maestro.groups = { getAll: mockGroupsGetAll };
-	(window as any).maestro.groupChat = { list: mockGroupChatList };
-	(window as any).maestro.agents = {
+	});
+	mockMaestroNamespace('groups', { getAll: mockGroupsGetAll });
+	mockMaestroNamespace('groupChat', { list: mockGroupChatList });
+	mockMaestroNamespace('agents', {
 		get: mockAgentsGet.mockResolvedValue({ id: 'claude-code', name: 'Claude Code' }),
-	};
+	});
 
 	mockGetAll.mockResolvedValue([]);
 	mockGroupsGetAll.mockResolvedValue([]);

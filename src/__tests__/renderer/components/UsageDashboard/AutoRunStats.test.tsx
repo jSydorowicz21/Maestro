@@ -16,6 +16,7 @@ import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import React from 'react';
 import { AutoRunStats } from '../../../../renderer/components/UsageDashboard/AutoRunStats';
 import { THEMES } from '../../../../shared/themes';
+import { mockMaestroNamespace } from '../../../helpers/mockMaestro';
 
 // Test theme
 const theme = THEMES['dracula'];
@@ -153,9 +154,7 @@ const mockStatsApi = {
 
 beforeEach(() => {
 	// Setup mock API
-	(window as any).maestro = {
-		stats: mockStatsApi,
-	};
+	mockMaestroNamespace('stats', mockStatsApi);
 
 	// Reset all mocks
 	vi.clearAllMocks();

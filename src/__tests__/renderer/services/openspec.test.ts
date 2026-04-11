@@ -9,6 +9,7 @@ import {
 	getOpenSpecMetadata,
 	getOpenSpecCommand,
 } from '../../../renderer/services/openspec';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // Mock the window.maestro.openspec object
 const mockOpenspec = {
@@ -20,12 +21,7 @@ const mockOpenspec = {
 // Setup mock before each test
 beforeEach(() => {
 	vi.clearAllMocks();
-
-	// Ensure window.maestro.openspec is mocked
-	(window as any).maestro = {
-		...(window as any).maestro,
-		openspec: mockOpenspec,
-	};
+	mockMaestroNamespace('openspec', mockOpenspec);
 
 	// Mock console.error to prevent noise in test output
 	vi.spyOn(console, 'error').mockImplementation(() => {});

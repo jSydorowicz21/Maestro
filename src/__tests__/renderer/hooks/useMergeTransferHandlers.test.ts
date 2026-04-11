@@ -131,6 +131,7 @@ import {
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import { useMergeSessionWithSessions } from '../../../renderer/hooks/agent/useMergeSession';
 import { useSendToAgentWithSessions } from '../../../renderer/hooks/agent/useSendToAgent';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // ============================================================================
 // Helpers
@@ -204,17 +205,15 @@ beforeEach(() => {
 	(stableDeps.setActiveSessionId as ReturnType<typeof vi.fn>).mockReset();
 
 	// Mock window.maestro APIs
-	(window as any).maestro = {
-		notification: { show: vi.fn() },
-		agents: {
-			get: vi.fn().mockResolvedValue({
-				command: 'claude',
-				args: [],
-				path: '/usr/bin/claude',
-			}),
-		},
-		process: { spawn: vi.fn().mockResolvedValue(undefined) },
-	};
+	mockMaestroNamespace('notification', { show: vi.fn() });
+	mockMaestroNamespace('agents', {
+		get: vi.fn().mockResolvedValue({
+			command: 'claude',
+			args: [],
+			path: '/usr/bin/claude',
+		}),
+	});
+	mockMaestroNamespace('process', { spawn: vi.fn().mockResolvedValue(undefined) });
 });
 
 afterEach(() => {

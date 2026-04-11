@@ -12,6 +12,7 @@ import type { ProcessQueuedItemDeps } from '../../../renderer/stores/agentStore'
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import type { Session, AgentConfig, QueuedItem } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // ============================================================================
 // Helpers
@@ -66,20 +67,18 @@ const mockDetect = vi.fn().mockResolvedValue([]);
 const mockGetAgent = vi.fn().mockResolvedValue(null);
 const mockClearError = vi.fn().mockResolvedValue(undefined);
 
-(window as any).maestro = {
-	process: {
-		spawn: mockSpawn,
-		kill: mockKill,
-		interrupt: mockInterrupt,
-	},
-	agents: {
-		detect: mockDetect,
-		get: mockGetAgent,
-	},
-	agentError: {
-		clearError: mockClearError,
-	},
-};
+mockMaestroNamespace('process', {
+	spawn: mockSpawn,
+	kill: mockKill,
+	interrupt: mockInterrupt,
+});
+mockMaestroNamespace('agents', {
+	detect: mockDetect,
+	get: mockGetAgent,
+});
+mockMaestroNamespace('agentError', {
+	clearError: mockClearError,
+});
 
 // Mock gitService
 vi.mock('../../../renderer/services/git', () => ({

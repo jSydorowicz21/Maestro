@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // Mock window.maestro
 const mockShowFile = vi.fn();
@@ -11,16 +12,12 @@ const mockReadFile = vi.fn();
 
 beforeEach(() => {
 	vi.clearAllMocks();
-
-	// Reset maestro mocks
-	(window as any).maestro = {
-		git: {
-			showFile: mockShowFile,
-		},
-		fs: {
-			readFile: mockReadFile,
-		},
-	};
+	mockMaestroNamespace('git', {
+		showFile: mockShowFile,
+	});
+	mockMaestroNamespace('fs', {
+		readFile: mockReadFile,
+	});
 });
 
 // Import after mocks are set up

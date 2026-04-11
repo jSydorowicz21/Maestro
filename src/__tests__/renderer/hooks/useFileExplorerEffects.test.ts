@@ -22,6 +22,7 @@ import type { Session } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
 import type { FileNode } from '../../../renderer/types/fileTree';
 import type { UseFileExplorerEffectsDeps } from '../../../renderer/hooks/git/useFileExplorerEffects';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // --- Mocks ---
 
@@ -94,19 +95,16 @@ beforeEach(() => {
 	});
 
 	// Setup window.maestro
-	(window as any).maestro = {
-		...(window as any).maestro,
-		shell: { openExternal: vi.fn(), openPath: vi.fn() },
-		fs: {
-			readFile: vi.fn().mockResolvedValue('file content'),
-			stat: vi.fn().mockResolvedValue({ modifiedAt: '2024-01-01T00:00:00Z' }),
-		},
-		settings: {
-			get: vi.fn().mockResolvedValue(undefined),
-			set: vi.fn().mockResolvedValue(undefined),
-			getAll: vi.fn().mockResolvedValue({}),
-		},
-	};
+	mockMaestroNamespace('shell', { openExternal: vi.fn(), openPath: vi.fn() });
+	mockMaestroNamespace('fs', {
+		readFile: vi.fn().mockResolvedValue('file content'),
+		stat: vi.fn().mockResolvedValue({ modifiedAt: '2024-01-01T00:00:00Z' }),
+	});
+	mockMaestroNamespace('settings', {
+		get: vi.fn().mockResolvedValue(undefined),
+		set: vi.fn().mockResolvedValue(undefined),
+		getAll: vi.fn().mockResolvedValue({}),
+	});
 });
 
 // ============================================================================

@@ -18,6 +18,7 @@ import { WizardExitConfirmModal } from '../../../../renderer/components/Wizard/W
 import { LayerStackProvider } from '../../../../renderer/contexts/LayerStackContext';
 import type { Theme, AgentConfig } from '../../../../renderer/types';
 import { formatShortcutKeys } from '../../../../renderer/utils/shortcutFormatter';
+import { mockMaestroNamespace } from '../../../helpers/mockMaestro';
 
 import { mockTheme } from '../../../helpers/mockTheme';
 // Mock lucide-react icons
@@ -210,7 +211,15 @@ function WizardOpener({ theme }: { theme: Theme }) {
 describe('Wizard Keyboard Navigation', () => {
 	beforeEach(() => {
 		// Setup window.maestro mock
-		(window as any).maestro = mockMaestro;
+		mockMaestroNamespace('agents', mockMaestro.agents);
+		mockMaestroNamespace('git', mockMaestro.git);
+		mockMaestroNamespace('dialog', mockMaestro.dialog);
+		mockMaestroNamespace('settings', mockMaestro.settings);
+		mockMaestroNamespace('autorun', mockMaestro.autorun);
+		mockMaestroNamespace('fs', mockMaestro.fs);
+		mockMaestroNamespace('shell', mockMaestro.shell);
+		mockMaestroNamespace('sshRemote', mockMaestro.sshRemote);
+		mockMaestroNamespace('sessions', mockMaestro.sessions);
 
 		// Setup default mock responses
 		mockMaestro.agents.detect.mockResolvedValue(mockAgents);

@@ -25,6 +25,7 @@ import { createMockSession as baseCreateMockSession } from '../../helpers/mockSe
 import { useAutoRunDocumentLoader } from '../../../renderer/hooks/batch/useAutoRunDocumentLoader';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import { useBatchStore } from '../../../renderer/stores/batchStore';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // ============================================================================
 // Helpers
@@ -93,15 +94,13 @@ beforeEach(() => {
 	mockUnwatchFolder.mockResolvedValue(undefined);
 
 	// Setup window.maestro
-	(window as any).maestro = {
-		autorun: {
-			listDocs: mockListDocs,
-			readDoc: mockReadDoc,
-			watchFolder: mockWatchFolder,
-			onFileChanged: mockOnFileChanged,
-			unwatchFolder: mockUnwatchFolder,
-		},
-	};
+	mockMaestroNamespace('autorun', {
+		listDocs: mockListDocs,
+		readDoc: mockReadDoc,
+		watchFolder: mockWatchFolder,
+		onFileChanged: mockOnFileChanged,
+		unwatchFolder: mockUnwatchFolder,
+	});
 });
 
 afterEach(() => {

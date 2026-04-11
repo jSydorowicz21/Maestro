@@ -59,6 +59,7 @@ import { notifyToast } from '../../../renderer/stores/notificationStore';
 import { gitService } from '../../../renderer/services/git';
 import { validateNewSession } from '../../../renderer/utils/sessionValidation';
 import type { Session } from '../../../renderer/types';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // ============================================================================
 // Window mock
@@ -85,7 +86,12 @@ const mockMaestro = {
 	},
 };
 
-(window as any).maestro = mockMaestro;
+mockMaestroNamespace('agents', mockMaestro.agents);
+mockMaestroNamespace('stats', mockMaestro.stats);
+mockMaestroNamespace('process', mockMaestro.process);
+mockMaestroNamespace('playbooks', mockMaestro.playbooks);
+mockMaestroNamespace('claude', mockMaestro.claude);
+mockMaestroNamespace('agentSessions', mockMaestro.agentSessions);
 
 // ============================================================================
 // Helpers

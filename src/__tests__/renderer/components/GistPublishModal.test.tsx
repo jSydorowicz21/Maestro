@@ -17,6 +17,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { GistPublishModal } from '../../../renderer/components/GistPublishModal';
 import { LayerStackProvider } from '../../../renderer/contexts/LayerStackContext';
 import type { Theme } from '../../../renderer/types';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // Mock lucide-react
 vi.mock('lucide-react', () => ({
@@ -33,14 +34,12 @@ const mockOpenExternal = vi.fn();
 const mockClipboardWriteText = vi.fn();
 
 beforeEach(() => {
-	(window as any).maestro = {
-		git: {
-			createGist: mockCreateGist,
-		},
-		shell: {
-			openExternal: mockOpenExternal,
-		},
-	};
+	mockMaestroNamespace('git', {
+		createGist: mockCreateGist,
+	});
+	mockMaestroNamespace('shell', {
+		openExternal: mockOpenExternal,
+	});
 	// Mock navigator.clipboard
 	Object.assign(navigator, {
 		clipboard: {

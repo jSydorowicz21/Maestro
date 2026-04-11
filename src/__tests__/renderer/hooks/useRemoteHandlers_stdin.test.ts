@@ -68,6 +68,7 @@ import {
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import { useSettingsStore } from '../../../renderer/stores/settingsStore';
 import { useUIStore } from '../../../renderer/stores/uiStore';
+import { mockMaestroNamespace, setMaestroPlatform } from '../../helpers/mockMaestro';
 
 // ============================================================================
 // Helpers
@@ -143,22 +144,20 @@ beforeEach(() => {
 	} as any);
 
 	// Mock window.maestro APIs with platform set to win32 for stdin tests
-	(window as any).maestro = {
-		platform: 'win32',
-		process: {
-			spawn: vi.fn().mockResolvedValue(undefined),
-			runCommand: vi.fn().mockResolvedValue(undefined),
-		},
-		agents: {
-			get: vi.fn().mockResolvedValue({
-				id: 'claude-code',
-				command: 'claude',
-				path: '/usr/local/bin/claude',
-				args: [],
-				capabilities: { supportsStreamJsonInput: true },
-			}),
-		},
-	};
+	setMaestroPlatform('win32');
+	mockMaestroNamespace('process', {
+		spawn: vi.fn().mockResolvedValue(undefined),
+		runCommand: vi.fn().mockResolvedValue(undefined),
+	});
+	mockMaestroNamespace('agents', {
+		get: vi.fn().mockResolvedValue({
+			id: 'claude-code',
+			command: 'claude',
+			path: '/usr/local/bin/claude',
+			args: [],
+			capabilities: { supportsStreamJsonInput: true },
+		}),
+	});
 
 	// Spy on addEventListener/removeEventListener for event listener extraction
 	vi.spyOn(window, 'addEventListener');
@@ -168,9 +167,7 @@ beforeEach(() => {
 afterEach(() => {
 	cleanup();
 	// Restore platform to default
-	if ((window as any).maestro) {
-		(window as any).maestro.platform = 'darwin';
-	}
+	setMaestroPlatform('darwin');
 });
 
 // ============================================================================

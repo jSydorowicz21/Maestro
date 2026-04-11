@@ -2,16 +2,15 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useContextWindow } from '../../../renderer/hooks/mainPanel/useContextWindow';
 import type { Session } from '../../../renderer/types';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 const mockGetConfig = vi.fn();
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	(window as any).maestro = {
-		agents: {
-			getConfig: mockGetConfig,
-		},
-	};
+	mockMaestroNamespace('agents', {
+		getConfig: mockGetConfig,
+	});
 });
 
 function makeSession(overrides: Partial<Session> = {}): Session {

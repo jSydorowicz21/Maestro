@@ -62,6 +62,7 @@ import {
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import { useSettingsStore } from '../../../renderer/stores/settingsStore';
 import { useUIStore } from '../../../renderer/stores/uiStore';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // ============================================================================
 // Helpers
@@ -128,19 +129,17 @@ beforeEach(() => {
 	} as any);
 
 	// Mock window.maestro APIs
-	(window as any).maestro = {
-		process: {
-			spawn: vi.fn().mockResolvedValue(undefined),
-			runCommand: vi.fn().mockResolvedValue(undefined),
-		},
-		agents: {
-			get: vi.fn().mockResolvedValue({
-				command: 'claude',
-				path: '/usr/local/bin/claude',
-				args: [],
-			}),
-		},
-	};
+	mockMaestroNamespace('process', {
+		spawn: vi.fn().mockResolvedValue(undefined),
+		runCommand: vi.fn().mockResolvedValue(undefined),
+	});
+	mockMaestroNamespace('agents', {
+		get: vi.fn().mockResolvedValue({
+			command: 'claude',
+			path: '/usr/local/bin/claude',
+			args: [],
+		}),
+	});
 
 	// Spy on addEventListener/removeEventListener for event listener tests
 	vi.spyOn(window, 'addEventListener');

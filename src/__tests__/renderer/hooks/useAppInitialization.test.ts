@@ -8,6 +8,7 @@
 
 import { renderHook, act } from '@testing-library/react';
 import { useAppInitialization } from '../../../renderer/hooks/ui/useAppInitialization';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // ============================================================================
 // Mock stores
@@ -153,18 +154,19 @@ const mockGetInitializationResult = vi.fn();
 const mockClearInitializationResult = vi.fn();
 
 beforeAll(() => {
-	(window as any).maestro = {
-		git: { checkGhCli: mockCheckGhCli },
-		power: { getStatus: mockGetStatus },
-		settings: { get: mockSettingsGet, set: mockSettingsSet },
-		updates: { setAllowPrerelease: mockSetAllowPrerelease, check: mockUpdatesCheck },
-		leaderboard: { sync: mockLeaderboardSync },
-		sshRemote: { getConfigs: mockGetSshConfigs },
-		stats: {
-			getInitializationResult: mockGetInitializationResult,
-			clearInitializationResult: mockClearInitializationResult,
-		},
-	};
+	mockMaestroNamespace('git', { checkGhCli: mockCheckGhCli });
+	mockMaestroNamespace('power', { getStatus: mockGetStatus });
+	mockMaestroNamespace('settings', { get: mockSettingsGet, set: mockSettingsSet });
+	mockMaestroNamespace('updates', {
+		setAllowPrerelease: mockSetAllowPrerelease,
+		check: mockUpdatesCheck,
+	});
+	mockMaestroNamespace('leaderboard', { sync: mockLeaderboardSync });
+	mockMaestroNamespace('sshRemote', { getConfigs: mockGetSshConfigs });
+	mockMaestroNamespace('stats', {
+		getInitializationResult: mockGetInitializationResult,
+		clearInitializationResult: mockClearInitializationResult,
+	});
 	(window as any).__hideSplash = vi.fn();
 	(window as any).__updateSplash = vi.fn();
 });

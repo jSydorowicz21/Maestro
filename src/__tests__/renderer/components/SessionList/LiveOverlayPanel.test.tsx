@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { LiveOverlayPanel } from '../../../../renderer/components/SessionList/LiveOverlayPanel';
 import type { Theme } from '../../../../renderer/types';
+import { mockMaestroNamespace } from '../../../helpers/mockMaestro';
 
 import { mockTheme } from '../../../helpers/mockTheme';
 // ---------------------------------------------------------------------------
@@ -17,14 +18,12 @@ vi.mock('../../../../renderer/utils/clipboard', () => ({
 }));
 
 // Mock window.maestro
-(window as any).maestro = {
-	shell: {
-		openExternal: vi.fn(),
-	},
-	tunnel: {
-		getStatus: vi.fn().mockResolvedValue({ isRunning: false, url: null, error: null }),
-	},
-};
+mockMaestroNamespace('shell', {
+	openExternal: vi.fn(),
+});
+mockMaestroNamespace('tunnel', {
+	getStatus: vi.fn().mockResolvedValue({ isRunning: false, url: null, error: null }),
+});
 
 
 // ---------------------------------------------------------------------------

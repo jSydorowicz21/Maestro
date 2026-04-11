@@ -79,6 +79,7 @@ import { gitService } from '../../../renderer/services/git';
 import { validateNewSession } from '../../../renderer/utils/sessionValidation';
 import type { SymphonyContributionData } from '../../../renderer/components/SymphonyModal';
 import type { RegisteredRepository, SymphonyIssue } from '../../../shared/symphony-types';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // ============================================================================
 // Window mock
@@ -99,7 +100,9 @@ const mockMaestro = {
 	},
 };
 
-(window as any).maestro = mockMaestro;
+mockMaestroNamespace('agents', mockMaestro.agents);
+mockMaestroNamespace('symphony', mockMaestro.symphony);
+mockMaestroNamespace('stats', mockMaestro.stats);
 
 // ============================================================================
 // Test data factories

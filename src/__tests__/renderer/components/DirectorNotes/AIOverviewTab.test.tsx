@@ -5,6 +5,8 @@ import {
 	AIOverviewTab,
 	_resetCacheForTesting,
 } from '../../../../renderer/components/DirectorNotes/AIOverviewTab';
+import type { Theme } from '../../../../renderer/types';
+import { mockMaestroNamespace } from '../../../helpers/mockMaestro';
 
 import { mockTheme } from '../../../helpers/mockTheme';
 // Mock useSettings hook
@@ -56,12 +58,10 @@ beforeEach(() => {
 	// Reset module-level synopsis cache so each test starts fresh
 	_resetCacheForTesting();
 
-	(window as any).maestro = {
-		directorNotes: {
-			generateSynopsis: mockGenerateSynopsis,
-			onSynopsisProgress: () => () => {},
-		},
-	};
+	mockMaestroNamespace('directorNotes', {
+		generateSynopsis: mockGenerateSynopsis,
+		onSynopsisProgress: () => () => {},
+	});
 
 	mockGenerateSynopsis.mockResolvedValue({
 		success: true,

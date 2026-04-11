@@ -14,6 +14,7 @@ import React, { useState, useCallback } from 'react';
 import { SessionList } from '../../renderer/components/SessionList';
 import { AutoRun, AutoRunHandle } from '../../renderer/components/AutoRun';
 import { LayerStackProvider } from '../../renderer/contexts/LayerStackContext';
+import { mockMaestroNamespace } from '../helpers/mockMaestro';
 import type {
 	Session,
 	Group,
@@ -201,7 +202,9 @@ const setupMaestroMock = () => {
 		},
 	};
 
-	(window as any).maestro = mockMaestro;
+	mockMaestroNamespace('fs', mockMaestro.fs);
+	mockMaestroNamespace('autorun', mockMaestro.autorun);
+	mockMaestroNamespace('settings', mockMaestro.settings);
 	return mockMaestro;
 };
 

@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { UnifiedHistoryTab } from '../../../../renderer/components/DirectorNotes/UnifiedHistoryTab';
 
 import { useSettingsStore } from '../../../../renderer/stores/settingsStore';
+import { mockMaestroNamespace } from '../../../helpers/mockMaestro';
 
 import { mockTheme } from '../../../helpers/mockTheme';
 // Mock useSettings hook (mutable so individual tests can override)
@@ -213,15 +214,13 @@ const createPaginatedResponse = (entries: any[], hasMore = false, total?: number
 
 beforeEach(() => {
 	mockDirNotesSettings.defaultLookbackDays = 7;
-	(window as any).maestro = {
-		directorNotes: {
-			getUnifiedHistory: mockGetUnifiedHistory,
-			onHistoryEntryAdded: vi.fn().mockReturnValue(() => {}),
-		},
-		history: {
-			update: mockHistoryUpdate,
-		},
-	};
+	mockMaestroNamespace('directorNotes', {
+		getUnifiedHistory: mockGetUnifiedHistory,
+		onHistoryEntryAdded: vi.fn().mockReturnValue(() => {}),
+	});
+	mockMaestroNamespace('history', {
+		update: mockHistoryUpdate,
+	});
 	mockHistoryUpdate.mockResolvedValue(true);
 	mockGetUnifiedHistory.mockResolvedValue(createPaginatedResponse(createMockEntries()));
 

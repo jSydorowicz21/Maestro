@@ -86,6 +86,7 @@ import { validateNewSession } from '../../../renderer/utils/sessionValidation';
 import { parseSynopsis } from '../../../shared/synopsis';
 import type { Session, AITab } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // ============================================================================
 // Test Helpers
@@ -248,19 +249,17 @@ const createMatchingInlineWizardTabState = (wizardState: any) => ({
 });
 
 const setupMaestroMocks = () => {
-	(window as any).maestro = {
-		claude: {
-			getCommands: vi.fn().mockResolvedValue([]),
-			getSkills: vi.fn().mockResolvedValue([]),
-		},
-		agents: {
-			discoverSlashCommands: vi.fn().mockResolvedValue([]),
-			get: vi.fn().mockResolvedValue({ id: 'claude-code', name: 'Claude Code' }),
-		},
-		stats: {
-			recordSessionCreated: vi.fn(),
-		},
-	};
+	mockMaestroNamespace('claude', {
+		getCommands: vi.fn().mockResolvedValue([]),
+		getSkills: vi.fn().mockResolvedValue([]),
+	});
+	mockMaestroNamespace('agents', {
+		discoverSlashCommands: vi.fn().mockResolvedValue([]),
+		get: vi.fn().mockResolvedValue({ id: 'claude-code', name: 'Claude Code' }),
+	});
+	mockMaestroNamespace('stats', {
+		recordSessionCreated: vi.fn(),
+	});
 };
 
 // ============================================================================

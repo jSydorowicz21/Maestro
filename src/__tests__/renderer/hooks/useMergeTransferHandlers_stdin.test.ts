@@ -103,6 +103,7 @@ import {
 	type UseMergeTransferHandlersDeps,
 } from '../../../renderer/hooks/agent/useMergeTransferHandlers';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
+import { mockMaestroNamespace, setMaestroPlatform } from '../../helpers/mockMaestro';
 
 // ============================================================================
 // Helpers
@@ -179,30 +180,26 @@ beforeEach(() => {
 	(stableDeps.setActiveSessionId as ReturnType<typeof vi.fn>).mockReset();
 
 	// Mock window.maestro APIs with platform set to win32 for stdin tests
-	(window as any).maestro = {
-		platform: 'win32',
-		notification: { show: vi.fn() },
-		agents: {
-			get: vi.fn().mockResolvedValue({
-				id: 'claude-code',
-				command: 'claude',
-				args: [],
-				path: '/usr/bin/claude',
-				capabilities: { supportsStreamJsonInput: true },
-			}),
-		},
-		process: {
-			spawn: vi.fn().mockResolvedValue(undefined),
-		},
-	};
+	setMaestroPlatform('win32');
+	mockMaestroNamespace('notification', { show: vi.fn() });
+	mockMaestroNamespace('agents', {
+		get: vi.fn().mockResolvedValue({
+			id: 'claude-code',
+			command: 'claude',
+			args: [],
+			path: '/usr/bin/claude',
+			capabilities: { supportsStreamJsonInput: true },
+		}),
+	});
+	mockMaestroNamespace('process', {
+		spawn: vi.fn().mockResolvedValue(undefined),
+	});
 });
 
 afterEach(() => {
 	cleanup();
 	// Restore platform to default
-	if ((window as any).maestro) {
-		(window as any).maestro.platform = 'darwin';
-	}
+	setMaestroPlatform('darwin');
 });
 
 // ============================================================================

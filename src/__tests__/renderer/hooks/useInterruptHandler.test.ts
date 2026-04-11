@@ -36,6 +36,7 @@ import { useInterruptHandler } from '../../../renderer/hooks/agent/useInterruptH
 import type { UseInterruptHandlerDeps } from '../../../renderer/hooks/agent/useInterruptHandler';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import type { Session, AITab } from '../../../renderer/types';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // ============================================================================
 // Window mock
@@ -48,7 +49,7 @@ const mockMaestro = {
 	},
 };
 
-(window as any).maestro = mockMaestro;
+mockMaestroNamespace('process', mockMaestro.process);
 
 // Mock confirm for force-kill dialog
 const originalConfirm = window.confirm;

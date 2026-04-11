@@ -17,6 +17,8 @@ import { LayerStackProvider } from '../../renderer/contexts/LayerStackContext';
 import { imageCache, useAutoRunImageHandling } from '../../renderer/hooks/useAutoRunImageHandling';
 import { useAutoRunUndo } from '../../renderer/hooks/useAutoRunUndo';
 import type { BatchRunState, SessionState } from '../../renderer/types';
+import type { Theme, BatchRunState, SessionState } from '../../renderer/types';
+import { mockMaestroNamespace } from '../helpers/mockMaestro';
 
 import { createMockTheme } from '../helpers/mockTheme';
 // Helper to render with LayerStackProvider (required by AutoRunSearchBar)
@@ -148,7 +150,9 @@ const setupMaestroMock = () => {
 		},
 	};
 
-	(window as any).maestro = mockMaestro;
+	mockMaestroNamespace('fs', mockMaestro.fs);
+	mockMaestroNamespace('autorun', mockMaestro.autorun);
+	mockMaestroNamespace('settings', mockMaestro.settings);
 	return mockMaestro;
 };
 

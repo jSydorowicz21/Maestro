@@ -5,6 +5,7 @@
 
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { gitService } from '../../../renderer/services/git';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // Mock the window.maestro.git object
 const mockGit = {
@@ -21,12 +22,7 @@ const mockGit = {
 // Setup mock before each test
 beforeEach(() => {
 	vi.clearAllMocks();
-
-	// Ensure window.maestro.git is mocked
-	(window as any).maestro = {
-		...(window as any).maestro,
-		git: mockGit,
-	};
+	mockMaestroNamespace('git', mockGit);
 
 	// Mock console.error to prevent noise in test output
 	vi.spyOn(console, 'error').mockImplementation(() => {});

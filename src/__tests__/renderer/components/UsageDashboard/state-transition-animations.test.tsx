@@ -17,6 +17,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import '@testing-library/jest-dom';
 import { UsageDashboardModal } from '../../../../renderer/components/UsageDashboard/UsageDashboardModal';
 import { SummaryCards } from '../../../../renderer/components/UsageDashboard/SummaryCards';
+import { mockMaestroNamespace } from '../../../helpers/mockMaestro';
 
 import { mockTheme } from '../../../helpers/mockTheme';
 // Mock lucide-react icons
@@ -135,11 +136,9 @@ const mockFs = {
 };
 
 beforeEach(() => {
-	(window as any).maestro = {
-		stats: mockStats,
-		dialog: mockDialog,
-		fs: mockFs,
-	};
+	mockMaestroNamespace('stats', mockStats);
+	mockMaestroNamespace('dialog', mockDialog);
+	mockMaestroNamespace('fs', mockFs);
 
 	// Reset mocks with default data
 	mockStats.getAggregation.mockResolvedValue({

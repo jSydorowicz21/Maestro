@@ -11,6 +11,7 @@ import type {
 	PipelineNode,
 	PipelineEdge,
 } from '../../../../shared/cue-pipeline-types';
+import { mockMaestroNamespace } from '../../../helpers/mockMaestro';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -57,14 +58,12 @@ const mockGetGraphData = vi.fn().mockResolvedValue([]);
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	(window as any).maestro = {
-		cue: {
-			getSettings: mockGetSettings,
-			writeYaml: mockWriteYaml,
-			refreshSession: mockRefreshSession,
-			getGraphData: mockGetGraphData,
-		},
-	};
+	mockMaestroNamespace('cue', {
+		getSettings: mockGetSettings,
+		writeYaml: mockWriteYaml,
+		refreshSession: mockRefreshSession,
+		getGraphData: mockGetGraphData,
+	});
 	vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 

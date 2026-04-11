@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { FileExplorerPanel } from '../../../renderer/components/FileExplorerPanel';
 import type { Session, Theme } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
+import { mockMaestroNamespace, setMaestroPlatform } from '../../helpers/mockMaestro';
 
 import { mockTheme } from '../../helpers/mockTheme';
 // Mock lucide-react
@@ -1756,7 +1757,8 @@ describe('FileExplorerPanel', () => {
 			const mockFs = {
 				countItems: vi.fn().mockResolvedValue({ fileCount: 0, folderCount: 0 }),
 			};
-			(window as any).maestro = { platform: 'darwin', fs: mockFs };
+			setMaestroPlatform('darwin');
+			mockMaestroNamespace('fs', mockFs);
 
 			const { container } = render(<FileExplorerPanel {...defaultProps} />);
 			const fileItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
@@ -1818,7 +1820,8 @@ describe('FileExplorerPanel', () => {
 
 		it('calls shell.showItemInFolder with full path when Reveal in Finder is clicked', () => {
 			const mockShell = { showItemInFolder: vi.fn().mockResolvedValue(undefined) };
-			(window as any).maestro = { platform: 'darwin', shell: mockShell };
+			setMaestroPlatform('darwin');
+			mockMaestroNamespace('shell', mockShell);
 
 			const { container } = render(<FileExplorerPanel {...defaultProps} />);
 			const fileItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
@@ -1834,7 +1837,8 @@ describe('FileExplorerPanel', () => {
 
 		it('calls shell.showItemInFolder with folder path when Reveal in Finder is clicked on folder', () => {
 			const mockShell = { showItemInFolder: vi.fn().mockResolvedValue(undefined) };
-			(window as any).maestro = { platform: 'darwin', shell: mockShell };
+			setMaestroPlatform('darwin');
+			mockMaestroNamespace('shell', mockShell);
 
 			const { container } = render(<FileExplorerPanel {...defaultProps} />);
 			const folderItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
@@ -1850,7 +1854,8 @@ describe('FileExplorerPanel', () => {
 
 		it('calls shell.openPath with full file path when Open in Default App is clicked', () => {
 			const mockShell = { openPath: vi.fn().mockResolvedValue(undefined) };
-			(window as any).maestro = { platform: 'darwin', shell: mockShell };
+			setMaestroPlatform('darwin');
+			mockMaestroNamespace('shell', mockShell);
 
 			const { container } = render(<FileExplorerPanel {...defaultProps} />);
 			const fileItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
@@ -1895,7 +1900,8 @@ describe('FileExplorerPanel', () => {
 			const mockFs = {
 				countItems: vi.fn().mockResolvedValue({ fileCount: 5, folderCount: 2 }),
 			};
-			(window as any).maestro = { platform: 'darwin', fs: mockFs };
+			setMaestroPlatform('darwin');
+			mockMaestroNamespace('fs', mockFs);
 
 			const { container } = render(<FileExplorerPanel {...defaultProps} />);
 			const folderItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
@@ -1918,7 +1924,8 @@ describe('FileExplorerPanel', () => {
 			const mockFs = {
 				countItems: vi.fn().mockResolvedValue({ fileCount: 0, folderCount: 0 }),
 			};
-			(window as any).maestro = { platform: 'darwin', fs: mockFs };
+			setMaestroPlatform('darwin');
+			mockMaestroNamespace('fs', mockFs);
 
 			const { container } = render(<FileExplorerPanel {...defaultProps} />);
 			const fileItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>

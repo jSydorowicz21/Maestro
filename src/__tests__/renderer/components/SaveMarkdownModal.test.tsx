@@ -16,6 +16,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SaveMarkdownModal } from '../../../renderer/components/SaveMarkdownModal';
 import type { Theme } from '../../../renderer/types';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // Mock createPortal to render inline for testing
 vi.mock('react-dom', async () => {
@@ -44,14 +45,12 @@ const mockSelectFolder = vi.fn();
 const mockWriteFile = vi.fn();
 
 beforeEach(() => {
-	(window as any).maestro = {
-		dialog: {
-			selectFolder: mockSelectFolder,
-		},
-		fs: {
-			writeFile: mockWriteFile,
-		},
-	};
+	mockMaestroNamespace('dialog', {
+		selectFolder: mockSelectFolder,
+	});
+	mockMaestroNamespace('fs', {
+		writeFile: mockWriteFile,
+	});
 });
 
 afterEach(() => {

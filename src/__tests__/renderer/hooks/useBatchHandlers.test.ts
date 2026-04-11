@@ -60,6 +60,7 @@ import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import { useSettingsStore } from '../../../renderer/stores/settingsStore';
 import { useBatchStore } from '../../../renderer/stores/batchStore';
 import { useModalStore } from '../../../renderer/stores/modalStore';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // ============================================================================
 // Helpers
@@ -164,23 +165,20 @@ beforeEach(() => {
 	});
 
 	// Ensure window.maestro.app is available for quit confirmation
-	(window as any).maestro = {
-		...((window as any).maestro || {}),
-		app: {
-			onQuitConfirmationRequest: vi.fn().mockReturnValue(vi.fn()),
-			confirmQuit: vi.fn(),
-			cancelQuit: vi.fn(),
-		},
-		history: {
-			add: vi.fn().mockResolvedValue(undefined),
-		},
-		leaderboard: {
-			submit: vi.fn().mockResolvedValue({ success: false }),
-		},
-		process: {
-			getActiveProcesses: vi.fn().mockResolvedValue([]),
-		},
-	};
+	mockMaestroNamespace('app', {
+		onQuitConfirmationRequest: vi.fn().mockReturnValue(vi.fn()),
+		confirmQuit: vi.fn(),
+		cancelQuit: vi.fn(),
+	});
+	mockMaestroNamespace('history', {
+		add: vi.fn().mockResolvedValue(undefined),
+	});
+	mockMaestroNamespace('leaderboard', {
+		submit: vi.fn().mockResolvedValue({ success: false }),
+	});
+	mockMaestroNamespace('process', {
+		getActiveProcesses: vi.fn().mockResolvedValue([]),
+	});
 });
 
 afterEach(() => {

@@ -19,6 +19,7 @@ import { useModalStore } from '../../../renderer/stores/modalStore';
 import { useGroupChatStore } from '../../../renderer/stores/groupChatStore';
 import type { Session, AITab, AgentError } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // ============================================================================
 // Helpers
@@ -195,27 +196,24 @@ beforeEach(() => {
 	});
 	useModalStore.getState().closeAll();
 
-	// Mock window.maestro
-	(window as any).maestro = {
-		...((window as any).maestro || {}),
-		process: mockProcess,
-		agentError: {
-			clearError: vi.fn().mockResolvedValue(undefined),
-		},
-		agentSessions: {
-			registerSessionOrigin: vi.fn().mockResolvedValue(undefined),
-		},
-		stats: {
-			recordQuery: vi.fn().mockResolvedValue(undefined),
-		},
-		logger: {
-			log: vi.fn(),
-		},
-		agents: {
-			detect: vi.fn().mockResolvedValue([]),
-			get: vi.fn().mockResolvedValue(null),
-		},
-	};
+	// Mock window.maestro namespaces
+	mockMaestroNamespace('process', mockProcess as unknown as Record<string, unknown>);
+	mockMaestroNamespace('agentError', {
+		clearError: vi.fn().mockResolvedValue(undefined),
+	});
+	mockMaestroNamespace('agentSessions', {
+		registerSessionOrigin: vi.fn().mockResolvedValue(undefined),
+	});
+	mockMaestroNamespace('stats', {
+		recordQuery: vi.fn().mockResolvedValue(undefined),
+	});
+	mockMaestroNamespace('logger', {
+		log: vi.fn(),
+	});
+	mockMaestroNamespace('agents', {
+		detect: vi.fn().mockResolvedValue([]),
+		get: vi.fn().mockResolvedValue(null),
+	});
 });
 
 afterEach(() => {

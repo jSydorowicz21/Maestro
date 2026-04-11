@@ -25,6 +25,8 @@ import { MaestroWizard } from '../../../../renderer/components/Wizard/MaestroWiz
 import { WizardResumeModal } from '../../../../renderer/components/Wizard/WizardResumeModal';
 import { LayerStackProvider } from '../../../../renderer/contexts/LayerStackContext';
 import type { AgentConfig } from '../../../../renderer/types';
+import type { Theme, AgentConfig } from '../../../../renderer/types';
+import { mockMaestroNamespace } from '../../../helpers/mockMaestro';
 
 import { mockTheme } from '../../../helpers/mockTheme';
 // Mock lucide-react icons
@@ -274,7 +276,14 @@ const renderWithProviders = (ui: React.ReactElement) => {
 describe('Wizard Integration Tests', () => {
 	beforeEach(() => {
 		// Setup window.maestro mock
-		(window as any).maestro = mockMaestro;
+		mockMaestroNamespace('agents', mockMaestro.agents);
+		mockMaestroNamespace('git', mockMaestro.git);
+		mockMaestroNamespace('dialog', mockMaestro.dialog);
+		mockMaestroNamespace('settings', mockMaestro.settings);
+		mockMaestroNamespace('autorun', mockMaestro.autorun);
+		mockMaestroNamespace('fs', mockMaestro.fs);
+		mockMaestroNamespace('process', mockMaestro.process);
+		mockMaestroNamespace('sshRemote', mockMaestro.sshRemote);
 
 		// Setup default mock responses
 		mockMaestro.agents.detect.mockResolvedValue(mockAgents);

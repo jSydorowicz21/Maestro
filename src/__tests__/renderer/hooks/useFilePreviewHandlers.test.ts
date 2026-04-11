@@ -2,14 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useFilePreviewHandlers } from '../../../renderer/hooks/mainPanel/useFilePreviewHandlers';
 import type { Session, FilePreviewTab } from '../../../renderer/types';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 const mockWriteFile = vi.fn().mockResolvedValue(undefined);
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	(window as any).maestro = {
-		fs: { writeFile: mockWriteFile },
-	};
+	mockMaestroNamespace('fs', { writeFile: mockWriteFile });
 });
 
 function makeSession(overrides: Partial<Session> = {}): Session {

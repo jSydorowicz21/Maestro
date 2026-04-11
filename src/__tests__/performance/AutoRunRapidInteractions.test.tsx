@@ -15,6 +15,8 @@ import { AutoRun, AutoRunHandle } from '../../renderer/components/AutoRun';
 import { AutoRunDocumentSelector } from '../../renderer/components/AutoRunDocumentSelector';
 import { LayerStackProvider } from '../../renderer/contexts/LayerStackContext';
 import type { BatchRunState, SessionState } from '../../renderer/types';
+import type { Theme, BatchRunState, SessionState } from '../../renderer/types';
+import { mockMaestroNamespace } from '../helpers/mockMaestro';
 
 import { createMockTheme } from '../helpers/mockTheme';
 // Helper to wrap component in LayerStackProvider with custom rerender
@@ -215,7 +217,9 @@ const setupMaestroMock = () => {
 		},
 	};
 
-	(window as any).maestro = mockMaestro;
+	mockMaestroNamespace('fs', mockMaestro.fs);
+	mockMaestroNamespace('autorun', mockMaestro.autorun);
+	mockMaestroNamespace('settings', mockMaestro.settings);
 	return mockMaestro;
 };
 

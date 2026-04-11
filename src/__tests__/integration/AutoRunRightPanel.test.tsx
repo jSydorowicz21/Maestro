@@ -17,6 +17,7 @@ import type { Session, Theme, Shortcut, BatchRunState, RightPanelTab } from '../
 import { createMockSession as baseCreateMockSession } from '../helpers/mockSession';
 import type { Session, Shortcut, BatchRunState, RightPanelTab } from '../../renderer/types';
 import { LayerStackProvider } from '../../renderer/contexts/LayerStackContext';
+import { mockMaestroNamespace } from '../helpers/mockMaestro';
 
 import { createMockTheme } from '../helpers/mockTheme';
 // Mock external dependencies
@@ -147,7 +148,9 @@ const setupMaestroMock = () => {
 		},
 	};
 
-	(window as any).maestro = mockMaestro;
+	mockMaestroNamespace('fs', mockMaestro.fs);
+	mockMaestroNamespace('autorun', mockMaestro.autorun);
+	mockMaestroNamespace('settings', mockMaestro.settings);
 	return mockMaestro;
 };
 

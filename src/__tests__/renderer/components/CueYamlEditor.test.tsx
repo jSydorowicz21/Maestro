@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { CueYamlEditor } from '../../../renderer/components/CueYamlEditor';
 import type { Theme } from '../../../renderer/types';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 import { mockTheme } from '../../helpers/mockTheme';
 // Mock the Modal component
@@ -124,30 +125,23 @@ const mockOnExit = vi.fn();
 const mockOnSessionId = vi.fn();
 const mockOnAgentError = vi.fn();
 
-const existingWindowMaestro = (window as any).maestro;
-
 beforeEach(() => {
 	vi.clearAllMocks();
 	mockCueModalOpen = false;
 
-	(window as any).maestro = {
-		...existingWindowMaestro,
-		cue: {
-			...existingWindowMaestro?.cue,
-			readYaml: mockReadYaml,
-			writeYaml: mockWriteYaml,
-			validateYaml: mockValidateYaml,
-			refreshSession: mockRefreshSession,
-		},
-		process: {
-			...existingWindowMaestro?.process,
-			spawn: mockSpawn,
-			onData: mockOnData,
-			onExit: mockOnExit,
-			onSessionId: mockOnSessionId,
-			onAgentError: mockOnAgentError,
-		},
-	};
+	mockMaestroNamespace('cue', {
+		readYaml: mockReadYaml,
+		writeYaml: mockWriteYaml,
+		validateYaml: mockValidateYaml,
+		refreshSession: mockRefreshSession,
+	});
+	mockMaestroNamespace('process', {
+		spawn: mockSpawn,
+		onData: mockOnData,
+		onExit: mockOnExit,
+		onSessionId: mockOnSessionId,
+		onAgentError: mockOnAgentError,
+	});
 
 	// Default: file doesn't exist, YAML is valid
 	mockReadYaml.mockResolvedValue(null);

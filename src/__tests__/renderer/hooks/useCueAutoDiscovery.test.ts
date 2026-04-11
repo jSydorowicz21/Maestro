@@ -10,6 +10,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useCueAutoDiscovery } from '../../../renderer/hooks/useCueAutoDiscovery';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import type { Session, EncoreFeatureFlags } from '../../../renderer/types';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // Mock Cue API
 const mockRefreshSession = vi.fn();
@@ -25,16 +26,12 @@ beforeEach(() => {
 	mockEnable.mockResolvedValue(undefined);
 	mockDisable.mockResolvedValue(undefined);
 
-	(window as any).maestro = {
-		...(window as any).maestro,
-		cue: {
-			...(window as any).maestro?.cue,
-			refreshSession: mockRefreshSession,
-			removeSession: mockRemoveSession,
-			enable: mockEnable,
-			disable: mockDisable,
-		},
-	};
+	mockMaestroNamespace('cue', {
+		refreshSession: mockRefreshSession,
+		removeSession: mockRemoveSession,
+		enable: mockEnable,
+		disable: mockDisable,
+	});
 
 	// Reset session store
 	useSessionStore.setState({ sessionsLoaded: false });

@@ -18,6 +18,7 @@ import { LayerStackProvider } from '../../../../renderer/contexts/LayerStackCont
 import { WizardExitConfirmModal } from '../../../../renderer/components/Wizard/WizardExitConfirmModal';
 import { WizardResumeModal } from '../../../../renderer/components/Wizard/WizardResumeModal';
 import { TourStep } from '../../../../renderer/components/Wizard/tour/TourStep';
+import { mockMaestroNamespace } from '../../../helpers/mockMaestro';
 
 // Mock lucide-react icons
 vi.mock('lucide-react', () => ({
@@ -191,7 +192,14 @@ describe('Wizard Theme Styles', () => {
 		vi.clearAllMocks();
 
 		// Setup window.maestro mock
-		(window as any).maestro = mockMaestro;
+		mockMaestroNamespace('agents', mockMaestro.agents);
+		mockMaestroNamespace('git', mockMaestro.git);
+		mockMaestroNamespace('dialog', mockMaestro.dialog);
+		mockMaestroNamespace('settings', mockMaestro.settings);
+		mockMaestroNamespace('autorun', mockMaestro.autorun);
+		mockMaestroNamespace('fs', mockMaestro.fs);
+		mockMaestroNamespace('sshRemote', mockMaestro.sshRemote);
+		mockMaestroNamespace('sessions', mockMaestro.sessions);
 
 		// Setup default mock responses
 		mockMaestro.agents.detect.mockResolvedValue([

@@ -9,6 +9,7 @@ import React from 'react';
 import { RenameSessionModal } from '../../../renderer/components/RenameSessionModal';
 import { LayerStackProvider } from '../../../renderer/contexts/LayerStackContext';
 import type { Theme, Session } from '../../../renderer/types';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 import { createMockTheme } from '../../helpers/mockTheme';
 // Mock the window.maestro API
@@ -83,15 +84,13 @@ describe('RenameSessionModal', () => {
 		mockSessions = createMockSessions();
 
 		// Setup window.maestro mock
-		(window as unknown as { maestro: Record<string, unknown> }).maestro = {
-			claude: {
-				updateSessionName: vi.fn().mockResolvedValue(undefined),
-			},
-			agentSessions: {
-				setSessionName: vi.fn().mockResolvedValue(undefined),
-				updateSessionName: vi.fn().mockResolvedValue(undefined),
-			},
-		};
+		mockMaestroNamespace('claude', {
+			updateSessionName: vi.fn().mockResolvedValue(undefined),
+		});
+		mockMaestroNamespace('agentSessions', {
+			setSessionName: vi.fn().mockResolvedValue(undefined),
+			updateSessionName: vi.fn().mockResolvedValue(undefined),
+		});
 	});
 
 	afterEach(() => {

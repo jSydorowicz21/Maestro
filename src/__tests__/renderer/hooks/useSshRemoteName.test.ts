@@ -1,16 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useSshRemoteName } from '../../../renderer/hooks/mainPanel/useSshRemoteName';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 const mockGetConfigs = vi.fn();
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	(window as any).maestro = {
-		sshRemote: {
-			getConfigs: mockGetConfigs,
-		},
-	};
+	mockMaestroNamespace('sshRemote', {
+		getConfigs: mockGetConfigs,
+	});
 });
 
 describe('useSshRemoteName', () => {

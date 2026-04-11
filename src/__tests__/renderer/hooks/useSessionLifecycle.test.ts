@@ -25,6 +25,7 @@ import { useModalStore } from '../../../renderer/stores/modalStore';
 import { useUIStore } from '../../../renderer/stores/uiStore';
 import type { Session, AITab } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // ============================================================================
 // Test Helpers
@@ -104,37 +105,35 @@ beforeEach(() => {
 	});
 
 	// Mock window.maestro APIs
-	(window as any).maestro = {
-		process: {
-			kill: vi.fn().mockResolvedValue(undefined),
-		},
-		stats: {
-			recordSessionClosed: vi.fn(),
-		},
-		playbooks: {
-			deleteAll: vi.fn().mockResolvedValue(undefined),
-		},
-		shell: {
-			trashItem: vi.fn().mockResolvedValue(undefined),
-		},
-		logger: {
-			log: vi.fn(),
-		},
-		claude: {
-			updateSessionName: vi.fn().mockResolvedValue(undefined),
-			updateSessionStarred: vi.fn().mockResolvedValue(undefined),
-		},
-		agentSessions: {
-			setSessionName: vi.fn().mockResolvedValue(undefined),
-			setSessionStarred: vi.fn().mockResolvedValue(undefined),
-		},
-		history: {
-			updateSessionName: vi.fn().mockResolvedValue(undefined),
-		},
-		groups: {
-			setAll: vi.fn(),
-		},
-	};
+	mockMaestroNamespace('process', {
+		kill: vi.fn().mockResolvedValue(undefined),
+	});
+	mockMaestroNamespace('stats', {
+		recordSessionClosed: vi.fn(),
+	});
+	mockMaestroNamespace('playbooks', {
+		deleteAll: vi.fn().mockResolvedValue(undefined),
+	});
+	mockMaestroNamespace('shell', {
+		trashItem: vi.fn().mockResolvedValue(undefined),
+	});
+	mockMaestroNamespace('logger', {
+		log: vi.fn(),
+	});
+	mockMaestroNamespace('claude', {
+		updateSessionName: vi.fn().mockResolvedValue(undefined),
+		updateSessionStarred: vi.fn().mockResolvedValue(undefined),
+	});
+	mockMaestroNamespace('agentSessions', {
+		setSessionName: vi.fn().mockResolvedValue(undefined),
+		setSessionStarred: vi.fn().mockResolvedValue(undefined),
+	});
+	mockMaestroNamespace('history', {
+		updateSessionName: vi.fn().mockResolvedValue(undefined),
+	});
+	mockMaestroNamespace('groups', {
+		setAll: vi.fn(),
+	});
 });
 
 afterEach(() => {

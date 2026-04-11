@@ -11,6 +11,7 @@ import {
 	ProcessExitHandler,
 	ProcessSessionIdHandler,
 } from '../../../renderer/services/process';
+import { mockMaestroNamespace } from '../../helpers/mockMaestro';
 
 // Mock the window.maestro.process object
 const mockProcess = {
@@ -27,12 +28,7 @@ const mockProcess = {
 // Setup mock before each test
 beforeEach(() => {
 	vi.clearAllMocks();
-
-	// Ensure window.maestro.process is mocked
-	(window as any).maestro = {
-		...(window as any).maestro,
-		process: mockProcess,
-	};
+	mockMaestroNamespace('process', mockProcess);
 
 	// Mock console.error to prevent noise in test output
 	vi.spyOn(console, 'error').mockImplementation(() => {});
