@@ -8,6 +8,7 @@ import {
 import type { Session, AITab, LogEntry, ToolType } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
 import type { SendToAgentOptions } from '../../../renderer/components/SendToAgentModal';
+import { createMockAITab } from '../../helpers/mockTab';
 import * as contextGroomer from '../../../renderer/services/contextGroomer';
 
 // Mock the context grooming service
@@ -86,18 +87,13 @@ vi.mock('../../../renderer/utils/tabHelpers', () => ({
 
 // Create a mock tab
 function createMockTab(id: string, logs: LogEntry[] = []): AITab {
-	return {
+	return createMockAITab({
 		id,
 		name: `Tab ${id}`,
 		agentSessionId: `session-${id}`,
-		starred: false,
 		logs,
-		inputValue: '',
-		stagedImages: [],
-		createdAt: Date.now(),
-		state: 'idle',
 		saveToHistory: true,
-	};
+	});
 }
 
 // Thin wrapper: positional signature preserved. Pre-populates a tab

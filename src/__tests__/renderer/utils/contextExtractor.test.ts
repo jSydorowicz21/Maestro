@@ -17,6 +17,7 @@ import { createMockSession as baseCreateMockSession } from '../../helpers/mockSe
 // 'session-123', so preserve that default via the shared factory.
 const createMockSession = (overrides: Partial<Session> = {}): Session =>
 	baseCreateMockSession({ id: 'session-123', ...overrides });
+import { createMockAITab } from '../../helpers/mockTab';
 
 // Mock window.maestro for extractStoredSessionContext tests
 const mockAgentSessionsRead = vi.fn();
@@ -30,18 +31,12 @@ vi.stubGlobal('window', {
 
 // Helper to create a mock tab
 function createMockTab(overrides: Partial<AITab> = {}): AITab {
-	return {
+	return createMockAITab({
 		id: 'tab-123',
 		agentSessionId: 'agent-session-456',
 		name: 'Test Tab',
-		starred: false,
-		logs: [],
-		inputValue: '',
-		stagedImages: [],
-		createdAt: Date.now(),
-		state: 'idle',
 		...overrides,
-	};
+	});
 }
 
 // Helper to create a mock log entry

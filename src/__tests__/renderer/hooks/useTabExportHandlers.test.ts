@@ -56,6 +56,7 @@ import {
 import type { Session, AITab, LogEntry, Theme } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
 import type { Session, AITab, LogEntry } from '../../../renderer/types';
+import { createMockAITab } from '../../helpers/mockTab';
 
 import { createMockTheme } from '../../helpers/mockTheme';
 // ============================================================================
@@ -73,21 +74,15 @@ function createLogEntry(overrides: Partial<LogEntry> = {}): LogEntry {
 }
 
 function createMockTab(overrides: Partial<AITab> = {}): AITab {
-	return {
-		id: 'tab-1',
+	return createMockAITab({
 		agentSessionId: 'agent-session-abc123',
 		name: 'My Tab',
-		starred: false,
 		logs: [
 			createLogEntry({ source: 'user', text: 'Hello' }),
 			createLogEntry({ source: 'ai', text: 'World' }),
 		],
-		inputValue: '',
-		stagedImages: [],
-		createdAt: Date.now(),
-		state: 'idle',
 		...overrides,
-	} as AITab;
+	});
 }
 
 // Thin wrapper: pre-populates an AI tab so tab export handlers have a tab

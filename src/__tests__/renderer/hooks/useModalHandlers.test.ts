@@ -29,6 +29,7 @@ import { useAgentErrorRecovery } from '../../../renderer/hooks/agent/useAgentErr
 import { gitService } from '../../../renderer/services/git';
 import type { Session, AITab } from '../../../renderer/types';
 import { createMockSession } from '../../helpers/mockSession';
+import { createMockAITab as createBaseMockAITab } from '../../helpers/mockTab';
 
 // ============================================================================
 // Helpers
@@ -44,20 +45,11 @@ const createTerminalOutputRef = () => ({
 
 
 function createMockAITab(overrides: Partial<AITab> = {}): AITab {
-	return {
-		id: overrides.id ?? 'tab-1',
-		agentSessionId: overrides.agentSessionId ?? null,
-		name: overrides.name ?? null,
-		starred: false,
-		logs: [],
-		inputValue: '',
-		stagedImages: [],
-		createdAt: Date.now(),
-		state: 'idle',
+	return createBaseMockAITab({
 		hasUnread: false,
 		isAtBottom: true,
 		...overrides,
-	} as AITab;
+	});
 }
 
 // ============================================================================

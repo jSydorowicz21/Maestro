@@ -26,6 +26,7 @@ import { useUIStore } from '../../../renderer/stores/uiStore';
 import type { Session, AITab } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
 import { mockMaestroNamespace } from '../../helpers/mockMaestro';
+import { createMockAITab } from '../../helpers/mockTab';
 
 // ============================================================================
 // Test Helpers

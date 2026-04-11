@@ -20,25 +20,18 @@ import { useGroupChatStore } from '../../../renderer/stores/groupChatStore';
 import type { Session, AITab, AgentError } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
 import { mockMaestroNamespace } from '../../helpers/mockMaestro';
+import { createMockAITab } from '../../helpers/mockTab';
 
 // ============================================================================
 // Helpers
 // ============================================================================
 
 function createMockTab(overrides: Partial<AITab> = {}): AITab {
-	return {
-		id: 'tab-1',
-		agentSessionId: null,
-		name: null,
-		starred: false,
-		logs: [],
-		inputValue: '',
-		stagedImages: [],
+	return createMockAITab({
 		createdAt: 1700000000000,
-		state: 'idle' as const,
 		saveToHistory: true,
 		...overrides,
-	};
+	});
 }
 
 // Thin wrapper: pre-populates a base AI tab so agent listeners have a

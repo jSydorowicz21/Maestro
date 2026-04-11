@@ -87,25 +87,21 @@ import { parseSynopsis } from '../../../shared/synopsis';
 import type { Session, AITab } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
 import { mockMaestroNamespace } from '../../helpers/mockMaestro';
+import { createMockAITab } from '../../helpers/mockTab';
 
 // ============================================================================
 // Test Helpers
 // ============================================================================
 
-const createMockTab = (overrides: Partial<AITab> = {}): AITab => ({
-	id: 'tab-1',
-	agentSessionId: 'agent-session-1',
-	name: 'Tab 1',
-	starred: false,
-	logs: [],
-	inputValue: '',
-	stagedImages: [],
-	createdAt: Date.now() - 60000,
-	state: 'idle',
-	saveToHistory: true,
-	showThinking: 'off',
-	...overrides,
-});
+const createMockTab = (overrides: Partial<AITab> = {}): AITab =>
+	createMockAITab({
+		agentSessionId: 'agent-session-1',
+		name: 'Tab 1',
+		createdAt: Date.now() - 60000,
+		saveToHistory: true,
+		showThinking: 'off',
+		...overrides,
+	});
 
 // Thin wrapper: pre-populates an AI tab so wizard handlers have a tab
 // target.

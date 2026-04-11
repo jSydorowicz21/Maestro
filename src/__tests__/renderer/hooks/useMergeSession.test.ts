@@ -8,6 +8,7 @@ import {
 } from '../../../renderer/hooks';
 import type { Session, AITab, LogEntry, ToolType } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
+import { createMockAITab } from '../../helpers/mockTab';
 import type { MergeOptions } from '../../../renderer/components/MergeSessionModal';
 import * as contextGroomer from '../../../renderer/services/contextGroomer';
 
@@ -83,20 +84,15 @@ vi.mock('../../../renderer/utils/tabHelpers', () => ({
 	getActiveTab: vi.fn((session) => session.aiTabs?.[0] || null),
 }));
 
-// Create a mock tab with logs
+// Create a mock tab with logs (positional signature thin wrapper over shared factory)
 function createMockTab(id: string, logs: LogEntry[] = [], name?: string): AITab {
-	return {
+	return createMockAITab({
 		id,
 		name: name || `Tab ${id}`,
 		agentSessionId: `session-${id}`,
-		starred: false,
 		logs,
-		inputValue: '',
-		stagedImages: [],
-		createdAt: Date.now(),
-		state: 'idle',
 		saveToHistory: true,
-	};
+	});
 }
 
 // Thin wrapper: positional signature is preserved for test readability.

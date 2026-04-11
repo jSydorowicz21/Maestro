@@ -26,21 +26,15 @@ import type {
 	QueuedItem,
 } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
+import { createMockAITab } from '../../helpers/mockTab';
 
 // Create a mock AITab
-const createMockTab = (overrides: Partial<AITab> = {}): AITab => ({
-	id: 'tab-1',
-	agentSessionId: null,
-	name: null,
-	starred: false,
-	logs: [],
-	inputValue: '',
-	stagedImages: [],
-	createdAt: 1700000000000,
-	state: 'idle',
-	saveToHistory: true,
-	...overrides,
-});
+const createMockTab = (overrides: Partial<AITab> = {}): AITab =>
+	createMockAITab({
+		createdAt: 1700000000000,
+		saveToHistory: true,
+		...overrides,
+	});
 
 // Thin wrapper: pre-populates an AI tab so input processing has a tab
 // to route messages to.

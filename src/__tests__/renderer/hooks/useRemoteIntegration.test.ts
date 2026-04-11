@@ -3,20 +3,14 @@ import { renderHook, act } from '@testing-library/react';
 import { useRemoteIntegration } from '../../../renderer/hooks';
 import type { Session, AITab } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
+import { createMockAITab } from '../../helpers/mockTab';
 
-const createMockTab = (overrides: Partial<AITab> = {}): AITab => ({
-	id: 'tab-1',
-	agentSessionId: null,
-	name: null,
-	starred: false,
-	logs: [],
-	inputValue: '',
-	stagedImages: [],
-	createdAt: 1700000000000,
-	state: 'idle',
-	saveToHistory: true,
-	...overrides,
-});
+const createMockTab = (overrides: Partial<AITab> = {}): AITab =>
+	createMockAITab({
+		createdAt: 1700000000000,
+		saveToHistory: true,
+		...overrides,
+	});
 
 // Thin wrapper: pre-populates an AI tab so remote integration handlers
 // have a tab to dispatch events to.

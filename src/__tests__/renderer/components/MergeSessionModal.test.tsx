@@ -26,6 +26,7 @@ import { MergeSessionModal } from '../../../renderer/components/MergeSessionModa
 import { LayerStackProvider } from '../../../renderer/contexts/LayerStackContext';
 import type { Theme, Session, AITab, ToolType } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
+import { createMockAITab } from '../../helpers/mockTab';
 
 // Create a test theme
 const testTheme: Theme = {
@@ -49,19 +50,14 @@ const testTheme: Theme = {
 	},
 };
 
-// Create a mock tab
+// Create a mock tab (positional signature thin wrapper over shared factory)
 function createMockTab(id: string, logs: any[] = [], name?: string): AITab {
-	return {
+	return createMockAITab({
 		id,
 		name: name || `Tab ${id}`,
 		agentSessionId: `session-${id}`,
-		starred: false,
 		logs,
-		inputValue: '',
-		stagedImages: [],
-		createdAt: Date.now(),
-		state: 'idle',
-	};
+	});
 }
 
 // Thin wrapper: pre-populates an AI tab with chat logs so merging has

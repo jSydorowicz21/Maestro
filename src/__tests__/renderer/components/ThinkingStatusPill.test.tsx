@@ -17,24 +17,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ThinkingStatusPill } from '../../../renderer/components/ThinkingStatusPill';
 import type { Session, Theme, BatchRunState, AITab, ThinkingItem } from '../../../renderer/types';
 import { createMockSession } from '../../helpers/mockSession';
+import { createMockAITab as createBaseMockAITab } from '../../helpers/mockTab';
 
 import { mockTheme } from '../../helpers/mockTheme';
 // Mock theme for tests
 
-// Helper to create a mock AITab
+// Helper to create a mock AITab with component-specific defaults (non-null name).
 function createMockAITab(overrides: Partial<AITab> = {}): AITab {
-	return {
-		id: 'tab-1',
+	return createBaseMockAITab({
 		name: 'Tab 1',
-		state: 'idle',
-		agentSessionId: null,
-		starred: false,
-		logs: [],
-		inputValue: '',
-		stagedImages: [],
-		createdAt: Date.now(),
 		...overrides,
-	};
+	});
 }
 
 // Helper to create a busy/thinking session
