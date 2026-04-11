@@ -10,27 +10,8 @@ vi.mock('marked', () => ({
 import { generateTabExportHtml } from '../../../renderer/utils/tabExport';
 import type { AITab, LogEntry, Theme } from '../../../renderer/types';
 
+import { mockTheme } from '../../helpers/mockTheme';
 // Mock theme for testing
-const mockTheme: Theme = {
-	id: 'dracula',
-	name: 'Dracula',
-	mode: 'dark',
-	colors: {
-		bgMain: '#282a36',
-		bgSidebar: '#21222c',
-		bgActivity: '#1e1f29',
-		border: '#44475a',
-		textMain: '#f8f8f2',
-		textDim: '#6272a4',
-		accent: '#bd93f9',
-		accentDim: 'rgba(189, 147, 249, 0.1)',
-		accentText: '#bd93f9',
-		accentForeground: '#282a36',
-		success: '#50fa7b',
-		warning: '#f1fa8c',
-		error: '#ff5555',
-	},
-};
 
 const mockSession = {
 	name: 'My Session',

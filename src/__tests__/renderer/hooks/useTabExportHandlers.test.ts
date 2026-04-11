@@ -55,7 +55,9 @@ import {
 } from '../../../renderer/hooks/tabs/useTabExportHandlers';
 import type { Session, AITab, LogEntry, Theme } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
+import type { Session, AITab, LogEntry } from '../../../renderer/types';
 
+import { createMockTheme } from '../../helpers/mockTheme';
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -97,25 +99,6 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 		unifiedTabOrder: [{ type: 'ai' as const, id: 'tab-1' }],
 		...overrides,
 	});
-}
-
-function createMockTheme(): Theme {
-	return {
-		id: 'dark',
-		name: 'Dark',
-		mode: 'dark',
-		colors: {
-			background: '#1e1e1e',
-			surface: '#252526',
-			text: '#d4d4d4',
-			primary: '#007acc',
-			secondary: '#3c3c3c',
-			border: '#454545',
-			error: '#f44747',
-			success: '#4ec9b0',
-			warning: '#dcdcaa',
-		},
-	} as unknown as Theme;
 }
 
 function createDeps(overrides: Partial<UseTabExportHandlersDeps> = {}): UseTabExportHandlersDeps {

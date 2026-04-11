@@ -10,6 +10,7 @@ import { PlaybookDeleteConfirmModal } from '../../../renderer/components/Playboo
 import { LayerStackProvider } from '../../../renderer/contexts/LayerStackContext';
 import type { Theme } from '../../../renderer/types';
 
+import { createMockTheme } from '../../helpers/mockTheme';
 // Mock lucide-react
 vi.mock('lucide-react', () => ({
 	X: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
@@ -24,26 +25,6 @@ vi.mock('lucide-react', () => ({
 }));
 
 // Create a mock theme for testing
-const createMockTheme = (): Theme => ({
-	id: 'test-theme',
-	name: 'Test Theme',
-	mode: 'dark',
-	colors: {
-		bgMain: '#1a1a1a',
-		bgPanel: '#252525',
-		bgSidebar: '#202020',
-		bgActivity: '#2d2d2d',
-		textMain: '#ffffff',
-		textDim: '#888888',
-		accent: '#0066ff',
-		accentForeground: '#ffffff',
-		border: '#333333',
-		highlight: '#0066ff33',
-		success: '#00aa00',
-		warning: '#ffaa00',
-		error: '#ff0000',
-	},
-});
 
 // Wrapper component to provide LayerStackContext
 const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (

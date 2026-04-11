@@ -23,6 +23,8 @@ import type {
 	SessionState,
 } from '../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../helpers/mockSession';
+import { createMockTheme } from '../helpers/mockTheme';
+import type { Session, Group, Shortcut, BatchRunState, SessionState } from '../../renderer/types';
 
 // Helper to wrap component in LayerStackProvider with custom rerender
 const renderWithProviders = (ui: React.ReactElement) => {
@@ -175,26 +177,6 @@ vi.mock('qrcode.react', () => ({
 }));
 
 // Create a mock theme for testing
-const createMockTheme = (): Theme => ({
-	id: 'test-theme',
-	name: 'Test Theme',
-	mode: 'dark',
-	colors: {
-		bgMain: '#1a1a1a',
-		bgPanel: '#252525',
-		bgActivity: '#2d2d2d',
-		bgSidebar: '#1e1e1e',
-		textMain: '#ffffff',
-		textDim: '#888888',
-		accent: '#0066ff',
-		accentForeground: '#ffffff',
-		border: '#333333',
-		highlight: '#0066ff33',
-		success: '#00aa00',
-		warning: '#ffaa00',
-		error: '#ff0000',
-	},
-});
 
 // Setup window.maestro mock
 const setupMaestroMock = () => {

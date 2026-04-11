@@ -4,8 +4,10 @@ import React from 'react';
 import { WorktreeRunSection } from '../../../renderer/components/WorktreeRunSection';
 import type { Theme, Session } from '../../../renderer/types';
 import { createMockSession as baseCreateMockSession } from '../../helpers/mockSession';
+import type { Session } from '../../../renderer/types';
 import { gitService } from '../../../renderer/services/git';
 
+import { createMockTheme } from '../../helpers/mockTheme';
 // Mock gitService
 vi.mock('../../../renderer/services/git', () => ({
 	gitService: {

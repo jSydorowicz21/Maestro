@@ -19,6 +19,7 @@ import { LayerStackProvider } from '../../../renderer/contexts/LayerStackContext
 import type { Theme, BatchRunState, SessionState, Shortcut } from '../../../renderer/types';
 import { formatShortcutKeys } from '../../../renderer/utils/shortcutFormatter';
 
+import { createMockTheme } from '../../helpers/mockTheme';
 // Mock createPortal to render in same container
 vi.mock('react-dom', async () => {
 	const actual = await vi.importActual('react-dom');
@@ -127,26 +128,6 @@ vi.mock('../../../renderer/utils/shortcutFormatter', () => ({
 }));
 
 // Create a mock theme for testing
-const createMockTheme = (): Theme => ({
-	id: 'test-theme',
-	name: 'Test Theme',
-	mode: 'dark',
-	colors: {
-		bgMain: '#1a1a1a',
-		bgSidebar: '#252525',
-		bgPanel: '#2d2d2d',
-		bgActivity: '#333333',
-		textMain: '#ffffff',
-		textDim: '#888888',
-		accent: '#0066ff',
-		accentForeground: '#ffffff',
-		border: '#333333',
-		highlight: '#0066ff33',
-		success: '#00aa00',
-		warning: '#ffaa00',
-		error: '#ff0000',
-	},
-});
 
 // Default props for AutoRunExpandedModal
 const createDefaultProps = (
