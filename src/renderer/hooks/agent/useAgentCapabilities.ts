@@ -12,6 +12,41 @@ import { DEFAULT_CAPABILITIES } from '../../../shared/types';
 
 export type { AgentCapabilities };
 export { DEFAULT_CAPABILITIES };
+import type { ToolType, AgentCapabilities } from '../../types';
+
+// Re-export for consumers that import from this module
+export type { AgentCapabilities } from '../../types';
+
+/**
+ * Default capabilities - safe defaults for unknown agents.
+ * All capabilities disabled by default (conservative approach).
+ */
+export const DEFAULT_CAPABILITIES: AgentCapabilities = {
+	supportsResume: false,
+	supportsReadOnlyMode: false,
+	supportsJsonOutput: false,
+	supportsSessionId: false,
+	supportsImageInput: false,
+	supportsImageInputOnResume: false,
+	supportsSlashCommands: false,
+	supportsSessionStorage: false,
+	supportsCostTracking: false,
+	supportsUsageStats: false,
+	supportsBatchMode: false,
+	requiresPromptToStart: false,
+	supportsStreaming: false,
+	supportsResultMessages: false,
+	supportsModelSelection: false,
+	supportsStreamJsonInput: false,
+	supportsThinkingDisplay: false,
+	supportsContextMerge: false,
+	supportsContextExport: false,
+	supportsWizard: false,
+	supportsGroupChatModeration: false,
+	usesJsonLineOutput: false,
+	usesCombinedContextWindow: false,
+	supportsAppendSystemPrompt: false,
+};
 
 /**
  * Return type for useAgentCapabilities hook.
