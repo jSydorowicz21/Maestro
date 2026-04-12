@@ -770,36 +770,7 @@ export interface Session {
 	symphonyMetadata?: SymphonySessionMetadata;
 }
 
-export interface AgentConfigOption {
-	key: string;
-	type: 'checkbox' | 'text' | 'number' | 'select';
-	label: string;
-	description: string;
-	default: any;
-	options?: string[];
-	dynamic?: boolean; // If true, options are fetched at runtime via agents:getConfigOptions IPC
-	argBuilder?: (value: any) => string[];
-}
-
-import type { AgentCapabilities } from '../../shared/types';
-export type { AgentCapabilities };
-
-export interface AgentConfig {
-	id: string;
-	name: string;
-	binaryName?: string;
-	available: boolean;
-	path?: string;
-	customPath?: string; // User-specified custom path (shown in UI even if not available)
-	command?: string;
-	args?: string[];
-	hidden?: boolean; // If true, agent is hidden from UI (internal use only)
-	configOptions?: AgentConfigOption[]; // Agent-specific configuration options
-	yoloModeArgs?: string[]; // Args for YOLO/full-access mode (e.g., ['--dangerously-skip-permissions'])
-	readOnlyCliEnforced?: boolean; // Whether the agent's CLI enforces read-only mode (false = prompt-only enforcement)
-	capabilities?: AgentCapabilities; // Agent capabilities (added at runtime)
-}
-// AgentConfigOption, AgentCapabilities, and AgentConfig are re-exported from shared/types above
+// AgentCapabilities, AgentConfig, and AgentConfigOption are re-exported from shared/types above
 
 // Process spawning configuration
 export interface ProcessConfig {
